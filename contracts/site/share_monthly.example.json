@@ -1,0 +1,25 @@
+{
+  "as_of_month": "MOCK",
+  "generated_at": "2026-10-24T00:00:00Z",
+  "validated": false,
+  "rows": [
+    {
+      "month": "2024-01-01",
+      "mode": "uber",
+      "trips_per_day": 445564.6,
+      "share": 0.5712
+    },
+    {
+      "month": "2024-01-01",
+      "mode": "lyft",
+      "trips_per_day": 156216.4,
+      "share": 0.2003
+    },
+    {
+      "month": "2024-01-01",
+      "mode": "other_hv",
+      "trips_per_day": 1564.2,
+      "share": 0.002
+    }
+  ]
+}

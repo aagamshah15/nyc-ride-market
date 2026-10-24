@@ -1,0 +1,128 @@
+{
+  "as_of_month": "MOCK",
+  "generated_at": "2026-10-24T00:00:00Z",
+  "validated": false,
+  "zone": 230,
+  "name": "Mock zone 230",
+  "borough": "Manhattan",
+  "flags": {
+    "cbd": false,
+    "cbd_borderline": false,
+    "airport": null,
+    "thin": false
+  },
+  "title": "MOCK: ride-hail apps carried 62% of pickups in Mock zone 230",
+  "subtitles": {
+    "share_trend": "MOCK subtitle for share_trend",
+    "hour_heatmap": "MOCK subtitle for hour_heatmap",
+    "waits": "MOCK subtitle for waits",
+    "top_destinations": "MOCK subtitle for top_destinations"
+  },
+  "tiles": {
+    "trips_per_day": 7538.0,
+    "rh_share": 0.62,
+    "wait_p50": 215.0,
+    "wait_p90": 452.0,
+    "top_destination": "Mock zone 29"
+  },
+  "yoy": {
+    "trips_per_day": -0.033,
+    "rh_share": -0.0159,
+    "wait_p50": -0.0252,
+    "wait_p90": -0.0947,
+    "top_destination": null
+  },
+  "share_trend": [
+    {
+      "month": "2024-01-01",
+      "mode": "uber",
+      "share": 0.461
+    },
+    {
+      "month": "2024-01-01",
+      "mode": "lyft",
+      "share": 0.1485
+    },
+    {
+      "month": "2024-01-01",
+      "mode": "yellow",
+      "share": 0.3578
+    }
+  ],
+  "hour_heatmap": [
+    {
+      "hour_of_week": 0,
+      "mode": "uber",
+      "trips": 42.4
+    },
+    {
+      "hour_of_week": 1,
+      "mode": "uber",
+      "trips": 42.8
+    },
+    {
+      "hour_of_week": 2,
+      "mode": "uber",
+      "trips": 44.7
+    }
+  ],
+  "waits": {
+    "monthly": [
+      {
+        "month": "2024-01-01",
+        "mode": "uber",
+        "wait_p50": 203.0,
+        "wait_p90": 469.0
+      },
+      {
+        "month": "2024-01-01",
+        "mode": "lyft",
+        "wait_p50": 206.0,
+        "wait_p90": 447.0
+      },
+      {
+        "month": "2024-02-01",
+        "mode": "uber",
+        "wait_p50": 232.0,
+        "wait_p90": 462.0
+      }
+    ],
+    "by_hour": [
+      {
+        "hour": 0,
+        "mode": "uber",
+        "wait_mean": 205.0
+      },
+      {
+        "hour": 0,
+        "mode": "lyft",
+        "wait_mean": 210.0
+      },
+      {
+        "hour": 1,
+        "mode": "uber",
+        "wait_mean": 227.0
+      }
+    ]
+  },
+  "top_destinations": [
+    {
+      "do_zone": 29,
+      "name": "Mock zone 29",
+      "trips": 15627,
+      "share": 0.0669
+    },
+    {
+      "do_zone": 260,
+      "name": "Mock zone 260",
+      "trips": 15301,
+      "share": 0.0655
+    },
+    {
+      "do_zone": 168,
+      "name": "Mock zone 168",
+      "trips": 15295,
+      "share": 0.0655
+    }
+  ]
+}

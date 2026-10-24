@@ -49,12 +49,12 @@ _Only this lane writes here. Newest first._
 
 | Date | State | Note |
 |---|---|---|
-| | not started | |
+| 2026-10-24 | built, awaiting approval | Built in the integrator space; proposed D15–D18 in `docs/decisions.md` |
 
-**Blocked:** none
+**Blocked:** the user's approval of the site contracts and D15–D18 (L05 and the page lanes wait on it; L07–L09 can start on the parts D15–D18 don't touch)
 
 **Hand-off**
-- Built:
-- Checked:
-- Known limits:
-- Follow-ups:
+- Built: `contracts/README.md` (envelope, page keys, units and precision, mode codes and groups, formatting rules, null rules, `validation_summary.json`, schema pins, field notes); `contracts/metrics.md` (29 metrics, 5 of them L10's, with params, grain and exact output columns); `contracts/site/tiles.yaml` (26 tiles), `contracts/site/pages.yaml` (9 routes, budgets, 10 methods anchors); 13 generated examples in `contracts/site/`; `tests/factories.py` (`CLEAN_TRIPS_SCHEMA`, `AGG_SCHEMAS` for 10 tables, `make_trip` / `clean_trips` / `write_clean`, `agg_row` / `agg_table` / `write_agg`); `tests/contract_check.py`; `tests/test_contracts.py` (41 tests); `scripts/make_mock_site_data.py` (`make site-mock`, `--examples`)
+- Checked: `make test` green (69 passed, 1 skipped); mocks match every example; every route's mock files fit 1.5 MB (largest is `/congestion-pricing`); largest mock zone file 39 KB; examples regenerate identically; `make site-mock && make site-build` works and the mock files were removed afterwards; mocks refuse to overwrite non-MOCK files; a test fails if a tracked file in `site/src/data/` is MOCK
+- Known limits: the checker allows `null` anywhere and can't type-check positions whose example is `null` or an empty list (e.g. `flags.airport`, `not_reported` in the Uber example); the mock geojson is a grid, not real zones; zone-file size needs revisiting for the Phase 6 back-fill
+- Follow-ups: on approval, flip D15–D18 to accepted; L08 should replace the `ref_indicators` percent column type once it sees the real CSV

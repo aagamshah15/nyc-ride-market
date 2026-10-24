@@ -1,0 +1,58 @@
+# Routes → the site/src/data/ files each page loads (SPEC §9.1, §9.2; D13 adds /zones).
+# The budget test sums each route's files; for parameterised routes it checks every value.
+# `methods` is the anchor the page's "How we measured this" note links to.
+
+budget_bytes: 1500000            # per route (SPEC §9.2)
+zone_file_max_bytes: 50000       # each zones/{zone}.json (SPEC §9.2)
+
+methods_anchors:                 # every one must exist on /methods
+  - cleaning
+  - flags
+  - cbd-zones
+  - validation
+  - congestion-method
+  - pay-rise-method
+  - tips
+  - waits
+  - limits
+  - downloads
+
+routes:
+  /:
+    source: index.md
+    files: [home.json, share_monthly.json, events.json, tiles.json]
+    methods: cleaning
+  /companies/{company}:
+    source: companies/[company].md
+    params: {company: [uber, lyft, yellow, green]}
+    files: ["companies/{company}.json", events.json, tiles.json]
+    methods: tips
+  /zones:
+    source: zones/index.md
+    files: [zones/index.json, taxi_zones.geojson, tiles.json]
+    methods: cleaning
+  /zones/{zone}:
+    source: zones/[zone].md
+    params: {zone: "1..263"}
+    files: ["zones/{zone}.json", events.json, tiles.json]
+    methods: waits
+  /airports:
+    source: airports.md
+    files: [airports.json, tiles.json]
+    methods: cleaning
+  /congestion-pricing:
+    source: congestion-pricing.md
+    files: [congestion.json, taxi_zones.geojson, events.json, tiles.json]
+    methods: congestion-method
+  /drivers:
+    source: drivers.md
+    files: [drivers.json, events.json, tiles.json]
+    methods: pay-rise-method
+  /prices:
+    source: prices.md
+    files: [prices.json, taxi_zones.geojson, tiles.json]
+    methods: cleaning
+  /methods:
+    source: methods.md
+    files: [quality.json]
+    methods: null

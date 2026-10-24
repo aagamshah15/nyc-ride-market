@@ -33,7 +33,7 @@ The integrator keeps the Status column current.
 | ID | Lane | Owns (main paths) | Wave | Starts when | Answers | Status |
 |---|---|---|---|---|---|---|
 | [L00](lanes/L00-scaffold.md) | Scaffold | Makefile, stubs, CI, `pipeline/common.py` | 0 | now (after D14) | — | done 23 Oct |
-| [L01](lanes/L01-contracts.md) | Contracts | `contracts/`, `tests/factories.py` | 0 | L00 merged; D7–D10, D13 answered | all | not started |
+| [L01](lanes/L01-contracts.md) | Contracts | `contracts/`, `tests/factories.py` | 0 | L00 merged; D7–D10, D13 answered | all | built 24 Oct; awaiting approval (D15–D18) |
 | [L02](lanes/L02-ingest.md) | Ingest | `pipeline/ingest.py`, `config/sources.yaml` | 1 | L00 merged | — | not started |
 | [L03](lanes/L03-schema.md) | Schema discovery and map | `pipeline/discover.py`, `pipeline/schema_map.py`, `config/schema_map.yaml` | 1 | L02 can fetch a month (or D11 agreed) | — | not started |
 | [L04](lanes/L04-zones.md) | Zones, CBD list, airports, map | `pipeline/zones.py`, `config/cbd_zones.csv`, `config/airports.csv` | 1 | `make ref` works | Q2, Q9 | not started |
@@ -41,8 +41,8 @@ The integrator keeps the Status column current.
 | [L06](lanes/L06-clean.md) | Clean | `pipeline/clean.py`, `sql/clean/` | 2 | L03 map + L04 draft | — | not started |
 | [L07](lanes/L07-aggregate.md) | Aggregate | `pipeline/aggregate.py`, `sql/agg/` | 2 | L01 approved | — | not started |
 | [L08](lanes/L08-validate.md) | Validation gate | `pipeline/validate.py`, `sql/validate/` | 2 | L01 approved | — | not started |
-| [L09](lanes/L09-metrics.md) | Metrics library | `sql/metrics/` (all but two), `pipeline/metrics.py` | 2 | L01 approved | Q1, Q4–Q15 | not started |
-| [L10](lanes/L10-policy-studies.md) | Policy studies | `sql/metrics/cp_effect.sql`, `pay_event.sql`, `pipeline/studies.py` | 3 | L09 runner exists | Q2, Q3, Q6 | not started |
+| [L09](lanes/L09-metrics.md) | Metrics library | `sql/metrics/` (all but L10's), `pipeline/metrics.py` | 2 | L01 approved | Q1, Q4–Q15 | not started |
+| [L10](lanes/L10-policy-studies.md) | Policy studies | `sql/metrics/cp_*.sql`, `pay_event.sql`, `pipeline/studies.py` | 3 | L09 runner exists | Q2, Q3, Q6 | not started |
 | [L11](lanes/L11-publish.md) | Publish and findings | `pipeline/publish.py`, `pipeline/findings.py`, `site/src/data/` | 3 | L09 runner exists | all | not started |
 | [L12](lanes/L12-pages-home-methods.md) | Pages: Home + Methods | `index.md`, `methods.md` | 4 | L05 done | home | not started |
 | [L13](lanes/L13-pages-companies.md) | Pages: Companies | `companies/[company].md` | 4 | L05 done | Q4, Q5, Q11–Q13 | not started |

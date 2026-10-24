@@ -84,3 +84,43 @@ Git repo initialised in the existing project folder. Because the folder name con
 Reason: worktree-based lanes need git; Pages needs a GitHub repo; Make doesn't handle paths with spaces.
 
 Update 23 Oct 2026: the repo was created at the user's request as https://github.com/aagamshah15/nyc-ride-market, first private, then made public by the user the same day. GitHub Pages is on at https://aagamshah15.github.io/nyc-ride-market/ with source "GitHub Actions" (switched from "Deploy from a branch" on 23 Oct). The `github-pages` environment accepts deploys from `main` only, and the default workflow token is read-only, so deploy workflows declare their own `permissions:`.
+
+---
+
+## D15 · `agg_od_month` carries `rider_total_ex_tip` — PROPOSED
+
+24 Oct 2026 · SPEC §5, §12 · L01, L07, L09, L16 · **Status: proposed by L01, awaiting the user's approval**
+
+Add `rider_total_ex_tip` (sum) to `agg_od_month`.
+
+Reason: the airport "fare to Manhattan" needs an origin–destination table, and SPEC §12 says rider-cost comparisons across modes use `rider_total_ex_tip`; `agg_od_month` only had `fare_base`, whose fee coverage differs between ride-hail and cabs.
+
+## D16 · City-wide distribution rows for mode groups — PROPOSED
+
+24 Oct 2026 · SPEC §5 · L01, L07, L09 · **Status: proposed by L01, awaiting the user's approval**
+
+Extends D10: the `pu_zone = 0` rows of `agg_zone_month_dist` also exist for the groups `ride_hail` (uber + lyft + other_hv) and `all`. Group rows exist only at `pu_zone = 0`.
+
+Reason: the prices page tiles ("median fare per mile", "price volatility") are for all modes, and percentiles can't be combined from per-mode rows.
+
+## D17 · Site data shapes beyond SPEC §9.2 — PROPOSED
+
+24 Oct 2026 · SPEC §9.2, §9.3 · L05, L11, L12–L16 · **Status: proposed by L01, awaiting the user's approval**
+
+Pinned in `contracts/` (README §1, examples in `contracts/site/`):
+
+- Every file carries `validated` alongside `as_of_month` and `generated_at`.
+- `share_monthly.json` and `zones/index.json` are objects with a `rows` array (SPEC shows bare arrays, which can't carry the envelope).
+- Two new files: `events.json` (policy dates and labels from `config/periods.yaml`) and `tiles.json` (the tile registry, `contracts/site/tiles.yaml`).
+- Every page file has a generated `title`, a `subtitles` map (one finding per chart) and a `yoy` map matching `tiles`.
+- Zone heatmaps keep modes with at least 10% of the zone's trips, to stay under the 50 KB zone-file cap.
+
+Reason: SPEC requires generated titles and subtitles and no numbers in page markdown, but its file shapes had nowhere to put them.
+
+## D18 · Clean partition files keep `mode` and `month` — PROPOSED
+
+24 Oct 2026 · SPEC §1, §4 · L06, L07 · **Status: proposed by L01, awaiting the user's approval**
+
+Files at `data/clean/mode={mode}/month={YYYY-MM}/part-0.parquet` contain every SPEC §4 column, including `mode` and `month` (DATE). Folder names are layout only; readers use `hive_partitioning = false`.
+
+Reason: DuckDB's `PARTITION_BY` drops partition columns from the files and would name the folder `month=2025-03-01`, not SPEC's `month=2025-03`; pinning the files as self-contained avoids type and naming ambiguity.

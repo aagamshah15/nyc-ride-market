@@ -28,9 +28,9 @@
   - `month` = the file's month, not the pickup month
   - taxi `duration_s` from timestamps; green `airport_fee` = 0; `cbd_fee` coalesced to 0
   - `other_fees`, `rider_total_ex_tip`, `is_card`; Y/N flags to BOOLEAN
-- [ ] Derived columns (§4.1): `wait_s` (NULL when `request_ts` is NULL), `hour_of_week` (Sunday = 0), boroughs, airports, `cbd_pu` / `cbd_do` / `cbd_touch` (for both zone lists if D9 is agreed), `period`
+- [ ] Derived columns (§4.1): `wait_s` (NULL when `request_ts` is NULL), `hour_of_week` (Sunday = 0), boroughs, airports, `cbd_pu` / `cbd_do` / `cbd_touch` for the core list and `cbd_pu_wide` / `cbd_do_wide` / `cbd_touch_wide` for the wide list (D9), `period`. `tests/factories.py` (`CLEAN_TRIPS_SCHEMA`) is the exact output schema
 - [ ] Flags (§4.2), including pickup outside the file's month ± 1 day; `is_valid`
-- [ ] Write `data/clean/mode={mode}/month={YYYY-MM}/part-0.parquet` with DuckDB `COPY … PARTITION_BY`, replacing the month atomically
+- [ ] Write one file per mode to `data/clean/mode={mode}/month={YYYY-MM}/part-0.parquet`, keeping every column including `mode` and `month` (D18: readers use `hive_partitioning = false`, so plain `COPY … TO` per mode rather than `PARTITION_BY`); replace the month atomically
 - [ ] Log rows in, rows out and flag counts per mode
 - [ ] One month in memory at a time; the SQL does the work
 

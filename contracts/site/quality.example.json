@@ -1,0 +1,178 @@
+{
+  "as_of_month": "MOCK",
+  "generated_at": "2026-10-24T00:00:00Z",
+  "validated": false,
+  "quality": [
+    {
+      "month": "2024-01-01",
+      "mode": "uber",
+      "rows": 13812503,
+      "valid_rows": 13545209,
+      "valid_share": 0.9806,
+      "f_time": 89098,
+      "f_miles": 89098,
+      "f_fare": 66823,
+      "f_zone": 53458,
+      "f_wait": 44549
+    },
+    {
+      "month": "2024-01-01",
+      "mode": "lyft",
+      "rows": 4842707,
+      "valid_rows": 4757961,
+      "valid_share": 0.9825,
+      "f_time": 28248,
+      "f_miles": 28248,
+      "f_fare": 21186,
+      "f_zone": 16949,
+      "f_wait": 14124
+    },
+    {
+      "month": "2024-01-01",
+      "mode": "other_hv",
+      "rows": 48489,
+      "valid_rows": 47552,
+      "valid_share": 0.9807,
+      "f_time": 312,
+      "f_miles": 312,
+      "f_fare": 234,
+      "f_zone": 187,
+      "f_wait": 156
+    }
+  ],
+  "validation": {
+    "status": "pass",
+    "checks": [
+      {
+        "id": "tie_out",
+        "status": "pass",
+        "summary": "MOCK summary for tie_out"
+      },
+      {
+        "id": "quality_drift",
+        "status": "pass",
+        "summary": "MOCK summary for quality_drift"
+      },
+      {
+        "id": "cbd_list",
+        "status": "pass",
+        "summary": "MOCK summary for cbd_list"
+      }
+    ],
+    "tie_out": [
+      {
+        "month": "2024-01-01",
+        "license_class": "FHV - High Volume",
+        "pipeline_trips_per_day": 603345.1,
+        "tlc_trips_per_day": 603078.5,
+        "diff": 0.0004,
+        "status": "pass"
+      },
+      {
+        "month": "2024-01-01",
+        "license_class": "Yellow",
+        "pipeline_trips_per_day": 162635.3,
+        "tlc_trips_per_day": 163481.6,
+        "diff": -0.0052,
+        "status": "pass"
+      },
+      {
+        "month": "2024-01-01",
+        "license_class": "Green",
+        "pipeline_trips_per_day": 14019.6,
+        "tlc_trips_per_day": 13959.1,
+        "diff": 0.0043,
+        "status": "pass"
+      }
+    ],
+    "cbd": [
+      {
+        "zone_list": "core",
+        "both_in_fee_share": 0.9903,
+        "neither_in_fee_share": 0.0048,
+        "status": "pass"
+      },
+      {
+        "zone_list": "wide",
+        "both_in_fee_share": 0.9938,
+        "neither_in_fee_share": 0.0042,
+        "status": "pass"
+      }
+    ],
+    "fees": [
+      {
+        "mode": "uber",
+        "configured_fee": 1.5,
+        "exact_share": 0.995,
+        "other_values": [
+          {
+            "cbd_fee": 0.75,
+            "trips": 120
+          }
+        ],
+        "status": "pass"
+      },
+      {
+        "mode": "lyft",
+        "configured_fee": 1.5,
+        "exact_share": 0.9955,
+        "other_values": [
+          {
+            "cbd_fee": 0.75,
+            "trips": 120
+          }
+        ],
+        "status": "pass"
+      },
+      {
+        "mode": "other_hv",
+        "configured_fee": 1.5,
+        "exact_share": 0.9953,
+        "other_values": [
+          {
+            "cbd_fee": 0.75,
+            "trips": 120
+          }
+        ],
+        "status": "pass"
+      }
+    ]
+  },
+  "cbd_zones": [
+    {
+      "zone": 5,
+      "name": "Mock zone 5",
+      "borderline": false,
+      "note": ""
+    },
+    {
+      "zone": 10,
+      "name": "Mock zone 10",
+      "borderline": false,
+      "note": ""
+    },
+    {
+      "zone": 15,
+      "name": "Mock zone 15",
+      "borderline": false,
+      "note": ""
+    }
+  ],
+  "downloads": [
+    {
+      "file": "share_monthly.json",
+      "description": "Monthly trips per day and share by mode",
+      "bytes": 12483
+    },
+    {
+      "file": "zones/index.json",
+      "description": "Zone summary, one row per taxi zone",
+      "bytes": 63284
+    },
+    {
+      "file": "congestion.json",
+      "description": "Congestion-pricing estimates, weekly series and fees",
+      "bytes": 295845
+    }
+  ]
+}

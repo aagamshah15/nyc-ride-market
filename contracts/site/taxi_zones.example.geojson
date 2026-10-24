@@ -1,0 +1,86 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "LocationID": 1,
+        "zone": "EWR Airport",
+        "borough": "EWR"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -74.26,
+              40.92
+            ],
+            [
+              -74.22706,
+              40.92
+            ],
+            [
+              -74.22706,
+              40.89313
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "LocationID": 2,
+        "zone": "Mock zone 2",
+        "borough": "Queens"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -74.22706,
+              40.92
+            ],
+            [
+              -74.19412,
+              40.92
+            ],
+            [
+              -74.19412,
+              40.89313
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "LocationID": 3,
+        "zone": "Mock zone 3",
+        "borough": "Bronx"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -74.19412,
+              40.92
+            ],
+            [
+              -74.16118,
+              40.92
+            ],
+            [
+              -74.16118,
+              40.89313
+            ]
+          ]
+        ]
+      }
+    }
+  ]
+}

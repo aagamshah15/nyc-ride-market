@@ -1,0 +1,47 @@
+{
+  "as_of_month": "MOCK",
+  "generated_at": "2026-10-24T00:00:00Z",
+  "validated": false,
+  "title": "MOCK: ride-hail apps carried 78% of NYC trips in Aug 2026",
+  "subtitles": {
+    "share_trend": "MOCK: Lyft's share has edged up since Jan 2024"
+  },
+  "tiles": {
+    "trips_per_day": 803509.2,
+    "rh_share": 0.7786,
+    "platform_share": 0.2708,
+    "cbd_fees_last_month": 10627132.13
+  },
+  "yoy": {
+    "trips_per_day": 0.0231,
+    "rh_share": 0.0036,
+    "platform_share": -0.0068,
+    "cbd_fees_last_month": 0.0229
+  },
+  "findings": [
+    {
+      "question": "Q1",
+      "text": "MOCK finding for Q1, Aug 2026",
+      "value": 0.2217,
+      "unit": "share",
+      "page": "/zones",
+      "featured": true
+    },
+    {
+      "question": "Q2",
+      "text": "MOCK finding for Q2, Aug 2026",
+      "value": 0.5416,
+      "unit": "share",
+      "page": "/congestion-pricing",
+      "featured": true
+    },
+    {
+      "question": "Q3",
+      "text": "MOCK finding for Q3, Aug 2026",
+      "value": 0.8579,
+      "unit": "share",
+      "page": "/congestion-pricing",
+      "featured": false
+    }
+  ]
+}

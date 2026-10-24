@@ -1,0 +1,120 @@
+{
+  "as_of_month": "MOCK",
+  "generated_at": "2026-10-24T00:00:00Z",
+  "validated": false,
+  "title": "MOCK: drivers kept 74% of ride-hail fares in Aug 2026",
+  "subtitles": {
+    "driver_share_trend": "MOCK subtitle for driver_share_trend",
+    "pay_per_hour_trend": "MOCK subtitle for pay_per_hour_trend",
+    "event_study": "MOCK subtitle for event_study",
+    "hours": "MOCK subtitle for hours"
+  },
+  "tiles": {
+    "pay_per_hour": 37.58,
+    "driver_share": 0.7355,
+    "trips_per_hour_worked": 1.541,
+    "active_drivers": 68215
+  },
+  "yoy": {
+    "pay_per_hour": -0.0195,
+    "driver_share": 0.0101,
+    "trips_per_hour_worked": -0.0178,
+    "active_drivers": -0.0537
+  },
+  "tlc_as_of_month": "2026-07",
+  "driver_share_trend": [
+    {
+      "month": "2024-01-01",
+      "mode": "uber",
+      "driver_share": 0.7139,
+      "platform_share": 0.2861
+    },
+    {
+      "month": "2024-01-01",
+      "mode": "lyft",
+      "driver_share": 0.726,
+      "platform_share": 0.274
+    },
+    {
+      "month": "2024-01-01",
+      "mode": "ride_hail",
+      "driver_share": 0.7117,
+      "platform_share": 0.2883
+    }
+  ],
+  "pay_per_hour_trend": [
+    {
+      "month": "2024-01-01",
+      "mode": "uber",
+      "pay_per_hour": 34.5
+    },
+    {
+      "month": "2024-01-01",
+      "mode": "lyft",
+      "pay_per_hour": 34.87
+    },
+    {
+      "month": "2024-01-01",
+      "mode": "ride_hail",
+      "pay_per_hour": 35.61
+    }
+  ],
+  "event_study": [
+    {
+      "year": 2024,
+      "week_offset": -12,
+      "week_start": "2024-05-06",
+      "mode": "uber",
+      "pay_per_mile": 1.926,
+      "pay_per_min": 0.624,
+      "fare_per_mile": 2.915,
+      "transition": false
+    },
+    {
+      "year": 2024,
+      "week_offset": -12,
+      "week_start": "2024-05-06",
+      "mode": "lyft",
+      "pay_per_mile": 1.959,
+      "pay_per_min": 0.629,
+      "fare_per_mile": 2.862,
+      "transition": false
+    },
+    {
+      "year": 2024,
+      "week_offset": -12,
+      "week_start": "2024-05-06",
+      "mode": "ride_hail",
+      "pay_per_mile": 1.95,
+      "pay_per_min": 0.62,
+      "fare_per_mile": 2.873,
+      "transition": false
+    }
+  ],
+  "hours": [
+    {
+      "month": "2024-01-01",
+      "license_class": "FHV - High Volume",
+      "trips_per_hour_worked": 1.526,
+      "active_drivers": 70230,
+      "vehicles_per_day": 63236,
+      "hours_per_day_per_vehicle": 7.06
+    },
+    {
+      "month": "2024-01-01",
+      "license_class": "Yellow",
+      "trips_per_hour_worked": 1.884,
+      "active_drivers": 9263,
+      "vehicles_per_day": 6783,
+      "hours_per_day_per_vehicle": 9.66
+    },
+    {
+      "month": "2024-01-01",
+      "license_class": "Green",
+      "trips_per_hour_worked": 1.036,
+      "active_drivers": 908,
+      "vehicles_per_day": 692,
+      "hours_per_day_per_vehicle": 6.08
+    }
+  ]
+}

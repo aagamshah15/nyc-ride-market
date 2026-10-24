@@ -1,0 +1,153 @@
+{
+  "as_of_month": "MOCK",
+  "generated_at": "2026-10-24T00:00:00Z",
+  "validated": false,
+  "title": "MOCK: estimated effect of congestion pricing on zone trips, -6.0%",
+  "subtitles": {
+    "effects": "MOCK subtitle for effects",
+    "weekly_effect": "MOCK subtitle for weekly_effect",
+    "weekly_trips": "MOCK subtitle for weekly_trips",
+    "fees": "MOCK subtitle for fees",
+    "zone_change": "MOCK subtitle for zone_change"
+  },
+  "tiles": {
+    "trips_effect": -0.06,
+    "fpm_effect": 0.0232,
+    "fees_to_date": 213045220.26
+  },
+  "yoy": {
+    "trips_effect": null,
+    "fpm_effect": null,
+    "fees_to_date": null
+  },
+  "effects": [
+    {
+      "metric": "trips",
+      "mode": "uber",
+      "zone_list": "core",
+      "median": -0.0584,
+      "p10": -0.0826,
+      "p90": -0.0402,
+      "weeks": 49
+    },
+    {
+      "metric": "fare_per_mile",
+      "mode": "uber",
+      "zone_list": "core",
+      "median": 0.0263,
+      "p10": 0.0079,
+      "p90": 0.0478,
+      "weeks": 49
+    },
+    {
+      "metric": "driver_share",
+      "mode": "uber",
+      "zone_list": "core",
+      "median": -0.0063,
+      "p10": -0.0184,
+      "p90": 0.0133,
+      "weeks": 49
+    }
+  ],
+  "weekly_effect": [
+    {
+      "week_start": "2025-01-06",
+      "iso_week": 2,
+      "metric": "trips",
+      "mode": "uber",
+      "zone_list": "core",
+      "effect": -0.0726,
+      "excluded": false
+    },
+    {
+      "week_start": "2025-01-06",
+      "iso_week": 2,
+      "metric": "fare_per_mile",
+      "mode": "uber",
+      "zone_list": "core",
+      "effect": 0.0154,
+      "excluded": false
+    },
+    {
+      "week_start": "2025-01-06",
+      "iso_week": 2,
+      "metric": "driver_share",
+      "mode": "uber",
+      "zone_list": "core",
+      "effect": 0.0072,
+      "excluded": false
+    }
+  ],
+  "weekly_trips": [
+    {
+      "week_start": "2024-01-01",
+      "iso_year": 2024,
+      "iso_week": 1,
+      "cbd_group": "treated",
+      "mode": "ride_hail",
+      "trips_per_day": 181799.7
+    },
+    {
+      "week_start": "2024-01-01",
+      "iso_year": 2024,
+      "iso_week": 1,
+      "cbd_group": "treated",
+      "mode": "taxi",
+      "trips_per_day": 39498.6
+    },
+    {
+      "week_start": "2024-01-01",
+      "iso_year": 2024,
+      "iso_week": 1,
+      "cbd_group": "treated",
+      "mode": "all",
+      "trips_per_day": 214223.6
+    }
+  ],
+  "fees": [
+    {
+      "month": "2025-01-01",
+      "mode": "uber",
+      "cbd_fee": 5820800.67,
+      "trips_with_cbd_fee": 3880533
+    },
+    {
+      "month": "2025-01-01",
+      "mode": "lyft",
+      "cbd_fee": 2203889.65,
+      "trips_with_cbd_fee": 1469259
+    },
+    {
+      "month": "2025-01-01",
+      "mode": "other_hv",
+      "cbd_fee": 20758.61,
+      "trips_with_cbd_fee": 13839
+    }
+  ],
+  "zone_change": [
+    {
+      "zone": 1,
+      "change": 0.0473
+    },
+    {
+      "zone": 2,
+      "change": 0.0111
+    },
+    {
+      "zone": 3,
+      "change": 0.0186
+    }
+  ],
+  "excluded_weeks": [
+    {
+      "iso_year": 2025,
+      "iso_week": 3,
+      "reason": "MLK Day is in ISO week 3 in 2024 and week 4 in 2025"
+    },
+    {
+      "iso_year": 2025,
+      "iso_week": 4,
+      "reason": "MLK Day is in ISO week 3 in 2024 and week 4 in 2025"
+    }
+  ]
+}

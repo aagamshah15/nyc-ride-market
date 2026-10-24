@@ -1,0 +1,200 @@
+{
+  "as_of_month": "MOCK",
+  "generated_at": "2026-10-24T00:00:00Z",
+  "validated": false,
+  "mode": "uber",
+  "name": "Uber",
+  "title": "MOCK: Uber carried 55% of NYC trips in Aug 2026",
+  "subtitles": {
+    "share_trend": "MOCK subtitle for share_trend",
+    "fpm_dist": "MOCK subtitle for fpm_dist",
+    "tip_rate": "MOCK subtitle for tip_rate",
+    "wav": "MOCK subtitle for wav",
+    "shared": "MOCK subtitle for shared",
+    "compare": "MOCK subtitle for compare",
+    "lyft_vs_uber": "MOCK subtitle for lyft_vs_uber"
+  },
+  "tiles": {
+    "trips_per_day": 443665.0,
+    "share": 0.5522,
+    "fpm_median": 3.275,
+    "driver_share": 0.7305,
+    "tip_rate": 0.07
+  },
+  "yoy": {
+    "trips_per_day": 0.0114,
+    "share": -0.0064,
+    "fpm_median": 0.0537,
+    "driver_share": 0.0159,
+    "tip_rate": -0.0044
+  },
+  "not_reported": [],
+  "share_trend": [
+    {
+      "month": "2024-01-01",
+      "mode": "uber",
+      "share": 0.5712,
+      "trips_per_day": 445564.6
+    },
+    {
+      "month": "2024-01-01",
+      "mode": "lyft",
+      "share": 0.2003,
+      "trips_per_day": 156216.4
+    },
+    {
+      "month": "2024-01-01",
+      "mode": "other_hv",
+      "share": 0.002,
+      "trips_per_day": 1564.2
+    }
+  ],
+  "fpm_dist": [
+    {
+      "month": "2024-01-01",
+      "mode": "uber",
+      "fpm_p10": 1.799,
+      "fpm_p50": 2.901,
+      "fpm_p90": 5.077,
+      "fpmin_p50": 1.102
+    },
+    {
+      "month": "2024-01-01",
+      "mode": "lyft",
+      "fpm_p10": 1.753,
+      "fpm_p50": 2.827,
+      "fpm_p90": 4.947,
+      "fpmin_p50": 1.074
+    },
+    {
+      "month": "2024-01-01",
+      "mode": "yellow",
+      "fpm_p10": 2.116,
+      "fpm_p50": 3.412,
+      "fpm_p90": 5.972,
+      "fpmin_p50": 1.297
+    }
+  ],
+  "tip_rate": [
+    {
+      "month": "2024-01-01",
+      "mode": "uber",
+      "tip_rate": 0.0713,
+      "card_only": false
+    },
+    {
+      "month": "2024-01-01",
+      "mode": "lyft",
+      "tip_rate": 0.0938,
+      "card_only": false
+    },
+    {
+      "month": "2024-01-01",
+      "mode": "yellow",
+      "tip_rate": 0.1721,
+      "card_only": true
+    }
+  ],
+  "wav": [
+    {
+      "month": "2024-01-01",
+      "mode": "uber",
+      "requests": 32400,
+      "matched": 28405,
+      "match_rate": 0.8767
+    },
+    {
+      "month": "2024-01-01",
+      "mode": "lyft",
+      "requests": 28371,
+      "matched": 24696,
+      "match_rate": 0.8705
+    },
+    {
+      "month": "2024-02-01",
+      "mode": "uber",
+      "requests": 31882,
+      "matched": 28300,
+      "match_rate": 0.8876
+    }
+  ],
+  "shared": [
+    {
+      "month": "2024-01-01",
+      "mode": "uber",
+      "requests": 118171,
+      "matched": 46258,
+      "match_rate": 0.3914
+    },
+    {
+      "month": "2024-01-01",
+      "mode": "lyft",
+      "requests": 125584,
+      "matched": 51840,
+      "match_rate": 0.4128
+    },
+    {
+      "month": "2024-02-01",
+      "mode": "uber",
+      "requests": 128229,
+      "matched": 50811,
+      "match_rate": 0.3963
+    }
+  ],
+  "compare": [
+    {
+      "metric": "trips_per_day",
+      "unit": "count",
+      "uber": 443665.0,
+      "lyft": 180334.2,
+      "yellow": 163352.5,
+      "green": 14542.5
+    },
+    {
+      "metric": "share",
+      "unit": "share",
+      "uber": 0.5522,
+      "lyft": 0.2244,
+      "yellow": 0.2033,
+      "green": 0.0181
+    },
+    {
+      "metric": "fpm_median",
+      "unit": "usd_per_mile",
+      "uber": 3.198,
+      "lyft": 3.017,
+      "yellow": 3.719,
+      "green": 3.358
+    }
+  ],
+  "lyft_vs_uber": {
+    "zones_lyft_ahead": 23,
+    "zones_lyft_ahead_prior_year": 19,
+    "by_zone": [
+      {
+        "zone": 1,
+        "name": "EWR Airport",
+        "lyft_share": 0.1379,
+        "uber_share": 0.4166,
+        "gap": -0.2787,
+        "gap_change": 0.0176
+      },
+      {
+        "zone": 2,
+        "name": "Mock zone 2",
+        "lyft_share": 0.2266,
+        "uber_share": 0.5857,
+        "gap": -0.3591,
+        "gap_change": 0.0179
+      },
+      {
+        "zone": 3,
+        "name": "Mock zone 3",
+        "lyft_share": 0.2255,
+        "uber_share": 0.5883,
+        "gap": -0.3628,
+        "gap_change": 0.0079
+      }
+    ]
+  }
+}

@@ -1,0 +1,113 @@
+{
+  "as_of_month": "MOCK",
+  "generated_at": "2026-10-24T00:00:00Z",
+  "validated": false,
+  "title": "MOCK: riders paid a median $3.35 a mile in Aug 2026",
+  "subtitles": {
+    "fpm_by_mode": "MOCK subtitle for fpm_by_mode",
+    "fpm_by_hour": "MOCK subtitle for fpm_by_hour",
+    "fpm_by_borough": "MOCK subtitle for fpm_by_borough",
+    "volatility_by_zone": "MOCK subtitle for volatility_by_zone"
+  },
+  "tiles": {
+    "fpm_median": 3.348,
+    "volatility": 2.573,
+    "cheapest_hour": 27,
+    "dearest_hour": 162
+  },
+  "yoy": {
+    "fpm_median": 0.062,
+    "volatility": -0.0186,
+    "cheapest_hour": null,
+    "dearest_hour": null
+  },
+  "fpm_by_mode": [
+    {
+      "month": "2024-01-01",
+      "mode": "uber",
+      "fpm_p10": 1.793,
+      "fpm_p50": 2.892,
+      "fpm_p90": 5.061,
+      "fpmin_p50": 1.099
+    },
+    {
+      "month": "2024-01-01",
+      "mode": "lyft",
+      "fpm_p10": 1.762,
+      "fpm_p50": 2.841,
+      "fpm_p90": 4.972,
+      "fpmin_p50": 1.08
+    },
+    {
+      "month": "2024-01-01",
+      "mode": "yellow",
+      "fpm_p10": 2.077,
+      "fpm_p50": 3.35,
+      "fpm_p90": 5.862,
+      "fpmin_p50": 1.273
+    }
+  ],
+  "fpm_by_hour": [
+    {
+      "hour_of_week": 0,
+      "mode": "uber",
+      "fare_per_mile": 2.968,
+      "fare_per_min": 1.131
+    },
+    {
+      "hour_of_week": 0,
+      "mode": "lyft",
+      "fare_per_mile": 2.758,
+      "fare_per_min": 1.055
+    },
+    {
+      "hour_of_week": 0,
+      "mode": "yellow",
+      "fare_per_mile": 3.368,
+      "fare_per_min": 1.271
+    }
+  ],
+  "fpm_by_borough": [
+    {
+      "borough": "Manhattan",
+      "mode": "uber",
+      "fare_per_mile": 2.912,
+      "fare_per_min": 1.101
+    },
+    {
+      "borough": "Manhattan",
+      "mode": "lyft",
+      "fare_per_mile": 2.782,
+      "fare_per_min": 1.073
+    },
+    {
+      "borough": "Manhattan",
+      "mode": "yellow",
+      "fare_per_mile": 3.445,
+      "fare_per_min": 1.28
+    }
+  ],
+  "volatility_by_zone": [
+    {
+      "zone": 1,
+      "mode": "uber",
+      "volatility": 3.049,
+      "fpm_p50": 2.947,
+      "n": 120365
+    },
+    {
+      "zone": 1,
+      "mode": "lyft",
+      "volatility": 2.25,
+      "fpm_p50": 2.791,
+      "n": 39838
+    },
+    {
+      "zone": 1,
+      "mode": "yellow",
+      "volatility": 2.6,
+      "fpm_p50": 3.464,
+      "n": 113603
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "as_of_month": "MOCK",
+  "generated_at": "2026-10-24T00:00:00Z",
+  "validated": false,
+  "events": [
+    {
+      "id": "congestion_pricing_start",
+      "date": "2025-01-05",
+      "label": "Congestion pricing starts"
+    },
+    {
+      "id": "driver_pay_rise",
+      "date": "2025-08-01",
+      "label": "Driver minimum pay rises 5%"
+    }
+  ]
+}

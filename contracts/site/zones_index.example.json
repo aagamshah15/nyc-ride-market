@@ -1,0 +1,66 @@
+{
+  "as_of_month": "MOCK",
+  "generated_at": "2026-10-24T00:00:00Z",
+  "validated": false,
+  "title": "MOCK: yellow cabs still lead in 1 zones",
+  "subtitles": {
+    "level_map": "MOCK subtitle for level_map",
+    "change_map": "MOCK subtitle for change_map",
+    "yellow_map": "MOCK subtitle for yellow_map",
+    "table": "MOCK subtitle for table"
+  },
+  "tiles": {
+    "zones_yellow_leads": 1,
+    "zones_lyft_beats_uber": 24,
+    "zones_rh_share_up": 159
+  },
+  "yoy": {
+    "zones_yellow_leads": -3,
+    "zones_lyft_beats_uber": 4,
+    "zones_rh_share_up": null
+  },
+  "rows": [
+    {
+      "zone": 1,
+      "name": "EWR Airport",
+      "borough": "EWR",
+      "trips_per_day": 9319.5,
+      "rh_share": 0.5562,
+      "yellow_share": 0.3932,
+      "wait_p50": 345.0,
+      "share_change_yoy": -0.0086,
+      "yellow_share_change_yoy": -0.0063,
+      "top_mode": "uber",
+      "cbd": false,
+      "thin": false
+    },
+    {
+      "zone": 2,
+      "name": "Mock zone 2",
+      "borough": "Queens",
+      "trips_per_day": 1755.1,
+      "rh_share": 0.8143,
+      "yellow_share": 0.0784,
+      "wait_p50": 344.0,
+      "share_change_yoy": 0.0357,
+      "yellow_share_change_yoy": -0.0368,
+      "top_mode": "uber",
+      "cbd": false,
+      "thin": false
+    },
+    {
+      "zone": 3,
+      "name": "Mock zone 3",
+      "borough": "Bronx",
+      "trips_per_day": 1863.9,
+      "rh_share": 0.8157,
+      "yellow_share": 0.0718,
+      "wait_p50": 297.0,
+      "share_change_yoy": 0.0286,
+      "yellow_share_change_yoy": -0.0302,
+      "top_mode": "uber",
+      "cbd": false,
+      "thin": false
+    }
+  ]
+}

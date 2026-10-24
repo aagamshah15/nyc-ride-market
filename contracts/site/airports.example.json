@@ -1,0 +1,116 @@
+{
+  "as_of_month": "MOCK",
+  "generated_at": "2026-10-24T00:00:00Z",
+  "validated": false,
+  "title": "MOCK: yellow cabs carried 41% of airport trips in Aug 2026",
+  "subtitles": {
+    "split": "MOCK subtitle for split",
+    "share_trend": "MOCK subtitle for share_trend",
+    "by_hour": "MOCK subtitle for by_hour",
+    "fares": "MOCK subtitle for fares"
+  },
+  "tiles": {
+    "trips_per_day": 48999.8,
+    "yellow_share": 0.41,
+    "fare_to_manhattan_mean": 76.89,
+    "busiest_hour": 15
+  },
+  "yoy": {
+    "trips_per_day": 0.0412,
+    "yellow_share": -0.0123,
+    "fare_to_manhattan_mean": 0.031,
+    "busiest_hour": null
+  },
+  "split": [
+    {
+      "airport": "JFK",
+      "direction": "from",
+      "mode": "uber",
+      "trips_per_day": 5131.0,
+      "share": 0.3947
+    },
+    {
+      "airport": "JFK",
+      "direction": "from",
+      "mode": "lyft",
+      "trips_per_day": 1622.7,
+      "share": 0.1248
+    },
+    {
+      "airport": "JFK",
+      "direction": "from",
+      "mode": "other_hv",
+      "trips_per_day": 28.9,
+      "share": 0.0022
+    }
+  ],
+  "share_trend": [
+    {
+      "month": "2024-01-01",
+      "airport": "JFK",
+      "mode": "uber",
+      "share": 0.4251
+    },
+    {
+      "month": "2024-01-01",
+      "airport": "JFK",
+      "mode": "lyft",
+      "share": 0.1549
+    },
+    {
+      "month": "2024-01-01",
+      "airport": "JFK",
+      "mode": "other_hv",
+      "share": 0.0019
+    }
+  ],
+  "by_hour": [
+    {
+      "airport": "JFK",
+      "direction": "from",
+      "hour": 0,
+      "mode": "uber",
+      "trips_per_day": 86.7
+    },
+    {
+      "airport": "JFK",
+      "direction": "from",
+      "hour": 0,
+      "mode": "lyft",
+      "trips_per_day": 32.5
+    },
+    {
+      "airport": "JFK",
+      "direction": "from",
+      "hour": 0,
+      "mode": "other_hv",
+      "trips_per_day": 0.4
+    }
+  ],
+  "fares": [
+    {
+      "airport": "JFK",
+      "mode": "uber",
+      "fare_mean": 74.9,
+      "fare_base_mean": 49.83,
+      "fare_per_mile": 3.673,
+      "trips_per_day": 2600.0
+    },
+    {
+      "airport": "JFK",
+      "mode": "lyft",
+      "fare_mean": 84.39,
+      "fare_base_mean": 53.44,
+      "fare_per_mile": 3.514,
+      "trips_per_day": 975.0
+    },
+    {
+      "airport": "JFK",
+      "mode": "other_hv",
+      "fare_mean": 81.54,
+      "fare_base_mean": 60.67,
+      "fare_per_mile": 3.659,
+      "trips_per_day": 13.0
+    }
+  ]
+}

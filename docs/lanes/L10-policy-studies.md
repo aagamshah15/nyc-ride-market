@@ -8,7 +8,7 @@ The two policy analyses: a year-over-year difference-in-differences for congesti
 
 ## Owns
 
-- `sql/metrics/cp_effect.sql`, `sql/metrics/pay_event.sql`, `pipeline/studies.py`
+- `sql/metrics/{cp_effect,cp_effect_summary,cp_weekly_trips,cp_zone_change,pay_event}.sql` (outputs in `contracts/metrics.md`), `pipeline/studies.py`
 - `config/periods.yaml`: the excluded-holiday-weeks key only
 - `reports/congestion_pricing.md`, `reports/pay_rise.md`
 - `tests/test_cp_effect.py`, `tests/test_pay_event.py`

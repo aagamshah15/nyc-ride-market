@@ -16,6 +16,8 @@
 - [ ] Run metrics through `pipeline.metrics`; shape each file exactly to `contracts/site/`; `as_of_month` and `generated_at` on every file
 - [ ] Refuse to write unless `validation_summary.json` passes. `--dev` writes locally with `"validated": false`, which deploy refuses
 - [ ] Copy `taxi_zones.simplified.geojson`; zone files 1–263 each under 50 KB; thin zones produce nulls, not errors
+- [ ] Write `tiles.json` from `contracts/site/tiles.yaml` and `events.json` from `config/periods.yaml` (D17)
+- [ ] Check every written file with `tests/contract_check.py` against `contracts/site/` in your tests
 - [ ] `findings.py`: one builder per question (Q1–Q15), plus page titles and chart subtitles. Numbers formatted per `contracts/README.md`. Language: "estimated effect"; "per hour with a passenger"; taxi tips "card-only"
 - [ ] Changes vs a year earlier compare the latest month with the same month of the previous year
 - [ ] Remove stale files the contract no longer lists

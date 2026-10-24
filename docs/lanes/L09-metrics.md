@@ -8,7 +8,7 @@ Every SPEC §6 metric defined once, as SQL over the aggregate tables, each with 
 
 ## Owns
 
-- `sql/metrics/*.sql`, except `cp_effect.sql` and `pay_event.sql` (L10)
+- `sql/metrics/*.sql`, except the files `contracts/metrics.md` assigns to L10
 - `pipeline/metrics.py`: registers `data/agg/*.parquet` as views, runs a named metric with parameters, returns an Arrow table; CLI `python -m pipeline.metrics <name>` and `--all`
 - `tests/test_metrics_<name>.py`
 
