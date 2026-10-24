@@ -324,7 +324,7 @@ def post_ref(tlc) -> None:
         b'264,"Unknown","N/A","N/A"\n')
     tlc.routes["/misc/taxi_zones.zip"] = Route(zip_bytes())
     tlc.routes["/csv/data_reports_monthly.csv"] = Route(
-        b"Month/Year,License Class,Trips Per Day\n2026-07,Yellow,\"110,000\"\n")
+        b"Year/Month,License Class,Trips Per Day\n2026-07,Yellow,\"110,000\"\n")
 
 
 def test_ref_downloads_lookups_with_manifest_entries(tlc, data_dir):
