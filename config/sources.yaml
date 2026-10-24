@@ -12,7 +12,10 @@ months:            # v1 scope (D2); back-fill to 2019-02 comes in Phase 6
 ref:
   taxi_zone_lookup.csv: "https://d37ci6vzurychx.cloudfront.net/misc/taxi_zone_lookup.csv"
   taxi_zones.zip: "https://d37ci6vzurychx.cloudfront.net/misc/taxi_zones.zip"
-  data_reports_monthly.csv: "https://www.nyc.gov/assets/tlc/downloads/csv/data_reports_monthly.csv"
+  # TLC monthly indicators from NYC Open Data ("TLC Industry Indicators", v6kb-cqej), saved
+  # unchanged. SPEC §3.2's nyc.gov copy answers 403 to non-browser clients. This copy's
+  # first column is "Year/Month", not "Month/Year".
+  data_reports_monthly.csv: "https://data.cityofnewyork.us/api/views/v6kb-cqej/rows.csv?accessType=DOWNLOAD"
 
 # How pipeline/ingest.py downloads. Retries cover 5xx, 429, dropped connections and short
 # reads; a 403 or 404 means the file isn't posted and fails at once.
