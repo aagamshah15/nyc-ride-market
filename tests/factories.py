@@ -95,8 +95,8 @@ AGG_SCHEMAS = {
     "agg_fee_values": pa.schema([        # D8
         ("month", D), ("mode", S), ("cbd_fee", F64), ("trips", I64),
     ]),
-    "ref_indicators": pa.schema([        # CSV columns unchanged, plus a parsed month
-        ("month", D), ("Month/Year", S), ("License Class", S), ("Trips Per Day", F64),
+    "ref_indicators": pa.schema([        # CSV columns unchanged (Open Data copy, D19), plus a parsed month
+        ("month", D), ("Year/Month", S), ("License Class", S), ("Trips Per Day", F64),
         ("Farebox Per Day", F64), ("Unique Drivers", F64), ("Unique Vehicles", F64),
         ("Vehicles Per Day", F64), ("Avg Days Vehicles on Road", F64),
         ("Avg Hours Per Day Per Vehicle", F64), ("Avg Days Drivers on Road", F64),
@@ -233,7 +233,7 @@ def _agg_defaults(name: str, mode: str) -> dict:
     if name == "agg_fee_values":
         return {"month": month, "mode": mode, "cbd_fee": 1.50 if hv else 0.75, "trips": 1_000}
     if name == "ref_indicators":
-        return {"month": month, "Month/Year": "2025-03", "License Class": "FHV - High Volume",
+        return {"month": month, "Year/Month": "2025-03", "License Class": "FHV - High Volume",
                 "Trips Per Day": 650_000.0, "Farebox Per Day": 17_500_000.0, "Unique Drivers": 70_000.0,
                 "Unique Vehicles": 66_000.0, "Vehicles Per Day": 58_000.0,
                 "Avg Days Vehicles on Road": 24.0, "Avg Hours Per Day Per Vehicle": 7.2,

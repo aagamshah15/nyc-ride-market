@@ -158,7 +158,7 @@ The executable schemas are the builders in `tests/factories.py` (`CLEAN_TRIPS_SC
 - D10, D16: `agg_zone_month_dist` has city-wide rows with `pu_zone = 0`, for each mode and for the groups `ride_hail` and `all`. Group rows exist only at `pu_zone = 0`.
 - D15: `agg_od_month` has `rider_total_ex_tip`.
 - Count and seconds sums are BIGINT; money and miles are DOUBLE. Sums that don't apply to a mode are NULL (for example `driver_pay` for taxis, `card_*` for ride-hail).
-- `ref_indicators` keeps the CSV's column names (quoted in SQL, e.g. `"Trips Per Day"`) with numeric columns as DOUBLE, plus a parsed `month` DATE. `Percent of Trips Paid with Credit Card` stays as text until L08 sees the real file.
+- `ref_indicators` keeps the CSV's column names (quoted in SQL, e.g. `"Trips Per Day"`; the month column is `"Year/Month"` in the NYC Open Data copy, D19) with numeric columns as DOUBLE, plus a parsed `month` DATE. `Percent of Trips Paid with Credit Card` stays as text until L08 sees the real file.
 - Clean partition files at `data/clean/mode={mode}/month={YYYY-MM}/part-0.parquet` keep every column, including `mode` and `month` (DATE). The folder names are layout only: read with `hive_partitioning = false`.
 
 ---

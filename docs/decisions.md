@@ -124,3 +124,11 @@ Reason: SPEC requires generated titles and subtitles and no numbers in page mark
 Files at `data/clean/mode={mode}/month={YYYY-MM}/part-0.parquet` contain every SPEC §4 column, including `mode` and `month` (DATE). Folder names are layout only; readers use `hive_partitioning = false`.
 
 Reason: DuckDB's `PARTITION_BY` drops partition columns from the files and would name the folder `month=2025-03-01`, not SPEC's `month=2025-03`; pinning the files as self-contained avoids type and naming ambiguity.
+
+## D19 · Indicators CSV comes from NYC Open Data
+
+24 Oct 2026 · SPEC §3.2, §8 · L02, L08, L09 · **Status: accepted by the user 24 Oct 2026** (raised by L02)
+
+The TLC monthly indicators are downloaded from NYC Open Data, "TLC Industry Indicators" (dataset `v6kb-cqej`, published by the TLC): `https://data.cityofnewyork.us/api/views/v6kb-cqej/rows.csv?accessType=DOWNLOAD`. It is still saved as `data/ref/data_reports_monthly.csv`, with contents untouched. It has the same 14 columns as SPEC §3.2 lists, except that the first header is **`Year/Month`** (not `Month/Year`); `ref_indicators` keeps that name. On 24 Oct 2026 it already included 2026-08.
+
+Reason: the nyc.gov URL in SPEC §3.2 answers HTTP 403 (Akamai "Access Denied") to non-browser clients, and the pipeline won't spoof a browser user agent. Replaces the indicators URL in SPEC §3.2.

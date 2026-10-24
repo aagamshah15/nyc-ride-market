@@ -13,7 +13,7 @@
 
 ## Tasks
 
-- [ ] Load the indicators CSV into `ref_indicators` without changing values. Check the real file's formats for `Month/Year`, thousands separators and percent strings
+- [ ] Load the indicators CSV into `ref_indicators` without changing values. It's the NYC Open Data copy (D19): the month column is `Year/Month` (`2026-08`), and numbers are plain (no thousands separators). The percent column holds whole numbers such as `79`, and some cells are empty, for example HVFHV `Farebox Per Day`. Confirm against the real file, then set the percent column's type in `tests/factories.py` through the integrator
 - [ ] Tie-out: trips per day = `SUM(trips_all)` ÷ days in month, against `"Trips Per Day"`, within ±2%, for HVFHV (uber + lyft + other_hv vs `FHV - High Volume`), Yellow and Green. Months the indicators file doesn't have yet are skipped and listed
 - [ ] Quality drift: `valid_rows / rows` ≥ 95% per month × mode; list any month more than 3 points below its mode's median
 - [ ] CBD list: share of both-in trips with a fee ≥ 98%; share of neither-in (pass-through) trips with a fee reported, not failed. From `agg_cbd_pairs` (D8), for both zone lists
