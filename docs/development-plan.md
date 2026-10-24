@@ -33,7 +33,7 @@ The integrator keeps the Status column current.
 | ID | Lane | Owns (main paths) | Wave | Starts when | Answers | Status |
 |---|---|---|---|---|---|---|
 | [L00](lanes/L00-scaffold.md) | Scaffold | Makefile, stubs, CI, `pipeline/common.py` | 0 | now (after D14) | — | done 23 Oct |
-| [L01](lanes/L01-contracts.md) | Contracts | `contracts/`, `tests/factories.py` | 0 | L00 merged; D7–D10, D13 answered | all | built 24 Oct; awaiting approval (D15–D18) |
+| [L01](lanes/L01-contracts.md) | Contracts | `contracts/`, `tests/factories.py` | 0 | L00 merged; D7–D10, D13 answered | all | done 24 Oct |
 | [L02](lanes/L02-ingest.md) | Ingest | `pipeline/ingest.py`, `config/sources.yaml` | 1 | L00 merged | — | not started |
 | [L03](lanes/L03-schema.md) | Schema discovery and map | `pipeline/discover.py`, `pipeline/schema_map.py`, `config/schema_map.yaml` | 1 | L02 can fetch a month (or D11 agreed) | — | not started |
 | [L04](lanes/L04-zones.md) | Zones, CBD list, airports, map | `pipeline/zones.py`, `config/cbd_zones.csv`, `config/airports.csv` | 1 | `make ref` works | Q2, Q9 | not started |
@@ -126,7 +126,7 @@ All gate checks run in the integrator space. G1, G3, G4, G5 and G6 are SPEC §11
 
 ## 6. Integrator checklist (this space)
 
-- Before Wave 1: settle §7 with the user (done 23 Oct); run L00 (done 23 Oct) and L01 (here or as its own agent). Repo: https://github.com/aagamshah15/nyc-ride-market (public); Pages: https://aagamshah15.github.io/nyc-ride-market/ (source GitHub Actions, deploys from `main` only).
+- Before Wave 1: settle §7 with the user (done 23 Oct); run L00 (done 23 Oct) and L01 (done 24 Oct; contracts and D15–D18 approved). Repo: https://github.com/aagamshah15/nyc-ride-market (public); Pages: https://aagamshah15.github.io/nyc-ride-market/ (source GitHub Actions, deploys from `main` only).
 - Merge order: L00 → L01 → L02, L04, L05 → L03 → L06 → L07 → L08, L09 → L10 → L11 → pages → L17 → L18.
 - Run the real-data jobs: the G2 month, the back-fill, `make validate`, `make publish`.
 - Route each validation failure to the lane that owns the cause. Never widen a tolerance without asking the user.
