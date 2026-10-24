@@ -1,7 +1,7 @@
--- agg_fees_month · SPEC §5 · lane L07
+-- agg_fees_month · SPEC §5, D23 · lane L07
 -- Fees collected per mode and month.
 --
--- Input  view `trips`: that month's clean files (pipeline/aggregate.py); valid rows only
+-- Input  view `trips`: that month's clean files (pipeline/aggregate.py); all rows (D23)
 -- Grain  month × mode
 --
 -- month                 DATE     first day of the source file's month
@@ -9,10 +9,11 @@
 -- cbd_fee               DOUBLE   sum of cbd_fee (0 before 2025: clean coalesces it)
 -- congestion_surcharge  DOUBLE   sum
 -- airport_fee           DOUBLE   sum (0 for green: the source has no column)
--- trips_with_cbd_fee    BIGINT   valid rows with cbd_fee > 0
+-- trips_with_cbd_fee    BIGINT   rows with cbd_fee > 0
 --
--- Valid rows only, like every sum other than trips_all (lane brief), so these slightly understate
--- the gross fees on all rows. Money is summed as DECIMAL(18, 4), exact for TLC values.
+-- All rows, valid or not (D23, an exception to SPEC §4.2): a fee was charged whether or not the
+-- trip's distance, duration or fare looks odd, and Q14 asks for the fee money each mode generates.
+-- Money is summed as DECIMAL(18, 4), exact for TLC values.
 
 WITH t AS (
     SELECT
@@ -21,7 +22,6 @@ WITH t AS (
         congestion_surcharge::DECIMAL(18, 4) AS congestion_surcharge,
         airport_fee::DECIMAL(18, 4) AS airport_fee
     FROM trips
-    WHERE is_valid
 ),
 g AS (
     SELECT

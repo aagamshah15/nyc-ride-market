@@ -272,16 +272,16 @@ def test_quality_fees_and_qa_tables():
     assert {k: quality["yellow"][k] for k in ("rows", "valid_rows", "f_zone", "f_wait")} == {
         "rows": 3, "valid_rows": 2, "f_zone": 1, "f_wait": None}
 
-    # fees over valid rows: uber A, B, F; yellow G, H
+    # fees over all rows, flagged ones included (D23): uber A–F, yellow G–I
     fees = {r["mode"]: r for r in rows("agg_fees_month")}
-    assert fees["uber"]["cbd_fee"] == pytest.approx(3.0)                  # 1.50 + 0 + 1.50
-    assert fees["uber"]["congestion_surcharge"] == pytest.approx(8.25)    # 3 × 2.75
-    assert fees["uber"]["airport_fee"] == pytest.approx(2.5)
-    assert fees["uber"]["trips_with_cbd_fee"] == 2                        # A, F
-    assert fees["yellow"]["cbd_fee"] == pytest.approx(1.5)                # 2 × 0.75
-    assert fees["yellow"]["congestion_surcharge"] == pytest.approx(5.0)   # 2 × 2.50
-    assert fees["yellow"]["airport_fee"] == pytest.approx(1.75)
-    assert fees["yellow"]["trips_with_cbd_fee"] == 2
+    assert fees["uber"]["cbd_fee"] == pytest.approx(7.5)                  # A C D E F × 1.50, B 0
+    assert fees["uber"]["congestion_surcharge"] == pytest.approx(16.5)    # 6 × 2.75
+    assert fees["uber"]["airport_fee"] == pytest.approx(2.5)              # B
+    assert fees["uber"]["trips_with_cbd_fee"] == 5                        # A C D E F
+    assert fees["yellow"]["cbd_fee"] == pytest.approx(2.2)                # 0.75 + 0.75 + 0.70
+    assert fees["yellow"]["congestion_surcharge"] == pytest.approx(7.5)   # 3 × 2.50
+    assert fees["yellow"]["airport_fee"] == pytest.approx(1.75)           # G
+    assert fees["yellow"]["trips_with_cbd_fee"] == 3                      # G H I
 
     # fee values over all rows
     assert {(r["mode"], r["cbd_fee"]): r["trips"] for r in rows("agg_fee_values")} == {
@@ -300,6 +300,20 @@ def test_quality_fees_and_qa_tables():
         ("yellow", 161, 236): (2, 2),  # G H
         ("yellow", 161, 265): (1, 1),  # I: 0.70 > 0
     }
+
+
+def test_fees_include_flagged_trips():
+    build(clean_trips([
+        {},                                                       # valid: cbd_fee 1.50, surcharge 2.75
+        {"dropoff_ts": P, "f_time": True, "airport_fee": 5.0},    # 0 s trip, flagged: its fees still count (D23)
+    ]))
+    fees = one("agg_fees_month", mode="uber")
+    assert fees["cbd_fee"] == pytest.approx(3.0)                  # 1.50 + 1.50
+    assert fees["congestion_surcharge"] == pytest.approx(5.5)     # 2 × 2.75
+    assert fees["airport_fee"] == pytest.approx(5.0)              # the flagged trip's
+    assert fees["trips_with_cbd_fee"] == 2
+    # every other money sum keeps the is_valid rule
+    assert one("agg_zone_hour", mode="uber")["cbd_fee"] == pytest.approx(1.5)
 
 
 def test_cbd_pairs_start_with_congestion_pricing():
