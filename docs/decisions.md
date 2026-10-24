@@ -147,3 +147,27 @@ Reason: the nyc.gov URL in SPEC §3.2 answers HTTP 403 (Akamai "Access Denied") 
 Reason: SPEC §9.5 gives only light-mode ramps. A light-to-dark ramp drawn on a dark page would put the smallest values brightest, and SPEC's `#F2F2F2` midpoint would glare.
 
 The colour-blindness check is recorded in L05's status log. Two mode pairs fall below the floor as lines (green vs Lyft light, other ride-hail vs Lyft dark), and yellow is 2.45:1 on white. The components compensate with fixed legend order, line-end labels, tooltips and table views; SPEC's mode colours are unchanged.
+
+## D21 · The 98% congestion-zone check gates on the core list only
+
+24 Oct 2026 · SPEC §7.2, §8 · L04, L08, L12 · **Status: accepted by the user 24 Oct 2026** (raised by L04)
+
+The SPEC §7.2 check (share of trips with both ends in the list that carry `cbd_fee > 0`, at least 98%) passes or fails on the **core** list (`borderline = false`). The **wide** list's result is computed, reported in `reports/validation.md` and `validation_summary.json`, and shown on the methods page, but it doesn't fail the gate. The 98% threshold itself is unchanged.
+
+Reason (SPEC §7.2 asks for a written one): the wide list adds nine borderline zones. Six straddle 60th St with most of their area north of it, outside the charge zone, and three are islands with no road access. So trips touching them often carry no fee, and the wide list can't reach 98% by construction (97.91% on 2026-08 HVFHV, against 99.70% for core). Its job is the "with borderline zones" sensitivity result (SPEC §7.3), not to validate the list.
+
+## D22 · The congestion-zone check leaves out 2025-01
+
+24 Oct 2026 · SPEC §7.2, §8 · L08 · **Status: accepted by the user 24 Oct 2026** (raised by L08)
+
+The CBD-list check (D21) starts at 2025-02, the first month wholly under congestion pricing. The fee check (SPEC §8) still starts at the pricing start date, 2025-01-05.
+
+Reason: pricing began on 5 Jan 2025, and `agg_cbd_pairs` has no day grain, so the 1–4 Jan trips, which carry no fee, can't be dropped. Across the scope they'd lower the both-in share by about half a point, enough to fail 98% for a reason that has nothing to do with the zone list. The report states the exclusion.
+
+## D23 · Fee revenue sums every trip record
+
+24 Oct 2026 · SPEC §4.2, §5, §6 (fee revenue, Q14) · L07, L09, L15 · **Status: accepted by the user 24 Oct 2026** (raised by L07)
+
+`agg_fees_month` sums `cbd_fee`, `congestion_surcharge`, `airport_fee` and `trips_with_cbd_fee` over **all** rows, not only `is_valid` ones. This is an exception to SPEC §4.2's "metrics use `is_valid` rows". Every other money sum keeps that rule.
+
+Reason: a fee was charged whether or not a trip's distance, duration or fare looks odd, and Q14 asks how much fee money each mode generates. Trip counts already use all rows for the same reason, so they match TLC's own figures. Using valid rows would understate fee revenue.

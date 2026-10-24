@@ -10,13 +10,14 @@ MONTH ?=
 FROM  ?=
 TO    ?=
 
-.PHONY: help setup discover ref ingest clean aggregate month backfill validate publish \
+.PHONY: help setup discover ref zones ingest clean aggregate month backfill validate publish \
         site-mock site-dev site-build test require-month require-range
 
 help:
 	@echo "make setup                    venv + Python and Node dependencies"
 	@echo "make discover                 schema discovery → reports/schema_discovery.md"
 	@echo "make ref                      download zone lookup, shapefile, indicators CSV"
+	@echo "make zones                    zone checks + simplified zone map (needs make ref)"
 	@echo "make ingest MONTH=YYYY-MM     download the three trip files for a month"
 	@echo "make clean MONTH=YYYY-MM      raw → unified trips for a month"
 	@echo "make aggregate MONTH=YYYY-MM  rebuild that month's aggregate rows"
@@ -38,6 +39,9 @@ discover:
 
 ref:
 	$(PY) -m pipeline.ingest --ref
+
+zones:
+	$(PY) -m pipeline.zones
 
 ingest: require-month
 	$(PY) -m pipeline.ingest --month $(MONTH)

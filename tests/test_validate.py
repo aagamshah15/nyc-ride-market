@@ -370,6 +370,19 @@ def test_cbd_wide_list_counts_borderline_zones():
     summary = run()
     assert [(r["zone_list"], r["both_in_fee_share"], r["status"]) for r in summary["cbd"]] == [
         ("core", 1.0, "pass"), ("wide", 0.5, "fail")]
+    # D21: only core gates the check; wide's failing result is reported, not gated
+    assert check(summary, "cbd_list")["status"] == "pass"
+    assert "wide (reported, not gated): 50.00% of both-in trips carry a fee (below 98%)" in check(
+        summary, "cbd_list")["summary"]
+
+
+def test_cbd_core_below_threshold_fails_even_when_wide_passes():
+    write_world()
+    # core 161 → 162: 9,700 / 10,000 = 97%; wide adds 142 → 161 at 100%: (9,700 + 10,000) / 20,000 = 98.5%
+    write_cbd_pairs([{"month": d("2025-03"), "pu_zone": 161, "do_zone": 162, "trips_all": 10_000, "trips_cbd_fee": 9_700},
+                     {"month": d("2025-03"), "pu_zone": 142, "do_zone": 161, "trips_all": 10_000, "trips_cbd_fee": 10_000}])
+    summary = run()
+    assert [(r["zone_list"], r["status"]) for r in summary["cbd"]] == [("core", "fail"), ("wide", "pass")]
     assert check(summary, "cbd_list")["status"] == "fail"
 
 
@@ -491,7 +504,7 @@ def test_ref_indicators_keeps_names_and_values():
     assert (hv["Year/Month"], hv["License Class"], hv["Trips Per Day"]) == ("2026-08", "FHV - High Volume", 661_076.0)
     assert (hv["Farebox Per Day"], hv["Percent of Trips Paid with Credit Card"], hv["Trips Per Day Shared"]) == (
         None, None, 5_315.0)
-    assert (green["Avg Hours Per Day Per Vehicle"], green["Percent of Trips Paid with Credit Card"]) == (3.6, "79")
+    assert (green["Avg Hours Per Day Per Vehicle"], green["Percent of Trips Paid with Credit Card"]) == (3.6, 79.0)
     assert green["Trips Per Day Shared"] is None
 
 

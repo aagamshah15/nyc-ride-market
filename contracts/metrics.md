@@ -1,17 +1,24 @@
 # Metric contracts
 
-One SQL file per metric in `sql/metrics/` (SPEC §6). Each is a single `SELECT` over the aggregate tables. `pipeline/metrics.py` (L09) registers every `data/agg/*.parquet` as a view of the same name, plus `ref_zones` (`LocationID, Borough, Zone, service_zone` from `data/ref/taxi_zone_lookup.csv`), then runs a metric with DuckDB named parameters (`$to_month`).
+One SQL file per metric in `sql/metrics/` (SPEC §6). Each is a single `SELECT` over the aggregate tables. `pipeline/metrics.py` (L09) registers every `data/agg/*.parquet` as a view of the same name, plus `ref_zones` (`LocationID SMALLINT, Borough, Zone, service_zone` from `data/ref/taxi_zone_lookup.csv`) and `ref_airports` (`LocationID SMALLINT, airport` from `config/airports.csv`), then runs a metric with DuckDB named parameters (`$to_month`). `run()` checks every output against this file (names, order and types) and raises `ContractError` on a mismatch, for L10's metrics too.
 
 ## Conventions
 
 - **Params.** `$to_month` DATE, default the latest month in `agg_zone_hour`. `$window` INTEGER months ending at `$to_month`, default 3. `$top_n` INTEGER, default 10. The runner fills defaults; SQL never hard-codes a month.
 - **Ratios of sums only** (CLAUDE.md), with `NULLIF(denominator, 0)`.
-- **Rows.** Metric rows use `is_valid` sums except trip counts and shares, which use `trips_all` (SPEC §4.2).
+- **Rows.** Metric rows use `is_valid` sums except trip counts and shares, which use `trips_all` (SPEC §4.2), and fee revenue, which `agg_fees_month` sums over every row (D23).
+- **"Prior" and "change"** (`share_prior`, `gap_prior`, `change`, `gap_change`) compare `$to_month` with the same month a year earlier.
+- **`zone_hour_profile.mode_share_in_zone`** is the mode's share of the zone's trips over the whole window and all hours; the zone heatmap keeps modes at 10% or more (contracts/README.md §1).
 - **Mode groups** (`ride_hail`, `taxi`, `all`) are extra rows with that value in `mode`, only where the Modes column lists them. See contracts/README.md §2.
 - **`trips_per_day`** = trips ÷ days in that month (or in the window).
 - **`agg_week_cbd` holds every trip once per `zone_list`.** Filter `zone_list = 'core'` unless the metric compares the two lists; summing across lists double counts.
 - **Header comment** in each file: questions, params, grain, output columns, as below.
 - The output columns are exact: names, order and types. L09's tests check them.
+- **Column types.** A type written next to a column anywhere in the table applies to every column of that name. Untyped columns follow these rules, as `pipeline/metrics.py` applies them:
+  - VARCHAR: `mode`, `pu_borough`, `airport`, `direction`, `license_class`, `metric`, `zone_list`, `cbd_group`, `exclusion_reason`
+  - SMALLINT: `do_zone`, `iso_year`, `iso_week`, `year` (and `pu_zone`, `hour_of_week`, `hour` as typed below)
+  - BIGINT: `n`, `requests`, `matched`, `rows`, `valid_rows`, `f_time`, `f_miles`, `f_fare`, `f_zone`, `f_wait`, `trips_with_cbd_fee` (and `trips` as typed below)
+  - DOUBLE: everything else, including `unique_drivers` as TLC reports it
 
 ## Metrics
 
@@ -24,7 +31,7 @@ Owner is L09 unless marked L10.
 | `zone_share_change` | Q1, Q4, Q10 | to_month | pu_zone × mode | each + `ride_hail` | `pu_zone, mode, trips_per_day, share, share_prior, change` | agg_zone_hour |
 | `lyft_vs_uber` | Q4 | to_month | pu_zone | — | `pu_zone, lyft_share, uber_share, gap, gap_prior, gap_change` (shares of all trips in the zone) | agg_zone_hour |
 | `zone_hour_profile` | Q1 | to_month, window | pu_zone × hour_of_week × mode | each | `pu_zone, hour_of_week SMALLINT, mode, trips_per_week DOUBLE, mode_share_in_zone DOUBLE` | agg_zone_hour |
-| `top_destinations` | Q1 | to_month, top_n | pu_zone × do_zone | all modes summed | `pu_zone, do_zone, rank INT, trips BIGINT, share DOUBLE` | agg_od_month |
+| `top_destinations` | Q1 | to_month, top_n | pu_zone × do_zone | all modes summed | `pu_zone, do_zone, rank INT, trips BIGINT, share DOUBLE` (`share` = trips ÷ the zone's valid trips in `agg_zone_hour`) | agg_od_month, agg_zone_hour |
 | `driver_share` | Q3, Q5, Q6 | — | month × mode | `uber`, `lyft`, `ride_hail` (= uber + lyft) | `month, mode, driver_pay, fare_base, driver_share, platform_share` | agg_zone_hour |
 | `pay_per_hour` | Q6 | — | month × mode | `uber`, `lyft`, `ride_hail` (= uber + lyft) | `month, mode, driver_pay, on_trip_hours, pay_per_hour` | agg_zone_hour |
 | `fare_rates` | Q3, Q7 | — | month × mode | each + `ride_hail`, `taxi`, `all` | `month, mode, fare_per_mile, fare_per_min, rider_total_per_trip` | agg_zone_hour |

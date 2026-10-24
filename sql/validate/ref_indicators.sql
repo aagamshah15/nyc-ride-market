@@ -7,7 +7,7 @@
 --   "Year/Month"                            text as published, e.g. 2026-08
 --   "License Class"                         text, e.g. FHV - High Volume, Yellow, Green
 --   numeric columns                         DOUBLE, values unchanged
---   "Percent of Trips Paid with Credit Card" text until the contract types it (contracts/README.md §6)
+--   "Percent of Trips Paid with Credit Card" DOUBLE, a whole-number percent (79 = 79%), NULL for FHV classes
 -- A value that doesn't parse fails the load; nothing is coerced to NULL.
 
 SELECT
@@ -24,7 +24,7 @@ SELECT
     CAST("Avg Days Drivers on Road" AS DOUBLE)              AS "Avg Days Drivers on Road",
     CAST("Avg Hours Per Day Per Driver" AS DOUBLE)          AS "Avg Hours Per Day Per Driver",
     CAST("Avg Minutes Per Trip" AS DOUBLE)                  AS "Avg Minutes Per Trip",
-    "Percent of Trips Paid with Credit Card",
+    CAST("Percent of Trips Paid with Credit Card" AS DOUBLE) AS "Percent of Trips Paid with Credit Card",
     CAST("Trips Per Day Shared" AS DOUBLE)                  AS "Trips Per Day Shared"
 FROM indicators_csv
 ORDER BY month, "License Class";

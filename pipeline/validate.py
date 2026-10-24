@@ -48,6 +48,7 @@ CHECKS = {   # id → report heading, in contract order
 }
 ROWS_KEY = {"tie_out": "tie_out", "quality_drift": "quality", "cbd_list": "cbd", "fees": "fees"}
 ZONE_LISTS = ("core", "wide")                       # D9
+GATED_ZONE_LIST = "core"                            # D21: only core gates the CBD check; wide is reported
 AGG_INPUTS = ("agg_zone_hour", "agg_quality_month", "agg_cbd_pairs", "agg_fee_values")
 HV_MODES = ("uber", "lyft", "other_hv")
 
@@ -341,7 +342,8 @@ def check_cbd(con: duckdb.DuckDBPyConnection, present: set[str], periods: dict, 
                 parts.append(f"{r['zone_list']}: no both-in trips")
                 continue
             below = f" (below {CBD_BOTH_IN_MIN_PCT}%)" if r["status"] == "fail" else ""
-            parts.append(f"{r['zone_list']}: {_pct(r['both_in_fee_share'])} of both-in trips carry a fee{below}, "
+            gate = "" if r["zone_list"] == GATED_ZONE_LIST else " (reported, not gated)"
+            parts.append(f"{r['zone_list']}{gate}: {_pct(r['both_in_fee_share'])} of both-in trips carry a fee{below}, "
                          f"pass-through {_pct(r['neither_in_fee_share'])}")
         summary = "; ".join(parts) + f" ({_m(window[0])} → {_m(window[-1])})"
 
@@ -352,8 +354,10 @@ def check_cbd(con: duckdb.DuckDBPyConnection, present: set[str], periods: dict, 
                  "and the table has no day grain to drop the trips before it.")
     details = [
         lead + f" Both-in: pickup and drop-off zones both in the list; passes when at least "
-        f"{CBD_BOTH_IN_MIN_PCT}% carry a fee (`cbd_fee > 0`). Pass-through: neither zone in the list; "
-        "reported, not failed. Zone lists from `pipeline.zones.cbd_zone_ids`: "
+        f"{CBD_BOTH_IN_MIN_PCT}% carry a fee (`cbd_fee > 0`). Only the {GATED_ZONE_LIST} list gates the check "
+        "(D21); the other list's result is reported, since its borderline zones lie mostly outside the "
+        "charge zone. Pass-through: neither zone in the list; reported, not failed. "
+        "Zone lists from `pipeline.zones.cbd_zone_ids`: "
         + ", ".join(f"{name} {len(ids)} zones" for name, ids in lists.items()) + ".",
         "",
         "| Zone list | Both-in trips | With fee | Share | Pass-through trips | With fee | Share | Status |",
@@ -377,7 +381,8 @@ def check_cbd(con: duckdb.DuckDBPyConnection, present: set[str], periods: dict, 
     contract_rows = [{"zone_list": r["zone_list"], "both_in_fee_share": _round(r["both_in_fee_share"], 4),
                       "neither_in_fee_share": _round(r["neither_in_fee_share"], 4), "status": r["status"]}
                      for r in total_rows]
-    return Check("cbd_list", _rollup(r["status"] for r in total_rows), summary, contract_rows, details)
+    gated = (r["status"] for r in total_rows if r["zone_list"] == GATED_ZONE_LIST)
+    return Check("cbd_list", _rollup(gated), summary, contract_rows, details)
 
 
 def _no_cbd_trips(zone_list: str) -> dict:

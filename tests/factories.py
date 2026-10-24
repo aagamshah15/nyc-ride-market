@@ -101,7 +101,7 @@ AGG_SCHEMAS = {
         ("Vehicles Per Day", F64), ("Avg Days Vehicles on Road", F64),
         ("Avg Hours Per Day Per Vehicle", F64), ("Avg Days Drivers on Road", F64),
         ("Avg Hours Per Day Per Driver", F64), ("Avg Minutes Per Trip", F64),
-        ("Percent of Trips Paid with Credit Card", S), ("Trips Per Day Shared", F64),
+        ("Percent of Trips Paid with Credit Card", F64), ("Trips Per Day Shared", F64),
     ]),
 }
 
@@ -238,7 +238,7 @@ def _agg_defaults(name: str, mode: str) -> dict:
                 "Unique Vehicles": 66_000.0, "Vehicles Per Day": 58_000.0,
                 "Avg Days Vehicles on Road": 24.0, "Avg Hours Per Day Per Vehicle": 7.2,
                 "Avg Days Drivers on Road": 23.0, "Avg Hours Per Day Per Driver": 6.9,
-                "Avg Minutes Per Trip": 19.5, "Percent of Trips Paid with Credit Card": "",
+                "Avg Minutes Per Trip": 19.5, "Percent of Trips Paid with Credit Card": None,
                 "Trips Per Day Shared": 0.0}
     raise KeyError(f"unknown aggregate table {name!r}; expected one of {sorted(AGG_SCHEMAS)}")
 

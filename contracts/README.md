@@ -129,7 +129,7 @@ Written by L08 to `data/agg/validation_summary.json`; read by L11 (into `quality
 {
   "generated_at": "2026-11-15T10:00:00Z",
   "status": "pass",
-  "months_checked": ["2024-01", "2026-08"],
+  "months_checked": ["2024-01", "2024-02", "…", "2026-08"],
   "checks": [
     {"id": "tie_out", "status": "pass", "summary": "All 31 months with indicators within ±2%; 2026-08 skipped (not yet in indicators)"},
     {"id": "quality_drift", "status": "pass", "summary": "..."},
@@ -146,6 +146,9 @@ Written by L08 to `data/agg/validation_summary.json`; read by L11 (into `quality
 
 `status` is `"pass"` only when every check passes. `status` values: `pass`, `fail`, `skipped`. `diff` is relative: pipeline ÷ TLC − 1.
 
+- `months_checked` is the full sorted list of every month checked, one `YYYY-MM` string each, not a [first, last] range; `[0]` and `[-1]` give the range. (The `"…"` above stands for the months in between.)
+- `cbd` rows: only `zone_list = "core"` gates the `cbd_list` check (D21). The `wide` row carries its own pass/fail against the same 98% threshold as information, and the check's status ignores it. 2025-01, the month pricing began part-way through, is left out (D22).
+
 ---
 
 ## 6. Clean and aggregate schemas
@@ -158,7 +161,8 @@ The executable schemas are the builders in `tests/factories.py` (`CLEAN_TRIPS_SC
 - D10, D16: `agg_zone_month_dist` has city-wide rows with `pu_zone = 0`, for each mode and for the groups `ride_hail` and `all`. Group rows exist only at `pu_zone = 0`.
 - D15: `agg_od_month` has `rider_total_ex_tip`.
 - Count and seconds sums are BIGINT; money and miles are DOUBLE. Sums that don't apply to a mode are NULL (for example `driver_pay` for taxis, `card_*` for ride-hail).
-- `ref_indicators` keeps the CSV's column names (quoted in SQL, e.g. `"Trips Per Day"`; the month column is `"Year/Month"` in the NYC Open Data copy, D19) with numeric columns as DOUBLE, plus a parsed `month` DATE. `Percent of Trips Paid with Credit Card` stays as text until L08 sees the real file.
+- `ref_indicators` keeps the CSV's column names (quoted in SQL, e.g. `"Trips Per Day"`; the month column is `"Year/Month"` in the NYC Open Data copy, D19) with numeric columns as DOUBLE, plus a parsed `month` DATE. `Percent of Trips Paid with Credit Card` is DOUBLE, a whole-number percent as published (79 = 79%), NULL for the FHV classes.
+- D23: `agg_fees_month` sums every row, not only `is_valid` ones (fee money was charged either way); every other money sum uses `is_valid` rows.
 - Clean partition files at `data/clean/mode={mode}/month={YYYY-MM}/part-0.parquet` keep every column, including `mode` and `month` (DATE). The folder names are layout only: read with `hive_partitioning = false`.
 
 ---
@@ -180,4 +184,4 @@ Fields whose meaning isn't obvious from the name:
 | `drivers.json` · `event_study[]` | `week_offset` 0 is 2025-W31 (`transition: true`); `year` 2024 rows are the seasonal reference |
 | `airports.json` · `fares[]` | trips from the airport to Manhattan: `fare_mean` = rider total ex tip per trip, `fare_base_mean` = base fare per trip |
 | `prices.json` · `fpm_by_hour[]` | ratio-of-sums fare per mile and per minute by hour of week, latest 3 months |
-| `taxi_zones.geojson` | FeatureCollection in WGS84, properties `LocationID`, `zone`, `borough`; exterior rings clockwise as d3-geo expects (mapshaper's default output). The mock is a grid, not real zones |
+| `taxi_zones.geojson` | FeatureCollection in WGS84, properties `LocationID`, `zone`, `borough`; exterior rings clockwise as d3-geo expects. mapshaper 0.7.98 writes RFC 7946 (counter-clockwise) rings by default, so `pipeline/zones.py` passes `gj2008` to get clockwise ones. The mock is a grid, not real zones |

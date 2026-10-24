@@ -19,7 +19,7 @@
 - [x] One SQL file per table: `agg_zone_hour`, `agg_zone_month_dist`, `agg_od_month`, `agg_airport`, `agg_week_cbd`, `agg_fees_month`, `agg_quality_month`, plus the D8 tables (`agg_cbd_pairs`, `agg_fee_values`), the D10/D16 city-wide rows (`pu_zone = 0`, each mode plus `ride_hail` and `all`) and D15's `rider_total_ex_tip` in `agg_od_month`. `AGG_SCHEMAS` in `tests/factories.py` is the exact output schema; read clean files with `hive_partitioning = false` (D18)
 - [x] Month rewrite: existing table minus that month, plus the new rows, written to a temp file, then renamed over `data/agg/{table}.parquet`. Other months untouched; a re-run gives identical output
 - [x] Rules:
-  - `trips_all` counts all rows; other sums use `is_valid` rows
+  - `trips_all` counts all rows; other sums use `is_valid` rows, except `agg_fees_month`, which sums every row (D23)
   - wait sums exclude `f_wait` and NULL waits
   - `card_*` columns for taxis only
   - percentiles via `quantile_cont` on valid rows; distribution rows only where n ≥ 100
