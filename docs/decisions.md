@@ -83,4 +83,4 @@ Git repo initialised in the existing project folder. Because the folder name con
 
 Reason: worktree-based lanes need git; Pages needs a GitHub repo; Make doesn't handle paths with spaces.
 
-Update 23 Oct 2026: the repo was created at the user's request as https://github.com/aagamshah15/nyc-ride-market, **private** for now. Making it public and enabling Pages (source: GitHub Actions) are still the user's call; GitHub Pages on a private repo needs a paid plan.
+Update 23 Oct 2026: the repo was created at the user's request as https://github.com/aagamshah15/nyc-ride-market, first private, then made public by the user the same day. GitHub Pages (source: GitHub Actions) is not enabled yet; L17 needs it.

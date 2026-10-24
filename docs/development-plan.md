@@ -126,7 +126,7 @@ All gate checks run in the integrator space. G1, G3, G4, G5 and G6 are SPEC §11
 
 ## 6. Integrator checklist (this space)
 
-- Before Wave 1: settle §7 with the user (done 23 Oct); run L00 (done 23 Oct) and L01 (here or as its own agent). Repo: https://github.com/aagamshah15/nyc-ride-market (private; the user decides when it goes public and enables Pages).
+- Before Wave 1: settle §7 with the user (done 23 Oct); run L00 (done 23 Oct) and L01 (here or as its own agent). Repo: https://github.com/aagamshah15/nyc-ride-market (public; Pages still to be enabled before L17).
 - Merge order: L00 → L01 → L02, L04, L05 → L03 → L06 → L07 → L08, L09 → L10 → L11 → pages → L17 → L18.
 - Run the real-data jobs: the G2 month, the back-fill, `make validate`, `make publish`.
 - Route each validation failure to the lane that owns the cause. Never widen a tolerance without asking the user.

@@ -1,6 +1,6 @@
 # L17 · Refresh and deploy
 
-**Wave** 4 · **Phase** 5 definition of done · **Spec** §10, D6 · **Decision** D14 · **Repo** https://github.com/aagamshah15/nyc-ride-market (private as of 23 Oct) · **Needs from the user** the repo made public (or a paid plan), Pages enabled with source "GitHub Actions", Actions permissions
+**Wave** 4 · **Phase** 5 definition of done · **Spec** §10, D6 · **Decision** D14 · **Repo** https://github.com/aagamshah15/nyc-ride-market (public) · **Needs from the user** Pages enabled with source "GitHub Actions", Actions permissions
 
 ## Goal
 
