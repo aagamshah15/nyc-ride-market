@@ -39,7 +39,7 @@ The integrator keeps the Status column current.
 | [L04](lanes/L04-zones.md) | Zones, CBD list, airports, map | `pipeline/zones.py`, `config/cbd_zones.csv`, `config/airports.csv` | 1 | `make ref` works | Q2, Q9 | done 24 Oct (merged) |
 | [L05](lanes/L05-site-foundation.md) | Site foundation | `site/observablehq.config.js`, `site/src/components/`, styles | 1 | L01 approved | — | done 24 Oct (merged) |
 | [L06](lanes/L06-clean.md) | Clean | `pipeline/clean.py`, `sql/clean/` | 2 | L03 map + L04 draft | — | not started |
-| [L07](lanes/L07-aggregate.md) | Aggregate | `pipeline/aggregate.py`, `sql/agg/` | 2 | L01 approved | — | built on fixtures, merged 24 Oct; D23 change pending; real run at G2 |
+| [L07](lanes/L07-aggregate.md) | Aggregate | `pipeline/aggregate.py`, `sql/agg/` | 2 | L01 approved | — | built on fixtures, merged 24 Oct (D23 included); real run at G2 |
 | [L08](lanes/L08-validate.md) | Validation gate | `pipeline/validate.py`, `sql/validate/` | 2 | L01 approved | — | built on fixtures, merged 24 Oct; real run at G2 |
 | [L09](lanes/L09-metrics.md) | Metrics library | `sql/metrics/` (all but L10's), `pipeline/metrics.py` | 2 | L01 approved | Q1, Q4–Q15 | built on fixtures, merged 24 Oct; real run at G2 |
 | [L10](lanes/L10-policy-studies.md) | Policy studies | `sql/metrics/cp_*.sql`, `pay_event.sql`, `pipeline/studies.py` | 3 | L09 runner exists | Q2, Q3, Q6 | not started |
