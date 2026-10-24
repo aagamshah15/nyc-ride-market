@@ -83,4 +83,4 @@ Git repo initialised in the existing project folder. Because the folder name con
 
 Reason: worktree-based lanes need git; Pages needs a GitHub repo; Make doesn't handle paths with spaces.
 
-Update 23 Oct 2026: the repo was created at the user's request as https://github.com/aagamshah15/nyc-ride-market, first private, then made public by the user the same day. GitHub Pages (source: GitHub Actions) is not enabled yet; L17 needs it.
+Update 23 Oct 2026: the repo was created at the user's request as https://github.com/aagamshah15/nyc-ride-market, first private, then made public by the user the same day. GitHub Pages is on at https://aagamshah15.github.io/nyc-ride-market/ with source "GitHub Actions" (switched from "Deploy from a branch" on 23 Oct). The `github-pages` environment accepts deploys from `main` only, and the default workflow token is read-only, so deploy workflows declare their own `permissions:`.
