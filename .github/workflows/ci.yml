@@ -18,4 +18,9 @@ jobs:
           cache: npm
           cache-dependency-path: site/package-lock.json
       - run: make setup PYTHON=python
+      # Until L11 commits real data, pages that load site/src/data/ can't build without mocks.
+      # make site-mock refuses to overwrite real data, and the mocks never leave this runner.
+      - name: Mock site data when no real data is committed
+        run: |
+          if [ ! -f site/src/data/home.json ]; then make site-mock; fi
       - run: make test

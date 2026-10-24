@@ -132,3 +132,18 @@ Reason: DuckDB's `PARTITION_BY` drops partition columns from the files and would
 The TLC monthly indicators are downloaded from NYC Open Data, "TLC Industry Indicators" (dataset `v6kb-cqej`, published by the TLC): `https://data.cityofnewyork.us/api/views/v6kb-cqej/rows.csv?accessType=DOWNLOAD`. It is still saved as `data/ref/data_reports_monthly.csv`, with contents untouched. It has the same 14 columns as SPEC §3.2 lists, except that the first header is **`Year/Month`** (not `Month/Year`); `ref_indicators` keeps that name. On 24 Oct 2026 it already included 2026-08.
 
 Reason: the nyc.gov URL in SPEC §3.2 answers HTTP 403 (Akamai "Access Denied") to non-browser clients, and the pipeline won't spoof a browser user agent. Replaces the indicators URL in SPEC §3.2.
+
+## D20 · Dark-mode map ramps and other palette additions
+
+24 Oct 2026 · SPEC §9.5 · L05, L12–L16 · **Status: accepted by the user 24 Oct 2026** (raised by L05)
+
+`site/src/components/palette.js` keeps every SPEC §9.5 token unchanged and adds:
+
+- **Sequential (magnitude) ramp:** Plot scheme `blues`, using its 0.12–1 range so the lightest bin stays visible on white. In dark mode the ramp is reversed, so larger values sit further from the dark surface.
+- **Diverging ramp, dark mode:** `accent.dark` (`#6E9CF0`) → `muted.dark` (`#4A4F55`) → `#E07B39`, centred on 0. Light mode keeps SPEC's `#2F6FDB` → `#F2F2F2` → `#E07B39`.
+- **Mode-group colours:** `ride_hail` = accent, `taxi` = yellow, `all` = the text colour.
+- **`ink`:** text colour for labels drawn on top of marks (`#1B1E23` on light fills, `#FFFFFF` on dark fills).
+
+Reason: SPEC §9.5 gives only light-mode ramps. A light-to-dark ramp drawn on a dark page would put the smallest values brightest, and SPEC's `#F2F2F2` midpoint would glare.
+
+The colour-blindness check is recorded in L05's status log. Two mode pairs fall below the floor as lines (green vs Lyft light, other ride-hail vs Lyft dark), and yellow is 2.45:1 on white. The components compensate with fixed legend order, line-end labels, tooltips and table views; SPEC's mode colours are unchanged.
