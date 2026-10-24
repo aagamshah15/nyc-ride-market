@@ -47,7 +47,7 @@ _Only this lane writes here. Newest first._
 
 | Date | State | Note |
 |---|---|---|
-| | not started | |
+| 24 Oct | in progress | Five metrics, `pipeline/studies.py`, the periods.yaml holiday key and both report templates are built. `tests/test_cp_effect.py` (15 tests) passes, and L09's `run_all` passes on its full fixture. Still to do: tests for `cp_weekly_trips`, `cp_zone_change`, `pay_event` and the studies CLI, then the hand-off. The real numbers and narrative wait for G3. |
 
 **Blocked:** none
 
