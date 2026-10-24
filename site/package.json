@@ -1,0 +1,19 @@
+{
+  "name": "nyc-ride-market-site",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "observable preview",
+    "build": "observable build",
+    "clean": "rm -rf src/.observablehq/cache"
+  },
+  "dependencies": {
+    "@observablehq/framework": "1.13.4"
+  },
+  "devDependencies": {
+    "mapshaper": "0.7.98"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

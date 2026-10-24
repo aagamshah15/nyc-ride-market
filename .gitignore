@@ -1,0 +1,17 @@
+# Pipeline data never goes in git (CLAUDE.md). Anchored so site/src/data/ stays tracked.
+/data/
+
+# Python
+/.venv/
+__pycache__/
+*.pyc
+/.pytest_cache/
+*.egg-info/
+
+# Site
+node_modules/
+/site/dist/
+/site/src/.observablehq/cache/
+
+# OS
+.DS_Store

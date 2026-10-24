@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nyc-ride-market"
+version = "0.1.0"
+description = "Pipeline for an independent analysis of NYC TLC trip records"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "duckdb==1.5.6",      # stay on 1.5.x; don't move to 2.x without testing (SPEC §2)
+    "pyarrow==26.0.0",
+    "pyyaml==6.0.3",
+    "requests==2.34.2",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==9.1.1",
+]
+
+[tool.setuptools]
+packages = ["pipeline"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

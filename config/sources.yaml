@@ -1,0 +1,22 @@
+# Data sources (SPEC §3). Seeded by L00; owned by L02 (Ingest).
+# URL pattern and latest month checked 22 Oct 2026 on the TLC Trip Record Data page.
+
+trip_url: "https://d37ci6vzurychx.cloudfront.net/trip-data/{dataset}_tripdata_{month}.parquet"
+datasets: [fhvhv, yellow, green]   # non-high-volume FHV is out of scope for v1
+
+months:            # v1 scope (D2); back-fill to 2019-02 comes in Phase 6
+  from: "2024-01"
+  to: "2026-08"    # latest TLC month on 22 Oct 2026; TLC posts with about a two-month lag
+
+# Lookup and context files, saved under data/ref/ with these names.
+ref:
+  taxi_zone_lookup.csv: "https://d37ci6vzurychx.cloudfront.net/misc/taxi_zone_lookup.csv"
+  taxi_zones.zip: "https://d37ci6vzurychx.cloudfront.net/misc/taxi_zones.zip"
+  data_reports_monthly.csv: "https://www.nyc.gov/assets/tlc/downloads/csv/data_reports_monthly.csv"
+
+# High-volume license codes → mode (SPEC §3.3). An unknown code is an error in clean.
+hv_license:
+  HV0003: uber
+  HV0005: lyft
+  HV0002: other_hv   # Juno
+  HV0004: other_hv   # Via

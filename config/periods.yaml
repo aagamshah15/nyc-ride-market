@@ -1,0 +1,8 @@
+# Policy dates used for period labels (SPEC §3.3, §4.1). Seeded by L00.
+# L10 (Policy studies) adds the excluded holiday weeks for the congestion effect (SPEC §6).
+
+congestion_pricing_start: 2025-01-05   # MTA Congestion Relief Zone toll begins
+driver_pay_rise: 2025-08-01            # TLC minimum pay +5%
+fees:
+  cbd_fee_hvfhv: 1.50                  # per trip, peak and overnight
+  cbd_fee_taxi: 0.75                   # yellow and green, per trip
