@@ -14,6 +14,14 @@ ref:
   taxi_zones.zip: "https://d37ci6vzurychx.cloudfront.net/misc/taxi_zones.zip"
   data_reports_monthly.csv: "https://www.nyc.gov/assets/tlc/downloads/csv/data_reports_monthly.csv"
 
+# How pipeline/ingest.py downloads. Retries cover 5xx, 429, dropped connections and short
+# reads; a 403 or 404 means the file isn't posted and fails at once.
+download:
+  attempts: 5         # tries per file
+  backoff_s: 2        # wait 2, 4, 8, 16 s between tries
+  timeout_s: 60       # connect and per-read timeout
+  user_agent: "nyc-ride-market/0.1 (+https://github.com/aagamshah15/nyc-ride-market)"
+
 # High-volume license codes → mode (SPEC §3.3). An unknown code is an error in clean.
 hv_license:
   HV0003: uber
