@@ -82,3 +82,5 @@ Reason: `zones/index.json` had no page in SPEC §9.1, and the city-wide zone map
 Git repo initialised in the existing project folder. Because the folder name contains spaces, the Makefile and scripts use relative paths only. The user creates the GitHub repo and enables GitHub Pages; L17 needs both.
 
 Reason: worktree-based lanes need git; Pages needs a GitHub repo; Make doesn't handle paths with spaces.
+
+Update 23 Oct 2026: the repo was created at the user's request as https://github.com/aagamshah15/nyc-ride-market, **private** for now. Making it public and enabling Pages (source: GitHub Actions) are still the user's call; GitHub Pages on a private repo needs a paid plan.
