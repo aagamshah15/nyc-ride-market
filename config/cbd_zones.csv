@@ -1,0 +1,48 @@
+LocationID,zone,borderline,note
+4,Alphabet City,false,
+12,Battery Park,false,
+13,Battery Park City,false,
+43,Central Park,true,Runs from 59th St to 110th St; only the edge along Central Park South is inside the zone
+45,Chinatown,false,
+48,Clinton East,false,
+50,Clinton West,false,
+68,East Chelsea,false,
+79,East Village,false,
+87,Financial District North,false,
+88,Financial District South,false,
+90,Flatiron,false,
+100,Garment District,false,
+103,Governor's Island/Ellis Island/Liberty Island,true,Liberty Island: south of 60th St but no road access
+104,Governor's Island/Ellis Island/Liberty Island,true,Ellis Island: south of 60th St but no road access
+105,Governor's Island/Ellis Island/Liberty Island,true,Governors Island: south of 60th St but no road access
+107,Gramercy,false,
+113,Greenwich Village North,false,
+114,Greenwich Village South,false,
+125,Hudson Sq,false,
+137,Kips Bay,false,
+140,Lenox Hill East,true,Straddles 60th St; most of it lies north of the line
+141,Lenox Hill West,true,Straddles 60th St; most of it lies north of the line
+142,Lincoln Square East,true,Straddles 60th St; most of it lies north of the line
+143,Lincoln Square West,true,Straddles 60th St; most of it lies north of the line
+144,Little Italy/NoLiTa,false,
+148,Lower East Side,false,
+158,Meatpacking/West Village West,false,
+161,Midtown Center,false,
+162,Midtown East,false,
+163,Midtown North,false,
+164,Midtown South,false,
+170,Murray Hill,false,
+186,Penn Station/Madison Sq West,false,
+209,Seaport,false,
+211,SoHo,false,
+224,Stuy Town/Peter Cooper Village,false,
+229,Sutton Place/Turtle Bay North,false,
+230,Times Sq/Theatre District,false,
+231,TriBeCa/Civic Center,false,
+232,Two Bridges/Seward Park,false,
+233,UN/Turtle Bay South,false,
+234,Union Sq,false,
+237,Upper East Side South,true,Straddles 60th St; most of it lies north of the line
+246,West Chelsea/Hudson Yards,false,
+249,West Village,false,
+261,World Trade Center,false,
