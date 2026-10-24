@@ -1,0 +1,172 @@
+# Raw column → SPEC §4 unified column, per dataset and month range. Owned by L03.
+# Built from reports/schema_discovery.md (the footer of every file in scope), not from the dictionaries alone.
+# Loaded and checked by pipeline/schema_map.py; `python -m pipeline.discover --check` runs it over every file.
+#
+# Each dataset is a list of ranges. valid_from / valid_to are inclusive YYYY-MM; valid_to: null leaves the
+# latest range open, so a new month resolves against it and fails loudly if TLC changes the schema.
+# Ranges must be in order, without gaps or overlaps.
+#
+# In a range, every raw column appears exactly once and matches case-insensitively:
+#   columns:  raw column → {unified: SPEC §4 column, type: DuckDB type from DESCRIBE, rule: how clean uses it}
+#             Required: a file without one is an error, and so is a file whose type differs.
+#   ignore:   raw column → one-line reason. Optional in the file.
+# A file column in neither list is an error, never a guess (CLAUDE.md, SPEC §8).
+#
+# Every SPEC §4 unified column is covered exactly once per range, by `columns` or by one of:
+#   constant: unified column → value
+#   nulls:    unified columns that are NULL for this dataset
+#   derived:  unified column → rule, computed in clean (L06) from the file's month or other unified columns
+#
+# Later ranges reuse earlier blocks with YAML anchors (&name) and merge keys (<<: *name).
+
+fhvhv:
+  - valid_from: "2024-01"
+    valid_to: "2024-12"
+    columns: &fhvhv_columns
+      hvfhs_license_num:    {unified: mode, type: VARCHAR, rule: "licence code to mode via hv_license in config/sources.yaml"}
+      request_datetime:     {unified: request_ts, type: TIMESTAMP}
+      pickup_datetime:      {unified: pickup_ts, type: TIMESTAMP}
+      dropoff_datetime:     {unified: dropoff_ts, type: TIMESTAMP}
+      PULocationID:         {unified: pu_zone, type: INTEGER}
+      DOLocationID:         {unified: do_zone, type: INTEGER}
+      trip_miles:           {unified: miles, type: DOUBLE}
+      trip_time:            {unified: duration_s, type: BIGINT, rule: "seconds"}
+      base_passenger_fare:  {unified: fare_base, type: DOUBLE}
+      tips:                 {unified: tips, type: DOUBLE}
+      tolls:                {unified: tolls, type: DOUBLE}
+      airport_fee:          {unified: airport_fee, type: DOUBLE}
+      congestion_surcharge: {unified: congestion_surcharge, type: DOUBLE}
+      bcf:                  {unified: other_fees, type: DOUBLE, rule: "other_fees = bcf + sales_tax"}
+      sales_tax:            {unified: other_fees, type: DOUBLE, rule: "other_fees = bcf + sales_tax"}
+      driver_pay:           {unified: driver_pay, type: DOUBLE}
+      shared_request_flag:  {unified: shared_request, type: VARCHAR, rule: "= 'Y'"}
+      shared_match_flag:    {unified: shared_match, type: VARCHAR, rule: "= 'Y'"}
+      wav_request_flag:     {unified: wav_request, type: VARCHAR, rule: "= 'Y'"}
+      wav_match_flag:       {unified: wav_match, type: VARCHAR, rule: "= 'Y'"}
+    ignore: &fhvhv_ignore
+      dispatching_base_num: "TLC base licence that dispatched the trip; not in SPEC §4"
+      originating_base_num: "base that received the original request; not in SPEC §4"
+      on_scene_datetime: "driver arrival at pickup; SPEC waits run from request to pickup"
+      access_a_ride_flag: "trip run for the MTA's Access-A-Ride service; not in SPEC §4"
+    constant:
+      cbd_fee: 0                       # cbd_congestion_fee starts in the 2025-01 file
+    nulls: [is_card, street_hail]
+    derived: &fhvhv_derived
+      month: "first day of the file's month"
+      rider_total_ex_tip: "fare_base + tolls + other_fees + congestion_surcharge + airport_fee + cbd_fee"
+
+  - valid_from: "2025-01"
+    valid_to: null
+    columns:
+      <<: *fhvhv_columns
+      cbd_congestion_fee:   {unified: cbd_fee, type: DOUBLE, rule: "COALESCE(cbd_congestion_fee, 0)"}
+    ignore: *fhvhv_ignore
+    nulls: [is_card, street_hail]
+    derived: *fhvhv_derived
+
+yellow:
+  - valid_from: "2024-01"
+    valid_to: "2024-12"
+    columns: &yellow_columns
+      tpep_pickup_datetime:  {unified: pickup_ts, type: TIMESTAMP}
+      tpep_dropoff_datetime: {unified: dropoff_ts, type: TIMESTAMP}
+      PULocationID:          {unified: pu_zone, type: INTEGER}
+      DOLocationID:          {unified: do_zone, type: INTEGER}
+      trip_distance:         {unified: miles, type: DOUBLE}
+      fare_amount:           {unified: fare_base, type: DOUBLE}
+      tip_amount:            {unified: tips, type: DOUBLE, rule: "card tips only"}
+      tolls_amount:          {unified: tolls, type: DOUBLE}
+      airport_fee:           {unified: airport_fee, type: DOUBLE, rule: "files spell it Airport_fee"}
+      congestion_surcharge:  {unified: congestion_surcharge, type: DOUBLE}
+      extra:                 {unified: other_fees, type: DOUBLE, rule: "other_fees = extra + mta_tax + improvement_surcharge"}
+      mta_tax:               {unified: other_fees, type: DOUBLE, rule: "other_fees = extra + mta_tax + improvement_surcharge"}
+      improvement_surcharge: {unified: other_fees, type: DOUBLE, rule: "other_fees = extra + mta_tax + improvement_surcharge"}
+      total_amount:          {unified: rider_total_ex_tip, type: DOUBLE, rule: "rider_total_ex_tip = total_amount - tip_amount"}
+      payment_type:          {unified: is_card, type: BIGINT, rule: "= 1"}
+    ignore: &yellow_ignore
+      VendorID: "TPEP technology provider code; not a company or mode"
+      passenger_count: "driver-entered passenger count; not in SPEC §4"
+      RatecodeID: "rate code (standard, JFK flat fare, Newark, ...); not in SPEC §4"
+      store_and_fwd_flag: "record held in the vehicle before upload; not in SPEC §4"
+    constant: &yellow_constant_2024
+      mode: yellow
+      cbd_fee: 0                       # cbd_congestion_fee starts in the 2025-01 file
+    nulls: &yellow_null [request_ts, driver_pay, shared_request, shared_match, wav_request, wav_match, street_hail]
+    derived: &taxi_derived
+      month: "first day of the file's month"
+      duration_s: "epoch(dropoff_ts - pickup_ts)"
+
+  - valid_from: "2025-01"
+    valid_to: "2026-05"
+    columns: &yellow_columns_2025
+      <<: *yellow_columns
+      cbd_congestion_fee:    {unified: cbd_fee, type: DOUBLE, rule: "COALESCE(cbd_congestion_fee, 0)"}
+    ignore: *yellow_ignore
+    constant: &yellow_constant
+      mode: yellow
+    nulls: *yellow_null
+    derived: *taxi_derived
+
+  - valid_from: "2026-06"
+    valid_to: null
+    columns: *yellow_columns_2025
+    ignore:
+      <<: *yellow_ignore
+      request_source: "new in 2026-06, undocumented; footer values run A to HV0005 (HV licence codes); not in SPEC §4"
+    constant: *yellow_constant
+    nulls: *yellow_null
+    derived: *taxi_derived
+
+green:
+  - valid_from: "2024-01"
+    valid_to: "2024-12"
+    columns: &green_columns
+      lpep_pickup_datetime:  {unified: pickup_ts, type: TIMESTAMP}
+      lpep_dropoff_datetime: {unified: dropoff_ts, type: TIMESTAMP}
+      PULocationID:          {unified: pu_zone, type: INTEGER}
+      DOLocationID:          {unified: do_zone, type: INTEGER}
+      trip_distance:         {unified: miles, type: DOUBLE}
+      fare_amount:           {unified: fare_base, type: DOUBLE}
+      tip_amount:            {unified: tips, type: DOUBLE, rule: "card tips only"}
+      tolls_amount:          {unified: tolls, type: DOUBLE}
+      congestion_surcharge:  {unified: congestion_surcharge, type: DOUBLE}
+      extra:                 {unified: other_fees, type: DOUBLE, rule: "other_fees = extra + mta_tax + improvement_surcharge"}
+      mta_tax:               {unified: other_fees, type: DOUBLE, rule: "other_fees = extra + mta_tax + improvement_surcharge"}
+      improvement_surcharge: {unified: other_fees, type: DOUBLE, rule: "other_fees = extra + mta_tax + improvement_surcharge"}
+      total_amount:          {unified: rider_total_ex_tip, type: DOUBLE, rule: "rider_total_ex_tip = total_amount - tip_amount"}
+      payment_type:          {unified: is_card, type: BIGINT, rule: "= 1"}
+      trip_type:             {unified: street_hail, type: BIGINT, rule: "= 1"}
+    ignore: &green_ignore
+      VendorID: "LPEP technology provider code; not a company or mode"
+      passenger_count: "driver-entered passenger count; not in SPEC §4"
+      RatecodeID: "rate code (standard, JFK flat fare, Newark, ...); not in SPEC §4"
+      store_and_fwd_flag: "record held in the vehicle before upload; not in SPEC §4"
+      ehail_fee: "e-hail fee; not in SPEC §4, and null in every row of the 2026-08 file"
+    constant: &green_constant_2024
+      mode: green
+      airport_fee: 0                   # green files have no airport fee column (SPEC §4)
+      cbd_fee: 0                       # cbd_congestion_fee starts in the 2025-01 file
+    nulls: &green_null [request_ts, driver_pay, shared_request, shared_match, wav_request, wav_match]
+    derived: *taxi_derived
+
+  - valid_from: "2025-01"
+    valid_to: "2026-05"
+    columns: &green_columns_2025
+      <<: *green_columns
+      cbd_congestion_fee:    {unified: cbd_fee, type: DOUBLE, rule: "COALESCE(cbd_congestion_fee, 0)"}
+    ignore: *green_ignore
+    constant: &green_constant
+      mode: green
+      airport_fee: 0                   # green files have no airport fee column (SPEC §4)
+    nulls: *green_null
+    derived: *taxi_derived
+
+  - valid_from: "2026-06"
+    valid_to: null
+    columns: *green_columns_2025
+    ignore:
+      <<: *green_ignore
+      request_source: "new in 2026-06, undocumented; footer values run A to HV0005 (HV licence codes); not in SPEC §4"
+    constant: *green_constant
+    nulls: *green_null
+    derived: *taxi_derived
