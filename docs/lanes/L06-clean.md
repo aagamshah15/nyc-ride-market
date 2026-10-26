@@ -34,6 +34,8 @@
 - [x] Log rows in, rows out and flag counts per mode
 - [x] One month in memory at a time; the SQL does the work
 
+- [ ] D25: carry `vendor_id`, the cab files' `VendorID` (SMALLINT, NULL for HVFHV), as the last unified column after `street_hail` (`schema_map.UNIFIED_COLUMNS`, `config/schema_map.yaml`); output still equals `CLEAN_TRIPS_SCHEMA`
+
 ## Tests (expected values worked out by hand)
 
 - Each flag at its boundary: duration 0 / 10800 / 10801 s; miles 0 / 100 / 100.01; fare 0; zones 264, 265 and NULL; wait −1 / 3600 / 3601 s; pickup one day vs two days before the month starts

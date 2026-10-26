@@ -171,3 +171,22 @@ Reason: pricing began on 5 Jan 2025, and `agg_cbd_pairs` has no day grain, so th
 `agg_fees_month` sums `cbd_fee`, `congestion_surcharge`, `airport_fee` and `trips_with_cbd_fee` over **all** rows, not only `is_valid` ones. This is an exception to SPEC §4.2's "metrics use `is_valid` rows". Every other money sum keeps that rule.
 
 Reason: a fee was charged whether or not a trip's distance, duration or fare looks odd, and Q14 asks how much fee money each mode generates. Trip counts already use all rows for the same reason, so they match TLC's own figures. Using valid rows would understate fee revenue.
+
+## D24 · A WAV or shared "match" counts only when the trip asked for it
+
+25 Oct 2026 · SPEC §5, §6 (Q11, Q12) · L07, L09, L13 · **Status: accepted by the user 25 Oct 2026** (found at G2)
+
+In `agg_zone_hour`, `wav_match` counts trips with `wav_request AND wav_match`, and `shared_match` counts trips with `shared_request AND shared_match`. `wav_req` and `shared_req` are unchanged, and so are SPEC §6's ratios: accessible match rate = `SUM(wav_match) / SUM(wav_req)`, shared match rate = `SUM(shared_match) / SUM(shared_req)`. Clean trips keep the raw flags as published.
+
+Reason: in the TLC data, `wav_match_flag = Y` means the trip ran in a wheelchair-accessible vehicle, whether or not the rider asked for one. In 2025-03, 1.36 million Uber trips ran in accessible vehicles against 39,879 requests, so SPEC's ratio came out at 34.7, not a rate. Q11 and Q12 ask how often *requests* are matched, so the match has to be counted among requesting trips (2025-03: Uber 39,879 of 39,879 WAV requests, Lyft 16,612 of 16,615; Uber shared 298,194 of 570,285).
+
+## D25 · Carry VendorID; the tie-out leaves out vendor 6
+
+25 Oct 2026 · SPEC §4, §5, §8 · L03 (closed; integrator), L06, L07, L08 · **Status: accepted by the user 25 Oct 2026** (found at G2)
+
+- **Clean:** the cab files' `VendorID` becomes a unified column, `vendor_id` (SMALLINT; NULL for HVFHV), mapped in `config/schema_map.yaml` and kept in clean trips.
+- **Aggregate:** a QA table, `agg_vendor_month` (month × mode × vendor_id: `rows`, over all rows), records how many records each vendor sent.
+- **Tie-out (SPEC §8):** compares TLC's trips per day with the pipeline's `trips_all` **minus** the records of vendors listed in `tie_out_exclude_vendors` in `config/sources.yaml` (vendor 6 for yellow and green). The excluded count is shown in the report.
+- **Everything else is unchanged:** every metric, share and count keeps vendor 6's trips, and the ±2% tolerance stays.
+
+Reason: green 2025-03 was +2.37% against TLC's indicators. The gap is exactly vendor 6's 1,222 records (Myle Technologies in TLC's 2025 dictionaries): without them the pipeline counts 50,317 trips against TLC's 50,344 (−0.05%). TLC's indicators evidently don't count that vendor, so the tie-out has to compare like with like rather than widen its tolerance. Yellow also has vendor-6 records (334 in 2025-03) and passes either way. Vendor 7's yellow records aren't excluded: they don't explain a failing gap, and the user approved vendor 6 only.

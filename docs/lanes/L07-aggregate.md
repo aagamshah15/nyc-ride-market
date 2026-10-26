@@ -28,6 +28,9 @@
 - [x] `agg_week_cbd`: ISO year and week from `pickup_ts`; treated = `cbd_touch`; with `month` (D7) and `zone_list` (D9) if agreed
 - [x] A column comment block at the top of each SQL file
 
+- [ ] D24: in `agg_zone_hour`, `wav_match` counts trips with `wav_request AND wav_match`, and `shared_match` counts `shared_request AND shared_match`
+- [ ] D25: new table `agg_vendor_month` (month × mode × vendor_id: `rows`, over all rows), with the same month-scoped rewrite; schema in `AGG_SCHEMAS`
+
 ## Tests (expected values worked out by hand)
 
 - Sums per table from a factory fixture

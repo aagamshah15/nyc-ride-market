@@ -22,6 +22,8 @@
 - [x] Report: pass/fail table first, then details. The summary JSON feeds `quality.json`
 - [x] Never widen a tolerance. A failure goes to the integrator with the evidence
 
+- [ ] D25: the tie-out subtracts the `agg_vendor_month` rows of vendors in `tie_out_exclude_vendors` (`config/sources.yaml`) from the pipeline count before comparing with TLC; the report shows the excluded records per month and class. The tolerance stays ±2%
+
 ## Tests
 
 - Each check passes and fails at its boundary (for example a 2.00% vs a 2.01% gap)

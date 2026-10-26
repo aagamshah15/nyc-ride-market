@@ -1,7 +1,7 @@
 """Builders for contract-shaped test data: unified clean trips and every aggregate table.
 
-These schemas are the executable form of SPEC §4 and §5 plus decisions D7–D10 and
-D15–D16 (contracts/README.md §6). Build fixtures from them instead of hand-writing
+These schemas are the executable form of SPEC §4 and §5 plus decisions D7–D10,
+D15–D16 and D24–D25 (contracts/README.md §6). Build fixtures from them instead of hand-writing
 Parquet, so a schema change reaches every lane's tests at once.
 
     trips = clean_trips([{"mode": "yellow", "fare_base": 12.0}, {}])
@@ -40,7 +40,7 @@ CLEAN_TRIPS_SCHEMA = pa.schema([
     ("congestion_surcharge", F64), ("cbd_fee", F64), ("other_fees", F64),
     ("rider_total_ex_tip", F64), ("driver_pay", F64), ("is_card", B),
     ("shared_request", B), ("shared_match", B), ("wav_request", B), ("wav_match", B),
-    ("street_hail", B),
+    ("street_hail", B), ("vendor_id", I16),   # vendor_id per D25 (cabs; NULL for HVFHV)
     # derived columns (SPEC §4.1; *_wide per D9)
     ("wait_s", I32), ("hour_of_week", I16), ("pu_borough", S), ("do_borough", S),
     ("airport_pu", S), ("airport_do", S),
@@ -95,6 +95,9 @@ AGG_SCHEMAS = {
     "agg_fee_values": pa.schema([        # D8
         ("month", D), ("mode", S), ("cbd_fee", F64), ("trips", I64),
     ]),
+    "agg_vendor_month": pa.schema([      # D25: records per technology vendor, all rows
+        ("month", D), ("mode", S), ("vendor_id", I16), ("rows", I64),
+    ]),
     "ref_indicators": pa.schema([        # CSV columns unchanged (Open Data copy, D19), plus a parsed month
         ("month", D), ("Year/Month", S), ("License Class", S), ("Trips Per Day", F64),
         ("Farebox Per Day", F64), ("Unique Drivers", F64), ("Unique Vehicles", F64),
@@ -139,6 +142,7 @@ def make_trip(**overrides) -> dict:
         "shared_request": False if hv else None, "shared_match": False if hv else None,
         "wav_request": False if hv else None, "wav_match": False if hv else None,
         "street_hail": True if mode == "green" else None,
+        "vendor_id": None if hv else 2,
         "pu_borough": "Manhattan", "do_borough": "Manhattan",
         "airport_pu": None, "airport_do": None,
         "cbd_pu": True, "cbd_do": False, "cbd_pu_wide": True, "cbd_do_wide": False,
@@ -232,6 +236,8 @@ def _agg_defaults(name: str, mode: str) -> dict:
                 "trips_all": 100, "trips_cbd_fee": 99}
     if name == "agg_fee_values":
         return {"month": month, "mode": mode, "cbd_fee": 1.50 if hv else 0.75, "trips": 1_000}
+    if name == "agg_vendor_month":
+        return {"month": month, "mode": mode, "vendor_id": None if hv else 2, "rows": 1_000}
     if name == "ref_indicators":
         return {"month": month, "Year/Month": "2025-03", "License Class": "FHV - High Volume",
                 "Trips Per Day": 650_000.0, "Farebox Per Day": 17_500_000.0, "Unique Drivers": 70_000.0,
