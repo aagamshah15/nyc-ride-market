@@ -128,9 +128,18 @@ def write_fee_values(rows=None, months=SCOPE):
     write_agg("agg_fee_values", agg_table("agg_fee_values", rows))
 
 
+def write_vendor_month(rows=None, months=SCOPE):
+    """Records per vendor (D25). Default: one vendor per month × mode (NULL for HVFHV, vendor 2 for
+    cabs), so nothing is excluded from the tie-out."""
+    if rows is None:
+        rows = [{"month": d(m), "mode": mode, "rows": PER_DAY[mode] * days(m)} for m in months for mode in MODES]
+    write_agg("agg_vendor_month", agg_table("agg_vendor_month", rows))
+
+
 def write_world():
     write_indicators()
     write_zone_hour()
+    write_vendor_month()
     write_quality()
     write_cbd_pairs()
     write_fee_values()
@@ -257,6 +266,7 @@ def test_tie_out_divides_by_days_in_the_month(monkeypatch):
     monkeypatch.setattr(common, "months_in_scope", lambda: ["2024-02"])    # leap year: 29 days
     write_indicators([("2024-02", cls, tpd) for cls, tpd in TLC.items()])
     write_zone_hour(months=["2024-02"])
+    write_vendor_month(months=["2024-02"])
     summary = run()
     assert [(r["pipeline_trips_per_day"], r["status"]) for r in summary["tie_out"]] == [
         (10_000.0, "pass"), (100.0, "pass"), (10_000.0, "pass")]
@@ -307,6 +317,83 @@ def test_tie_out_never_uses_a_stale_indicators_copy():
     summary = run()
     assert check(summary, "tie_out")["status"] == "fail"
     assert "missing ['Year/Month'], unexpected ['Month/Year']" in check(summary, "tie_out")["summary"]
+
+
+# D25: TLC's indicators don't count vendor 6's cab records, so the tie-out leaves them out.
+
+def tie_out_row(summary: dict, month: str, license_class: str) -> dict:
+    return next(r for r in summary["tie_out"] if r["month"] == f"{month}-01" and r["license_class"] == license_class)
+
+
+@pytest.mark.parametrize("exclusions, per_day, diff, status, excluded_cell", [
+    # config/sources.yaml (vendor 6): 51,539 − 1,222 = 50,317 records; 50,317 / 31 = 1,623.1 a day;
+    # 50,317 / (1,624 × 31 = 50,344) − 1 = −0.05%
+    (None, 1_623.1, -0.0005, "pass", "1,222 (vendor 6)"),
+    # nothing excluded: 51,539 / 31 = 1,662.5 a day; 51,539 / 50,344 − 1 = +2.37%
+    ({}, 1_662.5, 0.0237, "fail", "—"),
+])
+def test_tie_out_leaves_out_excluded_vendors(monkeypatch, report_path, exclusions, per_day, diff, status,
+                                              excluded_cell):
+    if exclusions is not None:
+        monkeypatch.setattr(validate, "tie_out_exclusions", lambda: exclusions)
+    write_world()
+    # green 2025-03 as found at G2: 51,539 records, 1,222 of them vendor 6; TLC 1,624 trips a day
+    write_indicators([(m, cls, 1_624 if (m, cls) == ("2025-03", "Green") else tpd)
+                      for m in SCOPE for cls, tpd in TLC.items()])
+    write_zone_hour(totals={("2025-03", "green"): 51_539})
+    write_vendor_month([{"month": d("2025-03"), "mode": "green", "vendor_id": 2, "rows": 50_317},
+                        {"month": d("2025-03"), "mode": "green", "vendor_id": 6, "rows": 1_222}])
+    summary = run()
+    row = tie_out_row(summary, "2025-03", "Green")
+    assert (row["pipeline_trips_per_day"], row["tlc_trips_per_day"], row["diff"], row["status"]) == (
+        per_day, 1_624.0, diff, status)
+    assert check(summary, "tie_out")["status"] == status
+    assert (f"| 2025-03 | Green | 51,539 | {excluded_cell} | {per_day:,.1f} | 1,624.0 | {diff * 100:+.2f}% | "
+            f"{status} |") in report_path.read_text()
+
+
+def test_tie_out_counts_vendors_not_in_the_list():
+    write_world()
+    # yellow 2025-03: vendor 2 309,500 + vendor 7 500 + vendor 6 310 = 310,310 records. Only vendor 6
+    # leaves: 310,000 / 31 = 10,000.0 a day, TLC's figure exactly (without vendor 7 too: 9,983.9)
+    write_zone_hour(totals={("2025-03", "yellow"): 310_310})
+    write_vendor_month([{"month": d("2025-03"), "mode": "yellow", "vendor_id": 2, "rows": 309_500},
+                        {"month": d("2025-03"), "mode": "yellow", "vendor_id": 7, "rows": 500},
+                        {"month": d("2025-03"), "mode": "yellow", "vendor_id": 6, "rows": 310}])
+    row = tie_out_row(run(), "2025-03", "Yellow")
+    assert (row["pipeline_trips_per_day"], row["diff"], row["status"]) == (10_000.0, 0.0, "pass")
+
+
+def test_tie_out_leaves_hvfhv_untouched(report_path):
+    write_world()
+    # HVFHV records have no vendor; even a stray uber row with vendor_id 6 isn't a cab vendor's.
+    # 2025-03 HV records stay 310,000 = 10,000.0 a day (subtracting it would give 9,838.7)
+    write_vendor_month([{"month": d("2025-03"), "mode": "uber", "vendor_id": None, "rows": 212_000},
+                        {"month": d("2025-03"), "mode": "uber", "vendor_id": 6, "rows": 5_000}])
+    row = tie_out_row(run(), "2025-03", "FHV - High Volume")
+    assert (row["pipeline_trips_per_day"], row["status"]) == (10_000.0, "pass")
+    assert "| 2025-03 | FHV - High Volume | 310,000 | — | 10,000.0 |" in report_path.read_text()
+
+
+def test_tie_out_needs_agg_vendor_month():
+    write_world()
+    common.agg_path("agg_vendor_month").unlink()
+    assert check(run(), "tie_out") == {"id": "tie_out", "status": "fail",
+                                       "summary": "could not run: missing data/agg/agg_vendor_month.parquet"}
+
+
+def test_tie_out_exclusions_come_from_config():
+    assert validate.tie_out_exclusions() == {"yellow": [6], "green": [6]}
+
+
+def test_tie_out_rejects_an_unknown_dataset_in_the_exclusions(monkeypatch):
+    load_yaml = common.load_yaml
+    monkeypatch.setattr(common, "load_yaml", lambda name: {**load_yaml(name), "tie_out_exclude_vendors": {"fhv": [6]}}
+                        if name == "sources.yaml" else load_yaml(name))
+    write_world()
+    result = check(run(), "tie_out")
+    assert result["status"] == "fail"
+    assert "names unknown datasets ['fhv']" in result["summary"]
 
 
 # --- quality drift -------------------------------------------------------------

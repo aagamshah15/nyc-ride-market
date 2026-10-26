@@ -13,7 +13,7 @@ the aggregates fails the tie-out and an extra one is still checked.
 The checks are SQL in sql/validate/ over the aggregate tables; the schema check reads trip-file
 footers through pipeline.discover (the same check as ``python -m pipeline.discover --check``).
 
-Lane L08 · SPEC §8, §7.2 · decision D8 · docs/lanes/L08-validate.md
+Lane L08 · SPEC §8, §7.2 · decisions D8, D21, D22, D25 · docs/lanes/L08-validate.md
 """
 
 from __future__ import annotations
@@ -49,8 +49,9 @@ CHECKS = {   # id → report heading, in contract order
 ROWS_KEY = {"tie_out": "tie_out", "quality_drift": "quality", "cbd_list": "cbd", "fees": "fees"}
 ZONE_LISTS = ("core", "wide")                       # D9
 GATED_ZONE_LIST = "core"                            # D21: only core gates the CBD check; wide is reported
-AGG_INPUTS = ("agg_zone_hour", "agg_quality_month", "agg_cbd_pairs", "agg_fee_values")
+AGG_INPUTS = ("agg_zone_hour", "agg_quality_month", "agg_cbd_pairs", "agg_fee_values", "agg_vendor_month")
 HV_MODES = ("uber", "lyft", "other_hv")
+DATASET_MODES = {"fhvhv": HV_MODES, "yellow": ("yellow",), "green": ("green",)}
 
 INDICATORS_CSV = "data_reports_monthly.csv"
 INDICATOR_COLUMNS = (   # NYC Open Data copy (D19): first header is Year/Month
@@ -209,7 +210,13 @@ def _sql(name: str) -> str:
 def check_tie_out(con: duckdb.DuckDBPyConnection, present: set[str], indicators_error: str | None) -> Check:
     if indicators_error:
         raise MissingInput(f"indicators not loaded: {indicators_error}")
-    _require(present, "agg_zone_hour", "ref_indicators")
+    _require(present, "agg_zone_hour", "agg_vendor_month", "ref_indicators")
+    exclusions = tie_out_exclusions()
+    con.execute("CREATE OR REPLACE TABLE excluded_vendors (mode VARCHAR, vendor_id SMALLINT)")
+    excluded = [[mode, vendor] for dataset, vendors in exclusions.items()
+                for mode in DATASET_MODES[dataset] for vendor in vendors]
+    if excluded:
+        con.executemany("INSERT INTO excluded_vendors VALUES (?, ?)", excluded)
     rows = _query(con, "tie_out", tolerance_pct=TIE_OUT_TOLERANCE_PCT)
     checked = [r for r in rows if r["status"] != "skipped"]
     failed = [r for r in rows if r["status"] == "fail"]
@@ -223,17 +230,22 @@ def check_tie_out(con: duckdb.DuckDBPyConnection, present: set[str], indicators_
     skipped = _skipped_label(rows)
     summary = "; ".join([head, skipped] if skipped else [head])
 
+    rule = "; ".join(f"{dataset} vendor {', '.join(str(v) for v in vendors)}"
+                     for dataset, vendors in exclusions.items() if vendors) or "none"
     details = [
-        f"Pipeline trips per day (`SUM(trips_all)` from `agg_zone_hour`, every row, ÷ days in the month) "
-        f"against TLC's \"Trips Per Day\" in `ref_indicators`; a row passes within ±{TIE_OUT_TOLERANCE_PCT}%. "
-        "FHV - High Volume compares uber + lyft + other_hv. A month the indicators file doesn't have yet is "
-        "skipped; a month with no pipeline trips fails.",
+        f"Pipeline trips per day against TLC's \"Trips Per Day\" in `ref_indicators`; a row passes within "
+        f"±{TIE_OUT_TOLERANCE_PCT}%. Records are `SUM(trips_all)` from `agg_zone_hour` (every row). Before "
+        "dividing by the days in the month, the records of technology vendors that TLC's indicators don't count "
+        "are taken out, from `agg_vendor_month` and `tie_out_exclude_vendors` in `config/sources.yaml` "
+        f"(D25; now: {rule}). Every metric keeps those trips. FHV - High Volume compares uber + lyft + other_hv. "
+        "A month the indicators file doesn't have yet is skipped; a month with no pipeline trips fails.",
         "",
-        "| Month | License class | Pipeline trips/day | TLC trips/day | Diff | Status |",
-        "|---|---|---:|---:|---:|---|",
+        "| Month | License class | Records | Excluded | Pipeline trips/day | TLC trips/day | Diff | Status |",
+        "|---|---|---:|---:|---:|---:|---:|---|",
     ]
-    details += [f"| {_m(r['month'])} | {r['license_class']} | {_num(r['pipeline_trips_per_day'], 1)} | "
-                f"{_num(r['tlc_trips_per_day'], 1)} | {_signed_pct(r['diff'])} | {r['status']} |" for r in rows]
+    details += [f"| {_m(r['month'])} | {r['license_class']} | {_num(r['records'])} | {_excluded_cell(r)} | "
+                f"{_num(r['pipeline_trips_per_day'], 1)} | {_num(r['tlc_trips_per_day'], 1)} | "
+                f"{_signed_pct(r['diff'])} | {r['status']} |" for r in rows]
     contract_rows = [{
         "month": r["month"].isoformat(),
         "license_class": r["license_class"],
@@ -245,8 +257,26 @@ def check_tie_out(con: duckdb.DuckDBPyConnection, present: set[str], indicators_
     return Check("tie_out", _rollup(r["status"] for r in rows), summary, contract_rows, details)
 
 
+def tie_out_exclusions() -> dict[str, list[int]]:
+    """Vendors whose records TLC's indicators don't count, by dataset: ``tie_out_exclude_vendors``
+    in config/sources.yaml (D25). An unknown dataset or a non-integer vendor raises ``ValueError``."""
+    exclusions = common.load_yaml("sources.yaml").get("tie_out_exclude_vendors") or {}
+    unknown = sorted(set(exclusions) - set(DATASET_MODES))
+    if unknown:
+        raise ValueError(f"tie_out_exclude_vendors in config/sources.yaml names unknown datasets {unknown}")
+    return {dataset: [int(vendor) for vendor in vendors or []] for dataset, vendors in exclusions.items()}
+
+
+def _excluded_cell(row: dict) -> str:
+    """Excluded records, naming the vendors; a dash for a class with none excluded."""
+    vendors = row["excluded_vendor_ids"]
+    if not vendors:
+        return "—"
+    return f"{row['excluded_records']:,} (vendor {', '.join(str(v) for v in vendors)})"
+
+
 def _diff_label(row: dict) -> str:
-    return "no pipeline trips" if row["pipeline_trips"] == 0 else _signed_pct(row["diff"])
+    return "no pipeline trips" if row["records"] == 0 else _signed_pct(row["diff"])
 
 
 def _skipped_label(rows: list[dict]) -> str:
