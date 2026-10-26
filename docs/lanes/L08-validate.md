@@ -25,6 +25,7 @@
 - [x] D25: the tie-out subtracts the `agg_vendor_month` rows of vendors in `tie_out_exclude_vendors` (`config/sources.yaml`) from the pipeline count before comparing with TLC; the report shows the excluded records per month and class. The tolerance stays ±2%
 
 - [ ] D26: the quality check fails a month × mode below 85% `valid_rows / rows` (was 95%); months more than 3 points below the mode's median stay listed, not failed
+- [ ] D27: the tie-out gates on `FHV - High Volume` only; `Yellow` and `Green` keep their own ±2% pass/fail, reported, not gating. `tie_out_exclude_vendors` is emptied (D25 reverted). Rows in `tie_out_exceptions` get status `excepted` with their reason in the report (first one: 2026-06 FHVHV)
 
 ## Tests
 

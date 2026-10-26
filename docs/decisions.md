@@ -184,6 +184,8 @@ Reason: in the TLC data, `wav_match_flag = Y` means the trip ran in a wheelchair
 
 25 Oct 2026 · SPEC §4, §5, §8 · L03 (closed; integrator), L06, L07, L08 · **Status: accepted by the user 25 Oct 2026** (found at G2)
 
+**Superseded in part by D27 (26 Oct 2026):** `vendor_id` and `agg_vendor_month` stay, but vendor 6 is no longer left out of the tie-out. The 32-month back-fill showed the match in 2025-03 was a coincidence.
+
 - **Clean:** the cab files' `VendorID` becomes a unified column, `vendor_id` (SMALLINT; NULL for HVFHV), mapped in `config/schema_map.yaml` and kept in clean trips.
 - **Aggregate:** a QA table, `agg_vendor_month` (month × mode × vendor_id: `rows`, over all rows), records how many records each vendor sent.
 - **Tie-out (SPEC §8):** compares TLC's trips per day with the pipeline's `trips_all` **minus** the records of vendors listed in `tie_out_exclude_vendors` in `config/sources.yaml` (vendor 6 for yellow and green). The excluded count is shown in the report.
@@ -199,3 +201,17 @@ Reason: green 2025-03 was +2.37% against TLC's indicators. The gap is exactly ve
 - **Quality check (SPEC §8):** a month × mode **fails below 85%** `valid_rows / rows`. A month **more than 3 points below its mode's median** is listed in the report but doesn't fail, as SPEC already had it. SPEC's flat 95% floor is replaced.
 
 Reason: on the 32 back-filled months (2024-01 → 2026-08), the 95% floor failed 57 of 128 month × mode rows on data quality that isn't a pipeline fault. Green was below in all 32 months (zero-mile records, 4.5% on average), and yellow in 21 (fares of $0 or less, 3.2% on average, peaking in 2025-05 → 2025-11). Uber and Lyft cleared it by fractions of a point only because 4.4% of their trips touch zone 265, which SPEC had treated as unknown. With 265 valid, Uber and Lyft have a 99.96% median. Every mode-month clears 85% (lowest: yellow 2025-11), and yellow's 2025 fare episode shows up as listed drift. The evidence is the valid-share table in the integrator's G3 report; `reports/validation.md` from the next full run will carry it.
+
+## D27 · The tie-out gates on ride-hail only; cab tie-outs are reported
+
+26 Oct 2026 · SPEC §8 (tie-out) · L08 · **Status: accepted by the user 26 Oct 2026** (from the G3 back-fill)
+
+- **Gate:** only `FHV - High Volume` (uber + lyft + other_hv) must be within ±2% of TLC's trips per day. `Yellow` and `Green` rows are computed and reported, each with its own pass/fail against ±2%, but they don't fail the check. The ±2% tolerance itself is unchanged.
+- **D25's vendor exclusion is reverted:** `tie_out_exclude_vendors` in `config/sources.yaml` is empty for both cab datasets. Clean trips keep `vendor_id`, and `agg_vendor_month` still records each vendor's count for the report.
+- **Documented exception:** `tie_out_exceptions` in `config/sources.yaml` lists month × class rows that are reported with their reason but don't gate. One row so far: **2026-06, FHV - High Volume**. TLC reports 707,670 trips a day, but its published file (unchanged since 17 Sep 2026: same size and ETag) holds 20,775,868 rows, 692,529 a day, −2.14%. TLC's figure covers trips its own file doesn't contain. Remove the exception if TLC revises either the file or the figure.
+
+Reason: over 32 months, ride-hail matches TLC to +0.00% in 30 months, so its tie-out tests the pipeline. The cab figures follow counting rules the pipeline can't reproduce, and they change over time:
+- green runs a steady +2.1% to +3.0% from 2024-12 (all vendors);
+- yellow drifts up to +4% through 2026-05, then falls to about 0 from 2026-06, the month TLC's files gained `request_source`.
+
+Gating on them would fail on TLC's method, not on the pipeline. Rows in, rows out and the manifest still check every cab record exactly (the integrity check in G2 and G3).
