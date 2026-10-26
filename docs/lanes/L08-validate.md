@@ -24,8 +24,8 @@
 
 - [x] D25: the tie-out subtracts the `agg_vendor_month` rows of vendors in `tie_out_exclude_vendors` (`config/sources.yaml`) from the pipeline count before comparing with TLC; the report shows the excluded records per month and class. The tolerance stays ±2%
 
-- [ ] D26: the quality check fails a month × mode below 85% `valid_rows / rows` (was 95%); months more than 3 points below the mode's median stay listed, not failed
-- [ ] D27: the tie-out gates on `FHV - High Volume` only; `Yellow` and `Green` keep their own ±2% pass/fail, reported, not gating. `tie_out_exclude_vendors` is emptied (D25 reverted). Rows in `tie_out_exceptions` get status `excepted` with their reason in the report (first one: 2026-06 FHVHV)
+- [x] D26: the quality check fails a month × mode below 85% `valid_rows / rows` (was 95%); months more than 3 points below the mode's median stay listed, not failed
+- [x] D27: the tie-out gates on `FHV - High Volume` only; `Yellow` and `Green` keep their own ±2% pass/fail, reported, not gating. `tie_out_exclude_vendors` is emptied (D25 reverted). Rows in `tie_out_exceptions` get status `excepted` with their reason in the report (first one: 2026-06 FHVHV)
 
 ## Tests
 
@@ -50,6 +50,8 @@ _Only this lane writes here. Newest first._
 
 | Date | State | Note |
 |---|---|---|
+| 26 Oct | D27 done on fixtures | Merged `main` (d9fc319). The tie-out now gates on FHV - High Volume only. Yellow and Green rows keep their own ±2% pass/fail, "reported, not gated (D27)" in the summary and report (a failing cab row reads `fail (reported, not gated)`). Rows listed in `tie_out_exceptions` get status `excepted`, don't gate, and the report lists their diff and reason; skipped rows stay skipped. `config/sources.yaml` (edit authorized by the integrator) has empty `tie_out_exclude_vendors` and the 2026-06 FHVHV exception. The vendor mechanism and the Records and Excluded columns stay. The `tie_out` row keys are unchanged. The vendor-6 G2 test is replaced by D27 tests worked by hand. `make test` is green: 361 passed, 12 skipped, and the site builds. |
+| 26 Oct | D26 done on fixtures | Merged `main` (5d9d043). The quality check now fails a month × mode only below 85% `valid_rows / rows` (`MIN_VALID_PCT = 85`, citing D26), still compared in whole numbers so exactly 85.00% passes. Months more than 3 points below the mode's median stay listed, not failed. The check's summary and report cite D26. `validation_summary.json` keeps its shape. Tests: the boundary is now 85.00% pass / 84.99% fail; the drift tests are kept, plus a 90% month that SPEC's 95% would have failed and that is now listed only. The tie-out is unchanged (D25 stays). `make test` is green: 351 passed, 12 skipped, and the site builds. |
 | 25 Oct | D25 done on fixtures | Merged `integrator/d24-d25` (e92d1c0). The tie-out now subtracts the `agg_vendor_month` records of the vendors in `tie_out_exclude_vendors` before comparing with TLC, and `agg_vendor_month` is a required input. The report's tie-out table gains Records and Excluded columns and states the rule. The tolerance stays ±2%, and the `tie_out` JSON keys are unchanged. Hand-worked G2 case: green 2025-03 has 51,539 records, 1,222 of them vendor 6, against TLC's 1,624 a day. It fails at +2.37% with vendor 6 and passes at −0.05% without. 7 new tests. `make test`: only the expected `tests/test_clean_*.py` (33) and `test_aggregate_tables.py::test_tables_cover_every_aggregate_schema` fail until L06 and L07 land; everything else passes and the site builds. |
 | 24 Oct | done on fixtures | Gate built and tested on factory aggregates. The real indicators CSV is loaded into the shared `data/agg/ref_indicators.parquet`. Two contract points wait on the integrator (see Blocked). The real `make validate` runs at G2 and G3 (integrator). |
 
@@ -61,34 +63,44 @@ _Only this lane writes here. Newest first._
 - Built:
   - `pipeline/validate.py`. The CLI is unchanged (`python -m pipeline.validate`, run by `make validate`) and `STUB_LANE` is gone. It adds one option, `--indicators-only`, which only loads the CSV.
   - `sql/validate/`: `ref_indicators.sql`, `tie_out.sql`, `quality.sql`, `cbd_list.sql` and `fees.sql`, each with a header block for inputs, params and output columns.
-  - `tests/test_validate.py`: 53 tests (7 for D25; 1 added by the integrator for D21).
+  - `tests/test_validate.py`: 64 tests.
   - What a run does:
     1. Reloads `data/ref/data_reports_monthly.csv` into `data/agg/ref_indicators.parquet`. The header must be exactly the 14 D19 columns. Values are cast but never coerced: a bad value fails the load and isn't turned into NULL.
     2. Registers the aggregates. Months checked = the `config/sources.yaml` scope plus any month found in `agg_zone_hour`, `agg_quality_month`, `agg_cbd_pairs`, `agg_fee_values` or `agg_vendor_month`.
     3. Runs the five checks. A check that can't run (missing table, zone helper still a stub, unreadable footer) fails with the reason; it doesn't stop the gate.
     4. Writes `reports/validation.md` (pass/fail table first, then a section per check) and `data/agg/validation_summary.json` (contract §5).
     5. Exits 0 only when every check passes; on `fail` or `skipped` it exits 1.
-  - Tie-out (D25):
-    - Pipeline trips = `SUM(agg_zone_hour.trips_all)` minus the `agg_vendor_month` rows whose `vendor_id` is listed under the mode's dataset in `tie_out_exclude_vendors` (`config/sources.yaml`).
-    - `validate.tie_out_exclusions()` reads that list; an unknown dataset or a non-integer vendor fails the check. HVFHV records carry no vendor, so they're never touched.
-    - The report's table shows Records, Excluded (count and vendor ids, or "—"), then trips per day after the exclusion.
-  - Thresholds are module constants taken from SPEC (2, 95, 3, 98, 95); none is a CLI option. Each boundary is computed with integers, so exactly 2.00%, 95% or 98% passes. For example, the tie-out tests `|trips − TLC × days| × 100 ≤ 2 × TLC × days`. Drift points are rounded to 1e-6 to drop float noise.
+  - Tie-out (D27 rule, D25 mechanism):
+    - Only `FHV - High Volume` rows gate the check (`GATED_LICENSE_CLASS`). Yellow and Green rows keep their own pass/fail against ±2% and are reported, not gated.
+    - `validate.tie_out_exceptions()` reads `tie_out_exceptions`. An entry needs a `YYYY-MM` month, a known license class and a reason; a malformed one fails the check. A matching row becomes `excepted` (not gating); a skipped row stays skipped.
+    - The report lists each exception's diff and reason. If an excepted row is back within ±2%, the report says to remove the exception. A listed exception outside the months checked is named.
+    - Pipeline trips = `SUM(agg_zone_hour.trips_all)` minus the `agg_vendor_month` rows of vendors in `tie_out_exclude_vendors`. The lists are empty since D27. `validate.tie_out_exclusions()` reads them; an unknown dataset or a non-integer vendor fails the check. HVFHV records carry no vendor.
+    - The report's table shows Records, Excluded (count and vendor ids, or "—"), trips per day, TLC, diff and status.
+  - Thresholds are module constants: tie-out 2, quality floor 85 (D26; SPEC had 95), drift 3, CBD 98, fees 95. None is a CLI option. Each boundary is computed with integers, so exactly 2.00%, 85%, 95% or 98% passes. For example, the tie-out tests `|trips − TLC × days| × 100 ≤ 2 × TLC × days`. Drift points are rounded to 1e-6 to drop float noise.
   - The schema check calls `pipeline.discover.discover` and `.check` in-process (the same check as `--check`) for the three datasets × months checked. It reads local raw footers when present, otherwise remote footers (D11).
 - Checked:
   - `make test` on 24 Oct was green: 183 passed, 6 skipped, and the site builds. On 25 Oct, on the D24/D25 branch, the 34 failures are all the expected L06/L07 ones: 33 in `tests/test_clean_*.py` plus `test_aggregate_tables.py::test_tables_cover_every_aggregate_schema`. The other 307 pass (12 skipped) and the site builds.
-  - D25 tests, worked by hand:
-    - Green 2025-03 as found at G2 (51,539 records, 1,222 of them vendor 6; TLC 1,624 × 31 = 50,344) passes at 1,623.1 a day, −0.05%, with the config's exclusion. With none it fails at 1,662.5, +2.37%. The report row shows `1,222 (vendor 6)`.
-    - Yellow vendor 7's 500 records stay counted; only vendor 6's 310 leave, so the result is exactly 10,000.0 a day.
+  - D27 tests, worked by hand:
+    - HVFHV at 10,300 a day against 10,000 (+3.00%) fails the check.
+    - Green 2025-03 with every vendor (51,539 / 31 = 1,662.5 a day; +2.37% against 1,624 × 31 = 50,344) and yellow at +4.00% each show `fail` on their row, while the check passes. The report row reads `fail (reported, not gated)`.
+    - 2026-06 FHVHV comes from the real config entry: 20,775,868 / 30 = 692,528.9 a day; against 707,670 × 30 = 21,230,100 that's −2.14%. With the exception the row is `excepted`, the check passes, and the report carries the reason. Without it the check fails.
+    - An exception on a passing row says to remove it.
+    - An exception on a month missing from the indicators stays `skipped`.
+    - Malformed exceptions fail the check.
+    - The real config gives one exception (2026-06 FHVHV) and empty vendor lists.
+  - D25 mechanism tests:
+    - Empty lists subtract nothing: yellow with 310 vendor-6 records stays at 10,010.0 a day, and Excluded shows "—".
+    - With a vendor listed, vendor 6's 310 records leave and vendor 7's 500 stay, giving exactly 10,000.0 a day and `310 (vendor 6)`.
     - A stray uber row with `vendor_id` 6 leaves HVFHV unchanged.
-    - A missing `agg_vendor_month` fails the tie-out with the reason.
-    - The real config gives `{yellow: [6], green: [6]}`; an unknown dataset fails the check.
+    - A missing `agg_vendor_month` fails the tie-out.
+    - An unknown dataset fails the check.
   - Fixture tests:
-    - Tie-out ±2.00% passes and ±2.01% fails.
+    - Tie-out ±2.00% passes and ±2.01% fails, on the gating FHV - High Volume row.
     - The tie-out sums uber + lyft + other_hv, and divides by 29 days in Feb 2024.
     - A month missing from the indicators is skipped and listed, and the check still passes. A single missing class is named.
     - A month with no pipeline trips fails.
     - A missing CSV, or a CSV with another header, fails the tie-out even when an older parquet exists.
-    - Quality 95.00% passes, 94.99% fails.
+    - Quality 85.00% passes, 84.99% fails (D26). A 90% month, below SPEC's old 95%, is listed as drift but passes.
     - Drift at exactly 3.00 points isn't listed; at 3.01 it's listed but doesn't fail.
     - CBD 98.00% passes, 97.99% fails. Pass-through is reported, not failed. The wide list counts a borderline pair.
     - 2025-01 is left out of the CBD check.
@@ -108,18 +120,21 @@ _Only this lane writes here. Newest first._
       | 2024-01 | −0.001% | +0.94% | +0.01% |
       | 2026-08 | +0.001% | +0.12% | **+1.66%** |
 
-      These counts include vendor 6, and every class passes either way. With D25, Green 2026-08 should come in below +1.66%, since that figure counted vendor 6's records.
+      These counts include every vendor, as the tie-out does since D27. Only the HVFHV column gates.
 - Known limits:
   - The CBD check leaves out 2025-01 (D22) and gates on the core list only (D21). The wide list's result is reported. The report states both.
   - The CBD and fee checks pass or fail on totals over the months (per mode for fees), as in the §5 shape. Single months below the threshold are listed, not failed.
-  - D25 excludes only the configured vendors (vendor 6, yellow and green). Any other vendor TLC turns out not to count would show as a tie-out gap; adding it needs the user's approval and a config edit.
+  - Since D27 the cab tie-outs don't gate. Their pass/fail is information, so a cab-side pipeline fault would show only as a reported `fail` row; rows in, rows out and the manifest still check every cab record. A new exception or vendor exclusion needs the user's approval and a `config/sources.yaml` edit. An `excepted` row keeps that status even when it's back within ±2%; the report says when to remove it.
   - "Exactly the configured fee" means equal as stored, with no rounding to cents.
   - `months_checked` covers the whole scope, so at G2 the 31 months without aggregates fail the tie-out as "no pipeline trips". That's expected, and the gate exits 1.
   - The schema check reads about 96 remote footers paced 1 s apart, about 2 minutes and ~190 requests. L03 measured CloudFront's limit at roughly 300 requests per 5 minutes, so don't run `make discover` just before.
   - `reports/validation.md` isn't committed by this lane. A fixture-built report would misstate the data, so the integrator commits the one from the real G2/G3 run.
 - Follow-ups:
-  - **Integrator at G2:** merge L06 and L07's D25 work, so clean carries `vendor_id` and `agg_vendor_month` exists; without it the tie-out fails with "missing data/agg/agg_vendor_month.parquet". Re-run `make month MONTH=2025-03`, then `NYC_DATA_DIR=… make validate`. The gate exits 1 because of the 31 months with no aggregates. G2 holds if the three 2025-03 tie-out rows pass (green should come in near −0.05%, with 1,222 vendor-6 records shown as excluded) and the 2025-03 quality, CBD (core gates), schema and fee results pass. Read them in the tie-out table and the sections of `reports/validation.md`. Route a failure to its owner: tie-out or quality → L06/L07; CBD → L04 (list) or L06 (flags); fees → L06; schema → L03.
-  - **At G3:** after the back-fill, `make validate` must exit 0. Commit `reports/validation.md`.
+  - **Integrator at G3:** re-run `NYC_DATA_DIR=… make validate` on the back-filled aggregates.
+    - Expected tie-out: 31 FHVHV months pass, 2026-06 is `excepted`, and cab rows are reported (green and yellow may show `fail (reported, not gated)`).
+    - Quality has an 85% floor, with yellow's 2025 fare episode listed as drift.
+    - The gate must exit 0. Commit `reports/validation.md`.
+    - Route a failure to its owner: HVFHV tie-out or quality → L06/L07; CBD → L04 (list) or L06 (flags); fees → L06; schema → L03.
   - **L17:** run `python -m pipeline.ingest --ref --force` before `make validate` so the indicators are current; without `--force`, `make ref` keeps the old copy (L02). Open the issue from `reports/validation.md`. The deploy guard reads `status == "pass"`.
   - **L09:** `ref_indicators.parquet` is in the shared `data/agg/`. `python -m pipeline.validate --indicators-only` rebuilds it without running the gate.
   - **Contract idea:** a `drift` flag on the `quality` rows would let the methods page show drift months. Today they appear only in the check's summary text.

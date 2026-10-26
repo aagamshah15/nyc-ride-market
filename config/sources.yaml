@@ -25,12 +25,19 @@ download:
   timeout_s: 60       # connect and per-read timeout
   user_agent: "nyc-ride-market/0.1 (+https://github.com/aagamshah15/nyc-ride-market)"
 
-# Technology vendors whose cab records the TLC monthly indicators leave out (D25). The tie-out
-# (pipeline/validate.py) subtracts their records from the pipeline count before comparing with TLC;
-# every metric keeps them. Found at G2: green 2025-03 was +2.37% with vendor 6, −0.05% without.
+# Tie-out against the TLC monthly indicators (SPEC §8; D25, D27). Only FHV - High Volume gates
+# the check (D27); Yellow and Green are reported with their own pass/fail.
+# Vendors whose cab records are subtracted before comparing (D25 mechanism). Empty since D27:
+# vendor 6 matched green's gap in 2025-03 only by coincidence.
 tie_out_exclude_vendors:
-  yellow: [6]
-  green: [6]
+  yellow: []
+  green: []
+
+# Month × class rows reported with their reason but not gating (D27). Remove one if TLC revises it.
+tie_out_exceptions:
+  - month: "2026-06"
+    license_class: "FHV - High Volume"
+    reason: "TLC reports 707,670 trips a day, but its published file (unchanged since 17 Sep 2026) holds 20,775,868 rows, 692,529 a day"
 
 # High-volume license codes → mode (SPEC §3.3). An unknown code is an error in clean.
 hv_license:

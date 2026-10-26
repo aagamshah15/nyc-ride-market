@@ -136,6 +136,13 @@ def write_vendor_month(rows=None, months=SCOPE):
     write_agg("agg_vendor_month", agg_table("agg_vendor_month", rows))
 
 
+def patch_sources(monkeypatch, **overrides):
+    """config/sources.yaml with ``overrides`` on top, e.g. ``tie_out_exceptions=[]``."""
+    load_yaml = common.load_yaml
+    monkeypatch.setattr(common, "load_yaml",
+                        lambda name: {**load_yaml(name), **overrides} if name == "sources.yaml" else load_yaml(name))
+
+
 def write_world():
     write_indicators()
     write_zone_hour()
@@ -151,6 +158,10 @@ def run() -> dict:
 
 def check(summary: dict, check_id: str) -> dict:
     return next(c for c in summary["checks"] if c["id"] == check_id)
+
+
+def tie_out_row(summary: dict, month: str, license_class: str) -> dict:
+    return next(r for r in summary["tie_out"] if r["month"] == f"{month}-01" and r["license_class"] == license_class)
 
 
 def contract_example() -> dict:
@@ -202,12 +213,13 @@ def test_report_has_the_table_first_then_every_section(report_path):
     table = report.index("| Check | Status | Summary |")
     assert report.index("**Status: PASS**") < table < positions[0]
     assert "months checked: 2025-02 → 2025-04 (3 months)" in report
-    assert "| Tie-out | PASS | All 3 months with indicators within ±2% |" in report
+    assert ("| Tie-out | PASS | All 3 FHV - High Volume months with indicators within ±2%; reported, not gated "
+            "(D27): Yellow within ±2%, Green within ±2% |") in report
 
 
 def test_any_failure_fails_the_gate():
     write_world()
-    write_quality(valid={("2025-03", "green"): 9_000})
+    write_quality(valid={("2025-03", "green"): 8_000})       # 80%, below D26's 85%
     summary = run()
     assert summary["status"] == "fail"
     assert check(summary, "quality_drift")["status"] == "fail"
@@ -245,9 +257,10 @@ def test_months_checked_adds_months_found_in_the_aggregates():
 ])
 def test_tie_out_boundary(per_day, status):
     write_world()
-    write_zone_hour(totals={("2025-03", "yellow"): per_day * 31})
+    # FHV - High Volume gates (D27): lyft + other_hv are 3,000 a day, so uber carries the rest
+    write_zone_hour(totals={("2025-03", "uber"): (per_day - 3_000) * 31})
     summary = run()
-    row = next(r for r in summary["tie_out"] if r["month"] == "2025-03-01" and r["license_class"] == "Yellow")
+    row = tie_out_row(summary, "2025-03", "FHV - High Volume")
     assert row["pipeline_trips_per_day"] == per_day
     assert row["diff"] == pytest.approx(per_day / 10_000 - 1)
     assert row["status"] == status
@@ -280,7 +293,8 @@ def test_month_missing_from_indicators_is_skipped_and_listed():
     assert [(r["status"], r["tlc_trips_per_day"], r["diff"]) for r in april] == [("skipped", None, None)] * 3
     assert check(summary, "tie_out") == {
         "id": "tie_out", "status": "pass",
-        "summary": "All 2 months with indicators within ±2%; 2025-04 skipped (not yet in indicators)"}
+        "summary": ("All 2 FHV - High Volume months with indicators within ±2%; reported, not gated (D27): "
+                    "Yellow within ±2%, Green within ±2%; 2025-04 skipped (not yet in indicators)")}
 
 
 def test_one_class_missing_from_indicators_is_named():
@@ -297,8 +311,9 @@ def test_month_in_scope_without_pipeline_trips_fails():
     summary = run()
     april = [r for r in summary["tie_out"] if r["month"] == "2025-04-01"]
     assert {(r["pipeline_trips_per_day"], r["diff"], r["status"]) for r in april} == {(0.0, -1.0, "fail")}
-    assert check(summary, "tie_out")["summary"].startswith(
-        "3 of 9 month × class rows outside ±2%: FHV - High Volume 2025-04 (no pipeline trips)")
+    assert check(summary, "tie_out") == {"id": "tie_out", "status": "fail", "summary": (
+        "1 of 3 FHV - High Volume months outside ±2%: 2025-04 (no pipeline trips); reported, not gated (D27): "
+        "Yellow 1 of 3 months outside ±2%, Green 1 of 3 months outside ±2%")}
 
 
 def test_tie_out_fails_without_the_indicators_csv():
@@ -319,40 +334,138 @@ def test_tie_out_never_uses_a_stale_indicators_copy():
     assert "missing ['Year/Month'], unexpected ['Month/Year']" in check(summary, "tie_out")["summary"]
 
 
-# D25: TLC's indicators don't count vendor 6's cab records, so the tie-out leaves them out.
+# D27: only FHV - High Volume gates; cab rows are reported; listed rows are excepted.
 
-def tie_out_row(summary: dict, month: str, license_class: str) -> dict:
-    return next(r for r in summary["tie_out"] if r["month"] == f"{month}-01" and r["license_class"] == license_class)
-
-
-@pytest.mark.parametrize("exclusions, per_day, diff, status, excluded_cell", [
-    # config/sources.yaml (vendor 6): 51,539 − 1,222 = 50,317 records; 50,317 / 31 = 1,623.1 a day;
-    # 50,317 / (1,624 × 31 = 50,344) − 1 = −0.05%
-    (None, 1_623.1, -0.0005, "pass", "1,222 (vendor 6)"),
-    # nothing excluded: 51,539 / 31 = 1,662.5 a day; 51,539 / 50,344 − 1 = +2.37%
-    ({}, 1_662.5, 0.0237, "fail", "—"),
-])
-def test_tie_out_leaves_out_excluded_vendors(monkeypatch, report_path, exclusions, per_day, diff, status,
-                                              excluded_cell):
-    if exclusions is not None:
-        monkeypatch.setattr(validate, "tie_out_exclusions", lambda: exclusions)
+def test_an_hvfhv_row_outside_tolerance_fails_the_check():
     write_world()
-    # green 2025-03 as found at G2: 51,539 records, 1,222 of them vendor 6; TLC 1,624 trips a day
-    write_indicators([(m, cls, 1_624 if (m, cls) == ("2025-03", "Green") else tpd)
-                      for m in SCOPE for cls, tpd in TLC.items()])
-    write_zone_hour(totals={("2025-03", "green"): 51_539})
-    write_vendor_month([{"month": d("2025-03"), "mode": "green", "vendor_id": 2, "rows": 50_317},
-                        {"month": d("2025-03"), "mode": "green", "vendor_id": 6, "rows": 1_222}])
+    # 2025-03 HVFHV: uber 7,300 + lyft 2,900 + other_hv 100 = 10,300 a day against TLC's 10,000, +3.00%
+    write_zone_hour(totals={("2025-03", "uber"): 7_300 * 31})
     summary = run()
-    row = tie_out_row(summary, "2025-03", "Green")
-    assert (row["pipeline_trips_per_day"], row["tlc_trips_per_day"], row["diff"], row["status"]) == (
-        per_day, 1_624.0, diff, status)
-    assert check(summary, "tie_out")["status"] == status
-    assert (f"| 2025-03 | Green | 51,539 | {excluded_cell} | {per_day:,.1f} | 1,624.0 | {diff * 100:+.2f}% | "
-            f"{status} |") in report_path.read_text()
+    assert tie_out_row(summary, "2025-03", "FHV - High Volume")["status"] == "fail"
+    assert check(summary, "tie_out") == {"id": "tie_out", "status": "fail", "summary": (
+        "1 of 3 FHV - High Volume months outside ±2%: 2025-03 (+3.00%); reported, not gated (D27): "
+        "Yellow within ±2%, Green within ±2%")}
 
 
-def test_tie_out_counts_vendors_not_in_the_list():
+@pytest.mark.parametrize("mode, license_class, records, tlc, per_day, diff", [
+    # green 2025-03 as found at G2, every vendor counted: 51,539 / 31 = 1,662.5 a day;
+    # 51,539 / (1,624 × 31 = 50,344) − 1 = +2.37%
+    ("green", "Green", 51_539, 1_624, 1_662.5, 0.0237),
+    # yellow drifting up: 322,400 / 31 = 10,400 a day against 10,000, +4.00%
+    ("yellow", "Yellow", 322_400, 10_000, 10_400.0, 0.04),
+])
+def test_a_cab_row_outside_tolerance_is_reported_not_gated(report_path, mode, license_class, records, tlc,
+                                                            per_day, diff):
+    write_world()
+    write_indicators([(m, cls, tlc if (m, cls) == ("2025-03", license_class) else tpd)
+                      for m in SCOPE for cls, tpd in TLC.items()])
+    write_zone_hour(totals={("2025-03", mode): records})
+    summary = run()
+    row = tie_out_row(summary, "2025-03", license_class)
+    assert (row["pipeline_trips_per_day"], row["diff"], row["status"]) == (per_day, diff, "fail")
+    assert check(summary, "tie_out")["status"] == "pass"
+    assert f"{license_class} 1 of 3 months outside ±2%" in check(summary, "tie_out")["summary"]
+    assert (f"| 2025-03 | {license_class} | {records:,} | — | {per_day:,.1f} | {tlc:,.1f} | {diff * 100:+.2f}% | "
+            "fail (reported, not gated) |") in report_path.read_text()
+
+
+def write_june_2026(months=("2026-05", "2026-06")):
+    """2026-06 HVFHV as found at G3: TLC 707,670 a day; the file holds 20,775,868 rows over 30 days.
+    2026-05 is an ordinary month, so the gate has a month to pass on."""
+    write_indicators([(m, cls, 707_670 if (m, cls) == ("2026-06", "FHV - High Volume") else tpd)
+                      for m in months for cls, tpd in TLC.items()])
+    # lyft + other_hv: 3,000 a day × 30 = 90,000; uber 20,775,868 − 90,000 = 20,685,868
+    write_zone_hour(months=months, totals={("2026-06", "uber"): 20_685_868})
+    write_vendor_month(months=months)
+    write_quality(months=months)
+    write_cbd_pairs(months=months)
+    write_fee_values(months=months)
+
+
+@pytest.mark.parametrize("excepted", [True, False])
+def test_an_excepted_hvfhv_row_shows_its_reason_and_doesnt_gate(monkeypatch, report_path, excepted):
+    monkeypatch.setattr(common, "months_in_scope", lambda: ["2026-05", "2026-06"])
+    if not excepted:
+        patch_sources(monkeypatch, tie_out_exceptions=[])
+    write_june_2026()
+    summary = run()
+    row = tie_out_row(summary, "2026-06", "FHV - High Volume")
+    # 20,775,868 / 30 = 692,528.9 a day; 20,775,868 / (707,670 × 30 = 21,230,100) − 1 = −2.14%
+    assert (row["pipeline_trips_per_day"], row["tlc_trips_per_day"], row["diff"]) == (692_528.9, 707_670.0, -0.0214)
+    report = report_path.read_text()
+    if excepted:      # the real config/sources.yaml entry
+        assert row["status"] == "excepted"
+        assert check(summary, "tie_out") == {"id": "tie_out", "status": "pass", "summary": (
+            "All 1 FHV - High Volume months with indicators within ±2%; reported, not gated (D27): Yellow within "
+            "±2%, Green within ±2%; excepted (D27): FHV - High Volume 2026-06")}
+        assert "| 2026-06 | FHV - High Volume | 20,775,868 | — | 692,528.9 | 707,670.0 | -2.14% | excepted |" in report
+        assert ("- FHV - High Volume 2026-06: -2.14%, outside ±2%. Reason: TLC reports 707,670 trips a day, but its "
+                "published file (unchanged since 17 Sep 2026) holds 20,775,868 rows, 692,529 a day.") in report
+    else:
+        assert row["status"] == "fail"
+        assert check(summary, "tie_out")["status"] == "fail"
+
+
+def test_an_exception_that_now_passes_says_to_remove_it(monkeypatch, report_path):
+    patch_sources(monkeypatch, tie_out_exceptions=[
+        {"month": "2025-03", "license_class": "FHV - High Volume", "reason": "test"}])
+    write_world()
+    summary = run()
+    assert tie_out_row(summary, "2025-03", "FHV - High Volume")["status"] == "excepted"
+    assert check(summary, "tie_out")["status"] == "pass"
+    assert ("- FHV - High Volume 2025-03: +0.00%, within ±2%, so the exception is no longer needed: remove it. "
+            "Reason: test.") in report_path.read_text()
+
+
+def test_an_exception_for_a_month_missing_from_the_indicators_stays_skipped(monkeypatch, report_path):
+    patch_sources(monkeypatch, tie_out_exceptions=[
+        {"month": "2025-04", "license_class": "FHV - High Volume", "reason": "test"}])
+    write_world()
+    write_indicators([(m, cls, tpd) for m in SCOPE[:2] for cls, tpd in TLC.items()])
+    summary = run()
+    assert tie_out_row(summary, "2025-04", "FHV - High Volume")["status"] == "skipped"
+    assert check(summary, "tie_out")["status"] == "pass"
+    assert "Exceptions (D27)" not in report_path.read_text()
+
+
+def test_tie_out_exceptions_come_from_config():
+    exceptions = validate.tie_out_exceptions()
+    assert list(exceptions) == [(date(2026, 6, 1), "FHV - High Volume")]
+    assert exceptions[(date(2026, 6, 1), "FHV - High Volume")].startswith("TLC reports 707,670 trips a day")
+
+
+@pytest.mark.parametrize("entry", [
+    {"month": "2026-06", "license_class": "HVFHV", "reason": "x"},
+    {"month": "2026-06", "license_class": "Green"},
+    {"month": "June 2026", "license_class": "Green", "reason": "x"},
+])
+def test_a_malformed_exception_fails_the_check(monkeypatch, entry):
+    patch_sources(monkeypatch, tie_out_exceptions=[entry])
+    write_world()
+    result = check(run(), "tie_out")
+    assert result["status"] == "fail"
+    assert result["summary"].startswith("could not run:")
+
+
+# The D25 vendor mechanism stays, with empty lists since D27.
+
+def test_empty_vendor_lists_subtract_nothing(report_path):
+    write_world()
+    # yellow 2025-03: 310,310 records, 310 of them vendor 6; nothing leaves: 10,010.0 a day, +0.10%
+    write_zone_hour(totals={("2025-03", "yellow"): 310_310})
+    write_vendor_month([{"month": d("2025-03"), "mode": "yellow", "vendor_id": 2, "rows": 310_000},
+                        {"month": d("2025-03"), "mode": "yellow", "vendor_id": 6, "rows": 310}])
+    row = tie_out_row(run(), "2025-03", "Yellow")
+    assert (row["pipeline_trips_per_day"], row["diff"], row["status"]) == (10_010.0, 0.001, "pass")
+    assert "| 2025-03 | Yellow | 310,310 | — | 10,010.0 |" in report_path.read_text()
+
+
+def test_tie_out_exclusions_come_from_config():
+    assert validate.tie_out_exclusions() == {"yellow": [], "green": []}
+
+
+def test_a_listed_vendor_is_subtracted_and_others_are_counted(monkeypatch, report_path):
+    patch_sources(monkeypatch, tie_out_exclude_vendors={"yellow": [6], "green": [6]})
     write_world()
     # yellow 2025-03: vendor 2 309,500 + vendor 7 500 + vendor 6 310 = 310,310 records. Only vendor 6
     # leaves: 310,000 / 31 = 10,000.0 a day, TLC's figure exactly (without vendor 7 too: 9,983.9)
@@ -362,9 +475,11 @@ def test_tie_out_counts_vendors_not_in_the_list():
                         {"month": d("2025-03"), "mode": "yellow", "vendor_id": 6, "rows": 310}])
     row = tie_out_row(run(), "2025-03", "Yellow")
     assert (row["pipeline_trips_per_day"], row["diff"], row["status"]) == (10_000.0, 0.0, "pass")
+    assert "| 2025-03 | Yellow | 310,310 | 310 (vendor 6) | 10,000.0 |" in report_path.read_text()
 
 
-def test_tie_out_leaves_hvfhv_untouched(report_path):
+def test_vendor_exclusions_leave_hvfhv_untouched(monkeypatch, report_path):
+    patch_sources(monkeypatch, tie_out_exclude_vendors={"yellow": [6], "green": [6]})
     write_world()
     # HVFHV records have no vendor; even a stray uber row with vendor_id 6 isn't a cab vendor's.
     # 2025-03 HV records stay 310,000 = 10,000.0 a day (subtracting it would give 9,838.7)
@@ -382,14 +497,8 @@ def test_tie_out_needs_agg_vendor_month():
                                        "summary": "could not run: missing data/agg/agg_vendor_month.parquet"}
 
 
-def test_tie_out_exclusions_come_from_config():
-    assert validate.tie_out_exclusions() == {"yellow": [6], "green": [6]}
-
-
 def test_tie_out_rejects_an_unknown_dataset_in_the_exclusions(monkeypatch):
-    load_yaml = common.load_yaml
-    monkeypatch.setattr(common, "load_yaml", lambda name: {**load_yaml(name), "tie_out_exclude_vendors": {"fhv": [6]}}
-                        if name == "sources.yaml" else load_yaml(name))
+    patch_sources(monkeypatch, tie_out_exclude_vendors={"fhv": [6]})
     write_world()
     result = check(run(), "tie_out")
     assert result["status"] == "fail"
@@ -398,7 +507,7 @@ def test_tie_out_rejects_an_unknown_dataset_in_the_exclusions(monkeypatch):
 
 # --- quality drift -------------------------------------------------------------
 
-@pytest.mark.parametrize("valid_rows, status", [(9_500, "pass"), (9_499, "fail")])   # 95.00% vs 94.99%
+@pytest.mark.parametrize("valid_rows, status", [(8_500, "pass"), (8_499, "fail")])   # 85.00% vs 84.99% (D26)
 def test_quality_boundary(valid_rows, status):
     write_world()
     write_quality(valid={("2025-03", "yellow"): valid_rows})
@@ -406,20 +515,27 @@ def test_quality_boundary(valid_rows, status):
     row = next(r for r in summary["quality"] if r["month"] == "2025-03-01" and r["mode"] == "yellow")
     assert (row["valid_share"], row["status"]) == (valid_rows / 10_000, status)
     assert check(summary, "quality_drift")["status"] == status
+    if status == "fail":
+        assert check(summary, "quality_drift")["summary"].startswith(
+            "1 of 15 month × mode rows below 85% valid (D26): yellow 2025-03 (84.99%)")
 
 
-@pytest.mark.parametrize("valid_rows, listed", [(9_600, False), (9_599, True)])   # 3.00 vs 3.01 points
-def test_quality_drift_is_listed_not_failed(valid_rows, listed, report_path):
+@pytest.mark.parametrize("valid_rows, points", [
+    (9_600, None),       # 3.00 points below: not listed
+    (9_599, "3.01"),     # 3.01 points below: listed
+    (9_000, "9.00"),     # 90%: below SPEC's old 95% floor, above D26's 85%, so listed but not failed
+])
+def test_quality_drift_is_listed_not_failed(valid_rows, points, report_path):
     write_world()
-    # uber: 99.00%, 99.00% and 96.00% (or 95.99%); median 99.00%
+    # uber: 99.00%, 99.00% and 96.00% (or 95.99%, or 90.00%); median 99.00%
     write_quality(valid={("2025-04", "uber"): valid_rows})
     summary = run()
     result = check(summary, "quality_drift")
     assert result["status"] == "pass"
-    if listed:
-        assert result["summary"] == ("All 15 month × mode rows at least 95% valid; 1 more than 3 points below "
-                                     "the mode's median (listed): uber 2025-04 (3.01 pts)")
-        assert "95.99% *drift −3.01 pts*" in report_path.read_text()
+    if points:
+        assert result["summary"] == ("All 15 month × mode rows at least 85% valid (D26); 1 more than 3 points "
+                                     f"below the mode's median (listed): uber 2025-04 ({points} pts)")
+        assert f"{valid_rows / 100:.2f}% *drift −{points} pts*" in report_path.read_text()
     else:
         assert result["summary"].endswith("none more than 3 points below its mode's median")
 
@@ -622,10 +738,10 @@ def test_cli_exit_codes(capsys):
         validate.main([])
     assert exit_.value.code == 0
     out = capsys.readouterr().out
-    assert "pass    tie_out: All 3 months with indicators within ±2%" in out
+    assert "pass    tie_out: All 3 FHV - High Volume months with indicators within ±2%" in out
     assert "validation pass" in out
 
-    write_zone_hour(totals={("2025-03", "yellow"): 10_201 * 31})
+    write_zone_hour(totals={("2025-03", "uber"): (10_201 - 3_000) * 31})     # HVFHV +2.01%
     with pytest.raises(SystemExit) as exit_:
         validate.main([])
     assert exit_.value.code == 1
