@@ -107,6 +107,50 @@ def test_zone_hour_sums():
     assert sum(r["trips_all"] for r in rows("agg_zone_hour")) == 8
 
 
+def test_matches_count_only_requested_trips():
+    build(clean_trips([
+        {"wav_request": True, "wav_match": True},                   # A: asked, matched
+        {"wav_request": True, "wav_match": False},                  # B: asked, not matched
+        {"wav_request": False, "wav_match": True},                  # C: accessible vehicle, not asked
+        {"shared_request": False, "shared_match": True},            # D: shared ride, not asked
+        {"shared_request": True, "shared_match": True},             # E: asked, matched
+        {"shared_request": True, "shared_match": False},            # F: asked, not matched
+        {"wav_request": True, "wav_match": True, "miles": 0.0, "f_miles": True},   # G: invalid
+    ]))
+    row = one("agg_zone_hour", mode="uber")
+    # WAV: requests A B; match A only. C ran in an accessible vehicle unasked, so it isn't a match
+    # (D24); the raw flag would give 2 matches (A, C). G is invalid.
+    assert (row["wav_req"], row["wav_match"]) == (2, 1)
+    # shared: requests E F; match E only (the raw flag would give D, E)
+    assert (row["shared_req"], row["shared_match"]) == (2, 1)
+
+
+def test_vendor_month_counts_every_row():
+    build(clean_trips([
+        {"mode": "yellow", "vendor_id": 1},
+        {"mode": "yellow", "vendor_id": 1, "fare_base": 0.0, "f_fare": True},   # invalid: still counted
+        {"mode": "yellow", "vendor_id": 2},
+        {"mode": "yellow", "vendor_id": 6},
+        {"mode": "yellow", "vendor_id": None},                  # a record with no VendorID
+        {"mode": "green", "vendor_id": 6},
+        {"mode": "green"},                                      # factory default vendor 2
+        {},                                                     # uber: no vendor
+        {"miles": 0.0, "f_miles": True},                        # uber, invalid
+        {"vendor_id": 3},                                       # uber with a stray value: still the NULL row
+        {"mode": "lyft"},
+    ]))
+    assert {(r["mode"], r["vendor_id"]): r["rows"] for r in rows("agg_vendor_month")} == {
+        ("yellow", 1): 2, ("yellow", 2): 1, ("yellow", 6): 1, ("yellow", None): 1,
+        ("green", 2): 1, ("green", 6): 1,
+        ("uber", None): 3, ("lyft", None): 1,                   # one NULL row per ride-hail mode
+    }
+    # per mode, the vendor rows add up to every record (agg_quality_month.rows)
+    by_mode = {}
+    for r in rows("agg_vendor_month"):
+        by_mode[r["mode"]] = by_mode.get(r["mode"], 0) + r["rows"]
+    assert by_mode == {r["mode"]: r["rows"] for r in rows("agg_quality_month")}
+
+
 def test_zone_hour_groups_by_hour_of_week():
     build(clean_trips([
         {"pickup_ts": datetime(2025, 3, 2, 0, 30)},     # Sunday 00:30 → 0
