@@ -83,14 +83,16 @@ def test_fare_boundary():
 
 
 def test_zone_flags():
-    zones = [(161, 236), (264, 236), (161, 265), (None, 236), (161, None), (265, 264)]
+    zones = [(161, 236), (264, 236), (161, 264), (None, 236), (161, None),
+             (265, 236), (161, 265), (265, 265), (265, 264), (None, 265)]
     write_month(MARCH, green=[{"PULocationID": pu, "DOLocationID": do, "tip_amount": float(i)}
                               for i, (pu, do) in enumerate(zones)])
     clean.clean_month(MARCH)
     trips = by_tip("green")
-    # either zone 264, 265 or NULL → f_zone
-    assert [trips[float(i)]["f_zone"] for i in range(6)] == [False, True, True, True, True, True]
-    assert [trips[float(i)]["is_valid"] for i in range(6)] == [True, False, False, False, False, False]
+    # either zone 264 or NULL → f_zone; 265 ("Outside of NYC") at either end or both is a real place (D26)
+    expected = [False, True, True, True, True, False, False, False, True, True]
+    assert [trips[float(i)]["f_zone"] for i in range(10)] == expected
+    assert [trips[float(i)]["is_valid"] for i in range(10)] == [not f for f in expected]
 
 
 def test_wait_boundaries():
