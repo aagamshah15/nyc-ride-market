@@ -24,6 +24,8 @@
 
 - [x] D25: the tie-out subtracts the `agg_vendor_month` rows of vendors in `tie_out_exclude_vendors` (`config/sources.yaml`) from the pipeline count before comparing with TLC; the report shows the excluded records per month and class. The tolerance stays ±2%
 
+- [ ] D26: the quality check fails a month × mode below 85% `valid_rows / rows` (was 95%); months more than 3 points below the mode's median stay listed, not failed
+
 ## Tests
 
 - Each check passes and fails at its boundary (for example a 2.00% vs a 2.01% gap)

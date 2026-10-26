@@ -190,3 +190,12 @@ Reason: in the TLC data, `wav_match_flag = Y` means the trip ran in a wheelchair
 - **Everything else is unchanged:** every metric, share and count keeps vendor 6's trips, and the ±2% tolerance stays.
 
 Reason: green 2025-03 was +2.37% against TLC's indicators. The gap is exactly vendor 6's 1,222 records (Myle Technologies in TLC's 2025 dictionaries): without them the pipeline counts 50,317 trips against TLC's 50,344 (−0.05%). TLC's indicators evidently don't count that vendor, so the tie-out has to compare like with like rather than widen its tolerance. Yellow also has vendor-6 records (334 in 2025-03) and passes either way. Vendor 7's yellow records aren't excluded: they don't explain a failing gap, and the user approved vendor 6 only.
+
+## D26 · Quality rule: zone 265 is a real place; the gate's floor is 85%
+
+26 Oct 2026 · SPEC §4.2 (`f_zone`), §8 (quality drift) · L06, L08, L11, L12 · **Status: accepted by the user 26 Oct 2026** (from the G3 back-fill)
+
+- **`f_zone`** is true when `pu_zone` or `do_zone` is **264** ("Unknown") or NULL. Zone **265** ("Outside of NYC" in the TLC lookup) is no longer flagged: trips to or from New Jersey, Westchester and other places outside the city are valid trips. Zone pages still cover only 1–263, so zone 265 gets no page, but it counts in city-wide metrics.
+- **Quality check (SPEC §8):** a month × mode **fails below 85%** `valid_rows / rows`. A month **more than 3 points below its mode's median** is listed in the report but doesn't fail, as SPEC already had it. SPEC's flat 95% floor is replaced.
+
+Reason: on the 32 back-filled months (2024-01 → 2026-08), the 95% floor failed 57 of 128 month × mode rows on data quality that isn't a pipeline fault. Green was below in all 32 months (zero-mile records, 4.5% on average), and yellow in 21 (fares of $0 or less, 3.2% on average, peaking in 2025-05 → 2025-11). Uber and Lyft cleared it by fractions of a point only because 4.4% of their trips touch zone 265, which SPEC had treated as unknown. With 265 valid, Uber and Lyft have a 99.96% median. Every mode-month clears 85% (lowest: yellow 2025-11), and yellow's 2025 fare episode shows up as listed drift. The evidence is the valid-share table in the integrator's G3 report; `reports/validation.md` from the next full run will carry it.

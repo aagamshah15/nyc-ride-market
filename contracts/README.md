@@ -147,6 +147,7 @@ Written by L08 to `data/agg/validation_summary.json`; read by L11 (into `quality
 `status` is `"pass"` only when every check passes. `status` values: `pass`, `fail`, `skipped`. `diff` is relative: pipeline ÷ TLC − 1.
 
 - `months_checked` is the full sorted list of every month checked, one `YYYY-MM` string each, not a [first, last] range; `[0]` and `[-1]` give the range. (The `"…"` above stands for the months in between.)
+- `quality` rows: `status` is `fail` below 85% `valid_share` (D26). Months more than 3 points below the mode's median are listed in the check's summary and report, not failed.
 - `tie_out` rows: `pipeline_trips_per_day` leaves out the records of vendors in `tie_out_exclude_vendors` (D25); the report shows how many were left out.
 - `cbd` rows: only `zone_list = "core"` gates the `cbd_list` check (D21). The `wide` row carries its own pass/fail against the same 98% threshold as information, and the check's status ignores it. 2025-01, the month pricing began part-way through, is left out (D22).
 
@@ -164,6 +165,7 @@ The executable schemas are the builders in `tests/factories.py` (`CLEAN_TRIPS_SC
 - Count and seconds sums are BIGINT; money and miles are DOUBLE. Sums that don't apply to a mode are NULL (for example `driver_pay` for taxis, `card_*` for ride-hail).
 - `ref_indicators` keeps the CSV's column names (quoted in SQL, e.g. `"Trips Per Day"`; the month column is `"Year/Month"` in the NYC Open Data copy, D19) with numeric columns as DOUBLE, plus a parsed `month` DATE. `Percent of Trips Paid with Credit Card` is DOUBLE, a whole-number percent as published (79 = 79%), NULL for the FHV classes.
 - D23: `agg_fees_month` sums every row, not only `is_valid` ones (fee money was charged either way); every other money sum uses `is_valid` rows.
+- D26: `f_zone` flags zone 264 ("Unknown") and NULL zones only; zone 265 ("Outside of NYC") is a valid place. City-wide metrics include its trips; zone pages still cover 1–263.
 - D24: in `agg_zone_hour`, `wav_match` counts trips with `wav_request AND wav_match` and `shared_match` counts `shared_request AND shared_match`, so a match is always a matched *request*. Clean trips keep the raw flags.
 - D25: clean trips carry `vendor_id` (SMALLINT; the cab files' `VendorID`, NULL for HVFHV), the last unified column, after `street_hail`. `agg_vendor_month` (month × mode × vendor_id: `rows`, all rows) feeds the tie-out, which subtracts the vendors in `tie_out_exclude_vendors` (`config/sources.yaml`) before comparing with TLC. Metrics keep every vendor.
 - Clean partition files at `data/clean/mode={mode}/month={YYYY-MM}/part-0.parquet` keep every column, including `mode` and `month` (DATE). The folder names are layout only: read with `hive_partitioning = false`.

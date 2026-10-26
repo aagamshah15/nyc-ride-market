@@ -36,6 +36,8 @@
 
 - [x] D25: carry `vendor_id`, the cab files' `VendorID` (SMALLINT, NULL for HVFHV), as the last unified column after `street_hail` (`schema_map.UNIFIED_COLUMNS`, `config/schema_map.yaml`); output still equals `CLEAN_TRIPS_SCHEMA`
 
+- [ ] D26: `f_zone` is true when `pu_zone` or `do_zone` is 264 or NULL; zone 265 ("Outside of NYC") is no longer flagged
+
 ## Tests (expected values worked out by hand)
 
 - Each flag at its boundary: duration 0 / 10800 / 10801 s; miles 0 / 100 / 100.01; fare 0; zones 264, 265 and NULL; wait −1 / 3600 / 3601 s; pickup one day vs two days before the month starts
