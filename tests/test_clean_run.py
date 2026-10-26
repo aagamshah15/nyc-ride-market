@@ -24,16 +24,17 @@ def test_rows_out_equal_rows_in_flagged_rows_kept():
     write_month(MARCH,
                 fhvhv=[{}, {"hvfhs_license_num": "HV0005"}, {"trip_time": 0}, {"PULocationID": None},
                        {"hvfhs_license_num": "HV0005", "trip_miles": 500.0}],
-                yellow=[{}, {"fare_amount": 0.0}, {"DOLocationID": 265}],
+                yellow=[{}, {"fare_amount": 0.0}, {"DOLocationID": 264}, {"DOLocationID": 265}],
                 green=[{}, {}, {"trip_distance": 0.0}, {}])
     counts = clean.clean_month(MARCH)
-    # fhvhv 5 rows = uber 3 + lyft 2; yellow 3; green 4
-    assert {mode: c["rows"] for mode, c in counts.items()} == {"uber": 3, "lyft": 2, "yellow": 3, "green": 4}
-    assert {mode: rows_in_file(mode) for mode in counts} == {"uber": 3, "lyft": 2, "yellow": 3, "green": 4}
+    # fhvhv 5 rows = uber 3 + lyft 2; yellow 4; green 4
+    assert {mode: c["rows"] for mode, c in counts.items()} == {"uber": 3, "lyft": 2, "yellow": 4, "green": 4}
+    assert {mode: rows_in_file(mode) for mode in counts} == {"uber": 3, "lyft": 2, "yellow": 4, "green": 4}
     # uber: trip_time 0 (f_time) and a NULL pickup zone (f_zone); lyft: 500 miles (f_miles)
     assert (counts["uber"]["valid"], counts["uber"]["f_time"], counts["uber"]["f_zone"]) == (1, 1, 1)
     assert (counts["lyft"]["valid"], counts["lyft"]["f_miles"]) == (1, 1)
-    assert (counts["yellow"]["valid"], counts["yellow"]["f_fare"], counts["yellow"]["f_zone"]) == (1, 1, 1)
+    # yellow: a $0 fare (f_fare) and a drop-off in zone 264 (f_zone); zone 265 is valid (D26)
+    assert (counts["yellow"]["valid"], counts["yellow"]["f_fare"], counts["yellow"]["f_zone"]) == (2, 1, 1)
     assert (counts["green"]["valid"], counts["green"]["f_miles"]) == (3, 1)
     # modes without rows get no file
     assert not part("other_hv").exists()

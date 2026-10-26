@@ -36,7 +36,7 @@
 
 - [x] D25: carry `vendor_id`, the cab files' `VendorID` (SMALLINT, NULL for HVFHV), as the last unified column after `street_hail` (`schema_map.UNIFIED_COLUMNS`, `config/schema_map.yaml`); output still equals `CLEAN_TRIPS_SCHEMA`
 
-- [ ] D26: `f_zone` is true when `pu_zone` or `do_zone` is 264 or NULL; zone 265 ("Outside of NYC") is no longer flagged
+- [x] D26: `f_zone` is true when `pu_zone` or `do_zone` is 264 or NULL; zone 265 ("Outside of NYC") is no longer flagged
 
 ## Tests (expected values worked out by hand)
 
@@ -63,6 +63,7 @@ _Only this lane writes here. Newest first._
 
 | Date | State | Note |
 |---|---|---|
+| 26 Oct 2026 | D26 applied | Merged `main` (5d9d043). `f_zone` in `sql/clean/derive.sql` now flags only zone 264 or NULL at either end; zone 265 ("Outside of NYC") is valid. The zone test covers 265 at the pickup end, the drop-off end and both (not flagged), and 264 or NULL at either end, including with 265 at the other (flagged); `is_valid` follows. `make test` green: 350 passed, 12 skipped, site build OK. Real months not re-run, as the integrator asked; the flag shares below are from the 24 Oct runs under the old rule |
 | 25 Oct 2026 | D25 applied | Merged `integrator/d24-d25` (e92d1c0). `vendor_id` (SMALLINT) is carried after `street_hail`: the cab `VendorID` through the map, NULL for HVFHV (the map's `nulls`); every file still equals `CLEAN_TRIPS_SCHEMA`. 39 clean tests pass. `make test`: 339 passed, 12 skipped, 1 failed, the expected L07 `agg_vendor_month` test; the site build passes on its own. Real months not re-run, as the integrator asked; the 2024-01 and 2026-08 files in the shared folder still lack `vendor_id` until the integrator's re-run |
 | 24 Oct 2026 | done | Built and tested; 38 clean tests and `make test` green. Real runs on 2024-01 and 2026-08 (the integrator's substitute for the brief's 2024-03 and 2025-03, since those two months are already downloaded and fall before and after pricing). Rows out = rows in = manifest for every dataset. Flag shares are under Hand-off. **Gate risk:** green (both months) and yellow 2026-08 are below SPEC §8's 95% valid share |
 | 24 Oct 2026 | started | |
@@ -80,7 +81,7 @@ _Only this lane writes here. Newest first._
   - `tests/fixtures/raw/raw_trips.py`: raw files built in code with the real files' column names, order and types (yellow's `Airport_fee`, `cbd_congestion_fee` from 2025-01, cab `request_source` from 2026-06), a manifest entry per file and a small zone lookup.
 - Checked:
   - `tests/test_clean_columns.py` (17), `tests/test_clean_flags.py` (14), `tests/test_clean_run.py` (8), with expected values worked out by hand in comments:
-    - every flag at its boundary: duration 0 / 1 / 10800 / 10801 / −60 s from `trip_time`, and 0 / 10800 / 10801 / −814 s from cab timestamps; miles 0 / 0.01 / 100 / 100.01 / −1; fare 0 / 0.01 / −3; zones 264, 265 and NULL at either end; wait −1 / 0 / 3600 / 3601 s; pickups at 28 Feb 00:00 (inside), 27 Feb 23:59:59 and 27 Feb 00:00 (outside), 1 Apr 23:59:59 (inside), 2 Apr 00:00 (outside) for the March file;
+    - every flag at its boundary: duration 0 / 1 / 10800 / 10801 / −60 s from `trip_time`, and 0 / 10800 / 10801 / −814 s from cab timestamps; miles 0 / 0.01 / 100 / 100.01 / −1; fare 0 / 0.01 / −3; zones 264 and NULL at either end flagged, 265 at either end or both not (D26); wait −1 / 0 / 3600 / 3601 s; pickups at 28 Feb 00:00 (inside), 27 Feb 23:59:59 and 27 Feb 00:00 (outside), 1 Apr 23:59:59 (inside), 2 Apr 00:00 (outside) for the March file;
     - `is_valid` ignoring `f_wait`; NULL measures setting their flags; a NULL request giving NULL `wait_s` and no `f_wait`; a duration beyond INTEGER (NULL and flagged);
     - `hour_of_week` Sunday 00:30 → 0, Saturday 23:10 → 167, Tuesday 08:10 → 56;
     - `period` at 2025-01-04 23:59:59 (pre_cp), 2025-01-05 00:00 (post_cp), 2025-07-31 23:59:59 (post_cp) and 2025-08-01 00:00 (post_pay);
@@ -90,7 +91,7 @@ _Only this lane writes here. Newest first._
     - rows out = rows in with flagged rows kept; a manifest mismatch; a missing raw file, manifest entry or zone lookup; a re-run replacing the month and dropping an emptied mode; a failed run (green fails after fhvhv and yellow staged) leaving the previous files intact; the CLI.
   - `make test` green on 24 Oct: 338 passed, 12 skipped, site build OK. After D25 (25 Oct): 339 passed, 12 skipped, 1 failed (L07's `agg_vendor_month`, expected until L07 lands); the site build passes.
   - Real runs (`NYC_DATA_DIR` = the shared data folder), about 2.8 s per month on this Mac, peak RSS 1.4–1.5 GB; both months together take 1.1 GB on disk. Every file's schema equals `CLEAN_TRIPS_SCHEMA`. Totals: 22,685,105 rows for 2024-01 and 23,870,883 for 2026-08, equal to the manifest's rows. Every flag count was recounted with a separate query straight on the raw files and matched exactly.
-  - Flag shares (share of the mode's rows; `other_hv` has no rows in either month):
+  - Flag shares from the 24 Oct runs, under the old rule that also flagged zone 265 (share of the mode's rows; `other_hv` has no rows in either month). Under D26, Uber's and Lyft's `f_zone` shares fall below 0.01%: their only zone-264 rows are 475 Uber trips in 2026-08:
 
     | Month | Mode | Rows | Valid | f_time | f_miles | f_fare | f_zone | f_wait |
     |---|---|---:|---:|---:|---:|---:|---:|---:|
@@ -107,11 +108,11 @@ _Only this lane writes here. Newest first._
   1. **Flags are never NULL.** A NULL duration, pickup, miles or fare fails its test and sets the flag. A NULL wait sets no `f_wait`, since wait metrics already drop NULL waits (L07). The real files have no such NULLs.
   2. **INTEGER overflow.** `duration_s` and `wait_s` are INTEGER (`CLEAN_TRIPS_SCHEMA`). A value outside that range (about 68 years, possible only with a garbled cab timestamp) is stored as NULL, and its flag is worked out on the full value. None in either month: cab durations run −18,031,051 to 567,324 s.
   3. **Raw NULLs stay NULL.** SPEC coalesces only `cbd_fee`. Yellow `Airport_fee` and `congestion_surcharge` are NULL in 140,162 rows (4.7%) in 2024-01 and 921,181 (27.6%) in 2026-08, and stay NULL. Green `payment_type` and `trip_type` NULL (3,415 and 6,313 rows) give NULL `is_card` and `street_hail`. A NULL Y/N flag would stay NULL (none seen).
-  4. **Zones** are cast to SMALLINT with a plain CAST, so a value outside its range stops the run rather than being lost; every zone in both months is in 1–265. Zones 264 and 265 get the lookup's boroughs (`Unknown`, `N/A`). Every HVFHV `f_zone` row in both months is zone 265 (outside NYC); none are 264.
+  4. **Zones** are cast to SMALLINT with a plain CAST, so a value outside its range stops the run rather than being lost; every zone in both months is in 1–265. Zones 264 and 265 get the lookup's boroughs (`Unknown`, `N/A`). Under the old rule, HVFHV's `f_zone` rows were all zone 265 (outside NYC) except 475 Uber rows with zone 264 in 2026-08 (none in 2024-01; an earlier note here wrongly said none at all), so under D26 HVFHV's `f_zone` share is under 0.01%.
   5. **Replacing the month** is one rename per file after everything passes, not one atomic step across five folders. If a run stops during the renames (a few milliseconds), re-run the month. There is no lock against two cleans of one month at once.
   6. **No file for an empty mode.** `other_hv` (HV0002, HV0004) has no trips in 2024-01 or 2026-08, so it has no folder. L07 reads whatever files exist.
   7. `period` is set by `pickup_ts`, so garbled old pickups in a 2026 file (e.g. 2009) read `pre_cp`. They always carry `f_time`.
 - Follow-ups:
-  - **Integrator (gate risk, G3):** under SPEC §4.2's flag rules, the quality-drift check (`valid_rows / rows` ≥ 95%, SPEC §8) would fail for green 2024-01 (93.57%), yellow 2026-08 (94.12%) and green 2026-08 (92.55%). Uber and Lyft 2026-08 pass narrowly (95.32%, 95.12%). The causes are in the data: zero-distance trips (yellow 119,059 = 3.6% in 2026-08; green 4.4–5.1%), yellow durations ≤ 0 (43,185 in 2026-08, against 870 in 2024-01) and HVFHV trips to or from zone 265 (3.7–4.9%). The independent recount rules out a clean bug. Changing a flag or the threshold is the user's call (CLAUDE.md), so nothing was changed here.
+  - **Integrator (gate risk, G3; settled by D26, zone 265 valid and an 85% floor):** under SPEC §4.2's flag rules, the quality-drift check (`valid_rows / rows` ≥ 95%, SPEC §8) would fail for green 2024-01 (93.57%), yellow 2026-08 (94.12%) and green 2026-08 (92.55%). Uber and Lyft 2026-08 pass narrowly (95.32%, 95.12%). The causes are in the data: zero-distance trips (yellow 119,059 = 3.6% in 2026-08; green 4.4–5.1%), yellow durations ≤ 0 (43,185 in 2026-08, against 870 in 2024-01) and HVFHV trips to or from zone 265 (3.7–4.9%). The independent recount rules out a clean bug. Changing a flag or the threshold is the user's call (CLAUDE.md), so nothing was changed here.
   - **L07 / L09:** yellow `airport_fee` is NULL in 27.6% of 2026-08 rows; `SUM` skips them, so airport-fee totals count only rows that report the fee.
   - **Integrator, G2:** `make clean MONTH=2025-03` needs the 2025-03 raw files, which aren't downloaded yet.

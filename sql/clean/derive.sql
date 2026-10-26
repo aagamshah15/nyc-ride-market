@@ -21,7 +21,8 @@
 --                 on or after the next month's first day + 1 day
 -- f_miles         miles <= 0 or > 100
 -- f_fare          fare_base <= 0
--- f_zone          pu_zone or do_zone is 264, 265 or NULL
+-- f_zone          pu_zone or do_zone is 264 ("Unknown") or NULL. Zone 265 ("Outside of NYC") is a
+--                 real place and isn't flagged (D26)
 -- f_wait          ride-hail and (wait_s < 0 or > 3600); false for cabs and for a NULL wait
 -- is_valid        none of f_time, f_miles, f_fare, f_zone
 --
@@ -54,7 +55,7 @@ f AS (
         coalesce(miles <= 0 OR miles > 100, true)                  AS f_miles,
         coalesce(fare_base <= 0, true)                             AS f_fare,
         pu_zone IS NULL OR do_zone IS NULL
-            OR pu_zone IN (264, 265) OR do_zone IN (264, 265)      AS f_zone,
+            OR pu_zone = 264 OR do_zone = 264                      AS f_zone,
         coalesce(mode IN ('uber', 'lyft', 'other_hv')
                  AND (wait_full < 0 OR wait_full > 3600), false)   AS f_wait
     FROM d
