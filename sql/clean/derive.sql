@@ -2,7 +2,7 @@
 -- Unified trips from any dataset → clean trips: the derived columns and quality flags, in the exact
 -- column order and types of CLEAN_TRIPS_SCHEMA (tests/factories.py).
 --
--- Input  view `unified`: the 24 SPEC §4 columns from hvfhv.sql, yellow.sql or green.sql
+-- Input  view `unified`: the 25 unified columns from hvfhv.sql, yellow.sql or green.sql
 --        (duration_s still BIGINT there)
 --        table `ref_zone` (zone, borough, airport, cbd, cbd_wide), one row per zone, built by
 --        pipeline/clean.py from data/ref/taxi_zone_lookup.csv and pipeline.zones: airports from
@@ -84,6 +84,7 @@ SELECT
     wav_request::BOOLEAN                                           AS wav_request,
     wav_match::BOOLEAN                                             AS wav_match,
     street_hail::BOOLEAN                                           AS street_hail,
+    vendor_id::SMALLINT                                            AS vendor_id,
     TRY_CAST(wait_full AS INTEGER)                                 AS wait_s,
     (dayofweek(pickup_ts) * 24 + hour(pickup_ts))::SMALLINT        AS hour_of_week,
     pu_borough::VARCHAR                                            AS pu_borough,

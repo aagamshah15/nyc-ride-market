@@ -81,7 +81,7 @@ def test_hvfhv_columns():
     assert trip["rider_total_ex_tip"] == pytest.approx(34.34)
     assert (trip["shared_request"], trip["shared_match"], trip["wav_request"], trip["wav_match"]) == (
         True, False, True, True)
-    assert (trip["is_card"], trip["street_hail"]) == (None, None)
+    assert (trip["is_card"], trip["street_hail"], trip["vendor_id"]) == (None, None, None)
     assert trip["wait_s"] == 240                                     # 4 min
 
 
@@ -142,6 +142,19 @@ def test_yellow_columns_and_the_airport_fee_spelling():
     for column in ("request_ts", "wait_s", "driver_pay", "shared_request", "wav_match", "street_hail"):
         assert card[column] is None, column
     assert card["f_wait"] is False
+
+
+def test_cab_vendor_id_comes_through_and_ride_hail_has_none():
+    # D25: the cab files' VendorID becomes vendor_id; HVFHV files have no vendor column
+    write_month(MARCH, fhvhv=[{}, {"hvfhs_license_num": "HV0005"}],
+                yellow=[{"tip_amount": 0.0}, {"VendorID": 6, "tip_amount": 1.0}, {"VendorID": 7, "tip_amount": 2.0}],
+                green=[{"VendorID": 1}, {"VendorID": 6}])
+    clean.clean_month(MARCH)
+    assert {r["tips"]: r["vendor_id"] for r in read("yellow")} == {0.0: 2, 1.0: 6, 2.0: 7}
+    assert sorted(r["vendor_id"] for r in read("green")) == [1, 6]
+    assert [r["vendor_id"] for r in read("uber") + read("lyft")] == [None, None]
+    # vendor 6 is kept like any other vendor: flags don't read vendor_id
+    assert all(r["is_valid"] for r in read("yellow") + read("green"))
 
 
 def test_lower_case_airport_fee_is_matched_too():
