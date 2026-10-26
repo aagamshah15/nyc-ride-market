@@ -42,7 +42,7 @@ The integrator keeps the Status column current.
 | [L07](lanes/L07-aggregate.md) | Aggregate | `pipeline/aggregate.py`, `sql/agg/` | 2 | L01 approved | — | built on fixtures, merged 24 Oct (D23 included); real run at G2 |
 | [L08](lanes/L08-validate.md) | Validation gate | `pipeline/validate.py`, `sql/validate/` | 2 | L01 approved | — | built on fixtures, merged 24 Oct; real run at G2 |
 | [L09](lanes/L09-metrics.md) | Metrics library | `sql/metrics/` (all but L10's), `pipeline/metrics.py` | 2 | L01 approved | Q1, Q4–Q15 | built on fixtures, merged 24 Oct; real run at G2 |
-| [L10](lanes/L10-policy-studies.md) | Policy studies | `sql/metrics/cp_*.sql`, `pay_event.sql`, `pipeline/studies.py` | 3 | L09 runner exists | Q2, Q3, Q6 | not started |
+| [L10](lanes/L10-policy-studies.md) | Policy studies | `sql/metrics/cp_*.sql`, `pay_event.sql`, `pipeline/studies.py` | 3 | L09 runner exists | Q2, Q3, Q6 | merged 26 Oct; metrics run on real data; findings narrative next |
 | [L11](lanes/L11-publish.md) | Publish and findings | `pipeline/publish.py`, `pipeline/findings.py`, `site/src/data/` | 3 | L09 runner exists | all | not started |
 | [L12](lanes/L12-pages-home-methods.md) | Pages: Home + Methods | `index.md`, `methods.md` | 4 | L05 done | home | not started |
 | [L13](lanes/L13-pages-companies.md) | Pages: Companies | `companies/[company].md` | 4 | L05 done | Q4, Q5, Q11–Q13 | not started |
@@ -133,7 +133,7 @@ All gate checks run in the integrator space. G1, G3, G4, G5 and G6 are SPEC §11
     - **fees:** 100%.
   - `python -m pipeline.metrics --all`: 24 metrics, exit 0.
   - `reports/validation.md` committed.
-  - SPEC §11 phase 2 is done except "pytest covers … every metric": L10's five congestion and pay-rise metrics are tested on L10's branch, not merged yet.
+  - **SPEC §11 phase 2 is done** as of the L10 merge (`5b07c37`, 26 Oct): pytest covers the cleaning flags and all 29 metrics (396 tests), and all five L10 metrics run on the real aggregates (`--all` exit 0).
 - **G3, back-fill 26 Oct 2026 — not passed.** `make backfill FROM=2024-01 TO=2026-08` ran all 32 months in about 10 minutes (exit 0). Rows match at every stage in every month; clean files take 19 GB and aggregates 215 MB.
   - `make validate`:
     - **pass:** CBD list (core 98.92%), schema, fees.
