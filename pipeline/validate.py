@@ -13,7 +13,7 @@ the aggregates fails the tie-out and an extra one is still checked.
 The checks are SQL in sql/validate/ over the aggregate tables; the schema check reads trip-file
 footers through pipeline.discover (the same check as ``python -m pipeline.discover --check``).
 
-Lane L08 · SPEC §8, §7.2 · decisions D8, D21, D22, D25 · docs/lanes/L08-validate.md
+Lane L08 · SPEC §8, §7.2 · decisions D8, D21, D22, D25, D26, D27 · docs/lanes/L08-validate.md
 """
 
 from __future__ import annotations
@@ -49,6 +49,8 @@ CHECKS = {   # id → report heading, in contract order
 ROWS_KEY = {"tie_out": "tie_out", "quality_drift": "quality", "cbd_list": "cbd", "fees": "fees"}
 ZONE_LISTS = ("core", "wide")                       # D9
 GATED_ZONE_LIST = "core"                            # D21: only core gates the CBD check; wide is reported
+LICENSE_CLASSES = ("FHV - High Volume", "Yellow", "Green")
+GATED_LICENSE_CLASS = "FHV - High Volume"           # D27: only ride-hail gates the tie-out; cabs are reported
 AGG_INPUTS = ("agg_zone_hour", "agg_quality_month", "agg_cbd_pairs", "agg_fee_values", "agg_vendor_month")
 HV_MODES = ("uber", "lyft", "other_hv")
 DATASET_MODES = {"fhvhv": HV_MODES, "yellow": ("yellow",), "green": ("green",)}
@@ -217,27 +219,48 @@ def check_tie_out(con: duckdb.DuckDBPyConnection, present: set[str], indicators_
                 for mode in DATASET_MODES[dataset] for vendor in vendors]
     if excluded:
         con.executemany("INSERT INTO excluded_vendors VALUES (?, ?)", excluded)
+    exceptions = tie_out_exceptions()
     rows = _query(con, "tie_out", tolerance_pct=TIE_OUT_TOLERANCE_PCT)
-    checked = [r for r in rows if r["status"] != "skipped"]
-    failed = [r for r in rows if r["status"] == "fail"]
+    for r in rows:   # D27: a listed row is shown with its reason and doesn't gate; skipped stays skipped
+        r["computed_status"] = r["status"]
+        r["reason"] = exceptions.get((r["month"], r["license_class"]))
+        if r["reason"] is not None and r["status"] != "skipped":
+            r["status"] = "excepted"
+    gated = [r for r in rows if r["license_class"] == GATED_LICENSE_CLASS]
+    checked = [r for r in gated if r["status"] in ("pass", "fail")]
+    failed = [r for r in gated if r["status"] == "fail"]
     if failed:
-        head = (f"{len(failed)} of {len(checked)} month × class rows outside ±{TIE_OUT_TOLERANCE_PCT}%: "
-                + _listing(f"{r['license_class']} {_m(r['month'])} ({_diff_label(r)})" for r in failed))
+        head = (f"{len(failed)} of {len(checked)} {GATED_LICENSE_CLASS} months outside ±{TIE_OUT_TOLERANCE_PCT}%: "
+                + _listing(f"{_m(r['month'])} ({_diff_label(r)})" for r in failed))
     elif checked:
-        head = f"All {len({r['month'] for r in checked})} months with indicators within ±{TIE_OUT_TOLERANCE_PCT}%"
+        head = f"All {len(checked)} {GATED_LICENSE_CLASS} months with indicators within ±{TIE_OUT_TOLERANCE_PCT}%"
     else:
-        head = "No month checked is in the indicators file"
+        head = f"No {GATED_LICENSE_CLASS} month to check"
+    parts = [head]
+    reported = [_reported_label(cls, [r for r in rows if r["license_class"] == cls])
+                for cls in LICENSE_CLASSES if cls != GATED_LICENSE_CLASS]
+    if any(reported):
+        parts.append("reported, not gated (D27): " + ", ".join(label for label in reported if label))
+    excepted = [r for r in rows if r["status"] == "excepted"]
+    if excepted:
+        parts.append("excepted (D27): " + _listing(f"{r['license_class']} {_m(r['month'])}" for r in excepted))
     skipped = _skipped_label(rows)
-    summary = "; ".join([head, skipped] if skipped else [head])
+    if skipped:
+        parts.append(skipped)
+    summary = "; ".join(parts)
 
     rule = "; ".join(f"{dataset} vendor {', '.join(str(v) for v in vendors)}"
                      for dataset, vendors in exclusions.items() if vendors) or "none"
     details = [
         f"Pipeline trips per day against TLC's \"Trips Per Day\" in `ref_indicators`; a row passes within "
-        f"±{TIE_OUT_TOLERANCE_PCT}%. Records are `SUM(trips_all)` from `agg_zone_hour` (every row). Before "
-        "dividing by the days in the month, the records of technology vendors that TLC's indicators don't count "
-        "are taken out, from `agg_vendor_month` and `tie_out_exclude_vendors` in `config/sources.yaml` "
-        f"(D25; now: {rule}). Every metric keeps those trips. FHV - High Volume compares uber + lyft + other_hv. "
+        f"±{TIE_OUT_TOLERANCE_PCT}%. Only {GATED_LICENSE_CLASS} (uber + lyft + other_hv) gates the check (D27). "
+        "Yellow and Green rows carry their own pass/fail as information, reported, not gated, because TLC's cab "
+        "figures follow counting rules the pipeline can't reproduce. A row listed in `tie_out_exceptions` "
+        "(`config/sources.yaml`) is `excepted`: shown with its reason below, not gating.",
+        "",
+        "Records are `SUM(trips_all)` from `agg_zone_hour` (every row). The records of vendors listed in "
+        "`tie_out_exclude_vendors` (`config/sources.yaml`, from `agg_vendor_month`) are taken out before dividing "
+        f"by the days in the month (D25 mechanism, emptied by D27; now: {rule}); every metric keeps them. "
         "A month the indicators file doesn't have yet is skipped; a month with no pipeline trips fails.",
         "",
         "| Month | License class | Records | Excluded | Pipeline trips/day | TLC trips/day | Diff | Status |",
@@ -245,7 +268,20 @@ def check_tie_out(con: duckdb.DuckDBPyConnection, present: set[str], indicators_
     ]
     details += [f"| {_m(r['month'])} | {r['license_class']} | {_num(r['records'])} | {_excluded_cell(r)} | "
                 f"{_num(r['pipeline_trips_per_day'], 1)} | {_num(r['tlc_trips_per_day'], 1)} | "
-                f"{_signed_pct(r['diff'])} | {r['status']} |" for r in rows]
+                f"{_signed_pct(r['diff'])} | {_tie_out_status_cell(r)} |" for r in rows]
+    if excepted:
+        details += ["", "Exceptions (D27):", ""]
+        for r in excepted:
+            within = r["computed_status"] == "pass"
+            result = (f"within ±{TIE_OUT_TOLERANCE_PCT}%, so the exception is no longer needed: remove it"
+                      if within else f"outside ±{TIE_OUT_TOLERANCE_PCT}%")
+            details.append(f"- {r['license_class']} {_m(r['month'])}: {_signed_pct(r['diff'])}, {result}. "
+                           f"Reason: {r['reason']}.")
+    matched = {(r["month"], r["license_class"]) for r in rows if r["reason"] is not None}
+    unmatched = sorted(set(exceptions) - matched)
+    if unmatched:
+        details += ["", "Exceptions listed but not among the months checked: "
+                    + ", ".join(f"{cls} {_m(month)}" for month, cls in unmatched) + "."]
     contract_rows = [{
         "month": r["month"].isoformat(),
         "license_class": r["license_class"],
@@ -254,7 +290,40 @@ def check_tie_out(con: duckdb.DuckDBPyConnection, present: set[str], indicators_
         "diff": _round(r["diff"], 4),
         "status": r["status"],
     } for r in rows]
-    return Check("tie_out", _rollup(r["status"] for r in rows), summary, contract_rows, details)
+    return Check("tie_out", _rollup(r["status"] for r in gated if r["status"] != "excepted"),
+                 summary, contract_rows, details)
+
+
+def tie_out_exceptions() -> dict[tuple[date, str], str]:
+    """Month × license class rows reported with their reason but not gating: ``tie_out_exceptions``
+    in config/sources.yaml (D27), as ``{(month, license_class): reason}``. An entry without a
+    ``YYYY-MM`` month, a known license class and a reason raises ``ValueError``."""
+    exceptions = {}
+    for entry in common.load_yaml("sources.yaml").get("tie_out_exceptions") or []:
+        entry = entry if isinstance(entry, dict) else {}
+        license_class, reason = entry.get("license_class"), entry.get("reason")
+        if license_class not in LICENSE_CLASSES or not reason:
+            raise ValueError(f"tie_out_exceptions in config/sources.yaml: {entry!r} needs month (YYYY-MM), "
+                             f"license_class (one of {list(LICENSE_CLASSES)}) and reason")
+        exceptions[(common.parse_month(str(entry.get("month"))), license_class)] = str(reason)
+    return exceptions
+
+
+def _reported_label(license_class: str, rows: list[dict]) -> str:
+    """``Green 20 of 32 months outside ±2%`` or ``Yellow within ±2%``, for a class that doesn't gate."""
+    checked = [r for r in rows if r["status"] in ("pass", "fail")]
+    if not checked:
+        return ""
+    outside = sum(r["status"] == "fail" for r in checked)
+    if not outside:
+        return f"{license_class} within ±{TIE_OUT_TOLERANCE_PCT}%"
+    return f"{license_class} {outside} of {len(checked)} months outside ±{TIE_OUT_TOLERANCE_PCT}%"
+
+
+def _tie_out_status_cell(row: dict) -> str:
+    if row["status"] == "fail" and row["license_class"] != GATED_LICENSE_CLASS:
+        return "fail (reported, not gated)"
+    return row["status"]
 
 
 def tie_out_exclusions() -> dict[str, list[int]]:

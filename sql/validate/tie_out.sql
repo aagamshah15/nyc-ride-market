@@ -7,8 +7,8 @@
 -- Output  one row per month checked × license class:
 --   month, license_class        FHV - High Volume = uber + lyft + other_hv; Yellow; Green
 --   records                     SUM(trips_all): every row, valid or not (SPEC §4.2)
---   excluded_records            records from excluded vendors (agg_vendor_month), which TLC's
---                               indicators don't count (D25); every metric keeps them
+--   excluded_records            records from vendors in tie_out_exclude_vendors (agg_vendor_month; D25
+--                               mechanism, an empty list since D27); every metric keeps them
 --   excluded_vendor_ids         the class's excluded vendors, sorted; NULL when it has none
 --   pipeline_trips              records − excluded_records
 --   days                        days in the month
@@ -16,7 +16,8 @@
 --   tlc_trips_per_day           "Trips Per Day"; NULL when the indicators file lacks the row
 --   diff                        pipeline ÷ TLC − 1
 --   status                      pass | fail | skipped (indicators file lacks that month and class)
--- A month with no pipeline rows counts 0 trips and fails.
+-- A month with no pipeline rows counts 0 trips and fails. pipeline/validate.py then applies D27:
+-- only FHV - High Volume gates the check, and rows in tie_out_exceptions become 'excepted'.
 
 WITH classes(mode, license_class) AS (
     VALUES ('uber', 'FHV - High Volume'), ('lyft', 'FHV - High Volume'), ('other_hv', 'FHV - High Volume'),
