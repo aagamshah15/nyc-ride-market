@@ -45,7 +45,7 @@ def write_full_fixture(data_dir):
     write_agg("agg_week_cbd", agg_table("agg_week_cbd", [
         {"mode": md, "zone_list": zl, "cbd_group": g} for md in MODES for zl in ("core", "wide")
         for g in ("treated", "control")]))
-    for name in ("agg_fees_month", "agg_quality_month", "agg_fee_values"):
+    for name in ("agg_fees_month", "agg_quality_month", "agg_fee_values", "agg_vendor_month"):   # last: D25
         write_agg(name, agg_table(name, [{"month": m, "mode": md} for m in MONTHS for md in MODES]))
     write_agg("agg_cbd_pairs", agg_table("agg_cbd_pairs", [{"mode": md} for md in MODES]))
     write_agg("ref_indicators", agg_table("ref_indicators", [

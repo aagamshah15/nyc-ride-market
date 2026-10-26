@@ -152,6 +152,19 @@ def test_changed_table_layout_stops_the_run():
     assert path.read_bytes() == before
 
 
+def test_clean_files_missing_a_column_stop_the_run_before_any_write():
+    write_clean(MARCH)
+    aggregate.aggregate_month("2025-03")
+    before = file_bytes()
+    # March cleaned again by an older clean.py, before vendor_id (D25): every query runs before any
+    # file is written, so agg_zone_hour and the rest stay as they were
+    drop_clean("2025-03")
+    write_clean(MARCH.drop_columns(["vendor_id"]))
+    with pytest.raises(aggregate.AggregateError, match=r"agg_vendor_month: .*vendor_id(.|\n)*make clean MONTH=2025-03"):
+        aggregate.aggregate_month("2025-03")
+    assert file_bytes() == before
+
+
 def test_existing_rows_from_the_factory_are_kept():
     # a table written by another month's run (here: the factory's February row) survives
     feb = agg_table("agg_fees_month", [{"month": date(2025, 2, 1), "mode": "lyft"}])

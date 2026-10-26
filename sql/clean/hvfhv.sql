@@ -1,5 +1,5 @@
 -- hvfhv · SPEC §4 · lane L06
--- One high-volume FHV file → the 24 SPEC §4 unified columns, in SPEC order.
+-- One high-volume FHV file → the 25 unified columns (SPEC §4 plus vendor_id, D25), in SPEC order.
 --
 -- Input  view `src` (pipeline/clean.py), built from config/schema_map.yaml for the file's month range:
 --        a raw column that alone feeds a unified column appears under the unified name, holding the
@@ -17,6 +17,7 @@
 --   other_fees           bcf + sales_tax
 --   rider_total_ex_tip   fare_base + tolls + other_fees + congestion_surcharge + airport_fee + cbd_fee
 --   shared_*, wav_*      = 'Y' (a NULL flag stays NULL)
+--   vendor_id            NULL; HVFHV files have no vendor column (D25)
 
 SELECT
     lic.mode::VARCHAR                                              AS mode,
@@ -43,6 +44,7 @@ SELECT
     (src.shared_match = 'Y')                                       AS shared_match,
     (src.wav_request = 'Y')                                        AS wav_request,
     (src.wav_match = 'Y')                                          AS wav_match,
-    src.street_hail::BOOLEAN                                       AS street_hail
+    src.street_hail::BOOLEAN                                       AS street_hail,
+    src.vendor_id::SMALLINT                                        AS vendor_id
 FROM src
 LEFT JOIN hv_license AS lic ON lic.code = src.mode

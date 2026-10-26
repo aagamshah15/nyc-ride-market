@@ -25,6 +25,13 @@ download:
   timeout_s: 60       # connect and per-read timeout
   user_agent: "nyc-ride-market/0.1 (+https://github.com/aagamshah15/nyc-ride-market)"
 
+# Technology vendors whose cab records the TLC monthly indicators leave out (D25). The tie-out
+# (pipeline/validate.py) subtracts their records from the pipeline count before comparing with TLC;
+# every metric keeps them. Found at G2: green 2025-03 was +2.37% with vendor 6, −0.05% without.
+tie_out_exclude_vendors:
+  yellow: [6]
+  green: [6]
+
 # High-volume license codes → mode (SPEC §3.3). An unknown code is an error in clean.
 hv_license:
   HV0003: uber

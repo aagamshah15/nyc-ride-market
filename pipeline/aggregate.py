@@ -2,14 +2,16 @@
 
 Deletes and rewrites only that month's rows in data/agg/{table}.parquet.
 
-Lane L07 · SPEC §5 · decisions D7–D10, D15–D18 · docs/lanes/L07-aggregate.md
+Lane L07 · SPEC §5 · decisions D7–D10, D15–D18, D23–D25 · docs/lanes/L07-aggregate.md
 
 Each ``sql/agg/{table}.sql`` is a SELECT over the view ``trips``: the month's clean files,
 ``data/clean/mode=*/month={YYYY-MM}/part-0.parquet``, read with ``hive_partitioning = false``
-(D18). The table is rebuilt as its other months' rows plus the new rows, sorted on every
-column, written to ``{table}.parquet.tmp`` beside it and renamed over the old file. Other
-months' rows are copied unchanged and a re-run writes the same file. Each table is replaced
-on its own: if a run stops part-way, run the month again.
+(D18). Every table's new rows are computed and checked first, so a failing query or a
+changed table layout stops the run before any file is touched. Then each table is rebuilt as
+its other months' rows plus the new rows, sorted on every column, written to
+``{table}.parquet.tmp`` beside it and renamed over the old file. Other months' rows are
+copied unchanged and a re-run writes the same file. If a run stops while writing, run the
+month again.
 """
 
 from __future__ import annotations
@@ -29,7 +31,7 @@ from pipeline.common import (
 
 TABLES = (
     "agg_zone_hour", "agg_zone_month_dist", "agg_od_month", "agg_airport", "agg_week_cbd",
-    "agg_fees_month", "agg_quality_month", "agg_cbd_pairs", "agg_fee_values",
+    "agg_fees_month", "agg_quality_month", "agg_cbd_pairs", "agg_fee_values", "agg_vendor_month",
 )
 
 DIST_MIN_N = 100     # agg_zone_month_dist: percentiles only for groups with this many valid trips
@@ -74,24 +76,36 @@ def _columns(con: duckdb.DuckDBPyConnection, relation: str) -> list[tuple[str, s
     return [(name, kind) for name, kind, *_ in con.execute(f"DESCRIBE {relation}").fetchall()]
 
 
-def rewrite(con: duckdb.DuckDBPyConnection, table: str, month: str) -> tuple[int, int]:
-    """Replace ``month``'s rows in ``data/agg/{table}.parquet``; return (month rows, all rows)."""
+def stage(con: duckdb.DuckDBPyConnection, table: str, month: str) -> None:
+    """Compute ``table``'s rows for the month into ``new_{table}`` and check them against the file."""
     query = (SQL_DIR / "agg" / f"{table}.sql").read_text(encoding="utf-8").strip().rstrip(";")
-    con.execute(f"CREATE OR REPLACE TEMP TABLE new_rows AS (\n{query}\n)")
+    try:
+        con.execute(f"CREATE OR REPLACE TEMP TABLE new_{table} AS (\n{query}\n)")
+    except duckdb.BinderException as exc:
+        raise AggregateError(f"{table}: {exc}\nThe clean files may predate a schema change; "
+                             f"rebuild them with make clean MONTH={month}") from None
     path = agg_path(table)
-    source = "SELECT * FROM new_rows"
     if path.exists():
-        existing = f"read_parquet({sql_literal(str(path))})"
-        old, new = _columns(con, f"SELECT * FROM {existing}"), _columns(con, "new_rows")
+        old = _columns(con, f"SELECT * FROM read_parquet({sql_literal(str(path))})")
+        new = _columns(con, f"new_{table}")
         if old != new:
             raise AggregateError(f"{table}: {path} has columns {old}, but sql/agg/{table}.sql now gives "
                                  f"{new}; move the old file aside and back-fill every month")
-        source = f"SELECT * FROM {existing} WHERE month <> DATE '{month}-01' UNION ALL {source}"
+
+
+def rewrite(con: duckdb.DuckDBPyConnection, table: str, month: str) -> tuple[int, int]:
+    """Replace ``month``'s rows in ``data/agg/{table}.parquet`` with ``new_{table}``;
+    return (month rows, all rows)."""
+    path = agg_path(table)
+    source = f"SELECT * FROM new_{table}"
+    if path.exists():
+        source = (f"SELECT * FROM read_parquet({sql_literal(str(path))}) "
+                  f"WHERE month <> DATE '{month}-01' UNION ALL {source}")
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_name(path.name + ".tmp")
     con.execute(f"COPY ({source} ORDER BY ALL) TO {sql_literal(str(tmp))} (FORMAT parquet)")
     os.replace(tmp, path)
-    month_rows = con.execute("SELECT count(*) FROM new_rows").fetchone()[0]
+    month_rows = con.execute(f"SELECT count(*) FROM new_{table}").fetchone()[0]
     all_rows = con.execute(f"SELECT count(*) FROM read_parquet({sql_literal(str(path))})").fetchone()[0]
     return month_rows, all_rows
 
@@ -103,12 +117,17 @@ def aggregate_month(month: str, tables: tuple[str, ...] = TABLES) -> dict[str, i
     try:
         modes = open_month(con, month)
         print(f"{month}: clean rows " + ", ".join(f"{mode} {n:,}" for mode, n in modes.items()))
+        seconds = {}
+        for table in tables:            # every query first: a failure leaves all files as they were
+            started = time.monotonic()
+            stage(con, table, month)
+            seconds[table] = time.monotonic() - started
         written = {}
         for table in tables:
             started = time.monotonic()
             written[table], total = rewrite(con, table, month)
-            print(f"{table}: {written[table]:,} rows for {month}, {total:,} in all "
-                  f"({time.monotonic() - started:.1f} s)")
+            seconds[table] += time.monotonic() - started
+            print(f"{table}: {written[table]:,} rows for {month}, {total:,} in all ({seconds[table]:.1f} s)")
         return written
     finally:
         con.close()

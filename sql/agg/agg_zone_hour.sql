@@ -24,9 +24,12 @@
 -- wait_n              BIGINT    rows in wait_s_sum; ride-hail only
 -- cbd_fee             DOUBLE    sum over valid rows
 -- shared_req          BIGINT    valid rows with shared_request; ride-hail only
--- shared_match        BIGINT    valid rows with shared_match; ride-hail only
+-- shared_match        BIGINT    valid rows with shared_request AND shared_match; ride-hail only (D24)
 -- wav_req             BIGINT    valid rows with wav_request; ride-hail only
--- wav_match           BIGINT    valid rows with wav_match; ride-hail only
+-- wav_match           BIGINT    valid rows with wav_request AND wav_match; ride-hail only (D24)
+--
+-- A match counts only on a trip that asked for it (D24): TLC sets wav_match_flag on any trip that
+-- ran in an accessible vehicle, requested or not, so the raw flag alone overstates matches.
 --
 -- Ride-hail is uber, lyft and other_hv. "Ride-hail only" columns are NULL for cabs and "cabs only"
 -- columns NULL for ride-hail; otherwise a sum over no qualifying rows is 0. Money and miles are
@@ -68,9 +71,9 @@ g AS (
         count(*) FILTER (WHERE wait_ok)                            AS wait_n,
         sum(cbd_fee) FILTER (WHERE is_valid)                       AS cbd_fee,
         count(*) FILTER (WHERE is_valid AND shared_request)        AS shared_req,
-        count(*) FILTER (WHERE is_valid AND shared_match)          AS shared_match,
+        count(*) FILTER (WHERE is_valid AND shared_request AND shared_match) AS shared_match,
         count(*) FILTER (WHERE is_valid AND wav_request)           AS wav_req,
-        count(*) FILTER (WHERE is_valid AND wav_match)             AS wav_match
+        count(*) FILTER (WHERE is_valid AND wav_request AND wav_match) AS wav_match
     FROM t
     GROUP BY month, mode, hv, pu_zone, hour_of_week
 )
