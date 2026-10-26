@@ -34,7 +34,7 @@ from pipeline.schema_map import SchemaError, load_schema_map
 
 # SPEC thresholds, as whole percentages so the SQL compares integers and each boundary is exact.
 TIE_OUT_TOLERANCE_PCT = 2    # SPEC §8: pipeline trips per day within ±2% of TLC's
-MIN_VALID_PCT = 95           # SPEC §8: valid_rows / rows per month × mode
+MIN_VALID_PCT = 85           # D26 (replaces SPEC §8's 95%): valid_rows / rows per month × mode
 DRIFT_POINTS = 3             # SPEC §8: list a month more than 3 points below its mode's median
 CBD_BOTH_IN_MIN_PCT = 98     # SPEC §7.2: both-in trips carrying a fee
 FEE_EXACT_MIN_PCT = 95       # SPEC §8: fee-paying trips at exactly the configured fee
@@ -300,10 +300,10 @@ def check_quality(con: duckdb.DuckDBPyConnection, present: set[str]) -> Check:
     failed = [r for r in rows if r["status"] == "fail"]
     drifted = [r for r in rows if r["drift"]]
     if failed:
-        head = (f"{len(failed)} of {len(rows)} month × mode rows below {MIN_VALID_PCT}% valid: "
+        head = (f"{len(failed)} of {len(rows)} month × mode rows below {MIN_VALID_PCT}% valid (D26): "
                 + _listing(f"{r['mode']} {_m(r['month'])} ({_pct(r['valid_share'])})" for r in failed))
     elif rows:
-        head = f"All {len(rows)} month × mode rows at least {MIN_VALID_PCT}% valid"
+        head = f"All {len(rows)} month × mode rows at least {MIN_VALID_PCT}% valid (D26)"
     else:
         head = "No rows in agg_quality_month for the months checked"
     if drifted:
@@ -317,7 +317,9 @@ def check_quality(con: duckdb.DuckDBPyConnection, present: set[str]) -> Check:
     cells = {(r["month"], r["mode"]): r for r in rows}
     medians = {r["mode"]: r["mode_median"] for r in rows}
     details = [
-        f"`valid_rows / rows` per month × mode from `agg_quality_month`; a row fails below {MIN_VALID_PCT}%. "
+        f"`valid_rows / rows` per month × mode from `agg_quality_month`; a row fails below {MIN_VALID_PCT}% "
+        "(D26, replacing SPEC §8's 95%: green's zero-mile records and yellow's fares of $0 or less are data "
+        "quality, not pipeline faults). "
         f"A month more than {DRIFT_POINTS} percentage points below its mode's median over the months checked "
         "is listed (marked *drift*), not failed.",
         "",

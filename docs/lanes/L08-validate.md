@@ -24,7 +24,7 @@
 
 - [x] D25: the tie-out subtracts the `agg_vendor_month` rows of vendors in `tie_out_exclude_vendors` (`config/sources.yaml`) from the pipeline count before comparing with TLC; the report shows the excluded records per month and class. The tolerance stays ±2%
 
-- [ ] D26: the quality check fails a month × mode below 85% `valid_rows / rows` (was 95%); months more than 3 points below the mode's median stay listed, not failed
+- [x] D26: the quality check fails a month × mode below 85% `valid_rows / rows` (was 95%); months more than 3 points below the mode's median stay listed, not failed
 
 ## Tests
 
@@ -49,6 +49,7 @@ _Only this lane writes here. Newest first._
 
 | Date | State | Note |
 |---|---|---|
+| 26 Oct | D26 done on fixtures | Merged `main` (5d9d043). The quality check now fails a month × mode only below 85% `valid_rows / rows` (`MIN_VALID_PCT = 85`, citing D26), still compared in whole numbers so exactly 85.00% passes. Months more than 3 points below the mode's median stay listed, not failed. The check's summary and report cite D26. `validation_summary.json` keeps its shape. Tests: the boundary is now 85.00% pass / 84.99% fail; the drift tests are kept, plus a 90% month that SPEC's 95% would have failed and that is now listed only. The tie-out is unchanged (D25 stays). `make test` is green: 351 passed, 12 skipped, and the site builds. |
 | 25 Oct | D25 done on fixtures | Merged `integrator/d24-d25` (e92d1c0). The tie-out now subtracts the `agg_vendor_month` records of the vendors in `tie_out_exclude_vendors` before comparing with TLC, and `agg_vendor_month` is a required input. The report's tie-out table gains Records and Excluded columns and states the rule. The tolerance stays ±2%, and the `tie_out` JSON keys are unchanged. Hand-worked G2 case: green 2025-03 has 51,539 records, 1,222 of them vendor 6, against TLC's 1,624 a day. It fails at +2.37% with vendor 6 and passes at −0.05% without. 7 new tests. `make test`: only the expected `tests/test_clean_*.py` (33) and `test_aggregate_tables.py::test_tables_cover_every_aggregate_schema` fail until L06 and L07 land; everything else passes and the site builds. |
 | 24 Oct | done on fixtures | Gate built and tested on factory aggregates. The real indicators CSV is loaded into the shared `data/agg/ref_indicators.parquet`. Two contract points wait on the integrator (see Blocked). The real `make validate` runs at G2 and G3 (integrator). |
 
@@ -60,7 +61,7 @@ _Only this lane writes here. Newest first._
 - Built:
   - `pipeline/validate.py`. The CLI is unchanged (`python -m pipeline.validate`, run by `make validate`) and `STUB_LANE` is gone. It adds one option, `--indicators-only`, which only loads the CSV.
   - `sql/validate/`: `ref_indicators.sql`, `tie_out.sql`, `quality.sql`, `cbd_list.sql` and `fees.sql`, each with a header block for inputs, params and output columns.
-  - `tests/test_validate.py`: 53 tests (7 for D25; 1 added by the integrator for D21).
+  - `tests/test_validate.py`: 54 tests (7 for D25, 1 more drift case for D26, 1 added by the integrator for D21).
   - What a run does:
     1. Reloads `data/ref/data_reports_monthly.csv` into `data/agg/ref_indicators.parquet`. The header must be exactly the 14 D19 columns. Values are cast but never coerced: a bad value fails the load and isn't turned into NULL.
     2. Registers the aggregates. Months checked = the `config/sources.yaml` scope plus any month found in `agg_zone_hour`, `agg_quality_month`, `agg_cbd_pairs`, `agg_fee_values` or `agg_vendor_month`.
@@ -71,7 +72,7 @@ _Only this lane writes here. Newest first._
     - Pipeline trips = `SUM(agg_zone_hour.trips_all)` minus the `agg_vendor_month` rows whose `vendor_id` is listed under the mode's dataset in `tie_out_exclude_vendors` (`config/sources.yaml`).
     - `validate.tie_out_exclusions()` reads that list; an unknown dataset or a non-integer vendor fails the check. HVFHV records carry no vendor, so they're never touched.
     - The report's table shows Records, Excluded (count and vendor ids, or "—"), then trips per day after the exclusion.
-  - Thresholds are module constants taken from SPEC (2, 95, 3, 98, 95); none is a CLI option. Each boundary is computed with integers, so exactly 2.00%, 95% or 98% passes. For example, the tie-out tests `|trips − TLC × days| × 100 ≤ 2 × TLC × days`. Drift points are rounded to 1e-6 to drop float noise.
+  - Thresholds are module constants: tie-out 2, quality floor 85 (D26; SPEC had 95), drift 3, CBD 98, fees 95. None is a CLI option. Each boundary is computed with integers, so exactly 2.00%, 85%, 95% or 98% passes. For example, the tie-out tests `|trips − TLC × days| × 100 ≤ 2 × TLC × days`. Drift points are rounded to 1e-6 to drop float noise.
   - The schema check calls `pipeline.discover.discover` and `.check` in-process (the same check as `--check`) for the three datasets × months checked. It reads local raw footers when present, otherwise remote footers (D11).
 - Checked:
   - `make test` on 24 Oct was green: 183 passed, 6 skipped, and the site builds. On 25 Oct, on the D24/D25 branch, the 34 failures are all the expected L06/L07 ones: 33 in `tests/test_clean_*.py` plus `test_aggregate_tables.py::test_tables_cover_every_aggregate_schema`. The other 307 pass (12 skipped) and the site builds.
@@ -87,7 +88,7 @@ _Only this lane writes here. Newest first._
     - A month missing from the indicators is skipped and listed, and the check still passes. A single missing class is named.
     - A month with no pipeline trips fails.
     - A missing CSV, or a CSV with another header, fails the tie-out even when an older parquet exists.
-    - Quality 95.00% passes, 94.99% fails.
+    - Quality 85.00% passes, 84.99% fails (D26). A 90% month, below SPEC's old 95%, is listed as drift but passes.
     - Drift at exactly 3.00 points isn't listed; at 3.01 it's listed but doesn't fail.
     - CBD 98.00% passes, 97.99% fails. Pass-through is reported, not failed. The wide list counts a borderline pair.
     - 2025-01 is left out of the CBD check.

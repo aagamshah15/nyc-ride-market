@@ -207,7 +207,7 @@ def test_report_has_the_table_first_then_every_section(report_path):
 
 def test_any_failure_fails_the_gate():
     write_world()
-    write_quality(valid={("2025-03", "green"): 9_000})
+    write_quality(valid={("2025-03", "green"): 8_000})       # 80%, below D26's 85%
     summary = run()
     assert summary["status"] == "fail"
     assert check(summary, "quality_drift")["status"] == "fail"
@@ -398,7 +398,7 @@ def test_tie_out_rejects_an_unknown_dataset_in_the_exclusions(monkeypatch):
 
 # --- quality drift -------------------------------------------------------------
 
-@pytest.mark.parametrize("valid_rows, status", [(9_500, "pass"), (9_499, "fail")])   # 95.00% vs 94.99%
+@pytest.mark.parametrize("valid_rows, status", [(8_500, "pass"), (8_499, "fail")])   # 85.00% vs 84.99% (D26)
 def test_quality_boundary(valid_rows, status):
     write_world()
     write_quality(valid={("2025-03", "yellow"): valid_rows})
@@ -406,20 +406,27 @@ def test_quality_boundary(valid_rows, status):
     row = next(r for r in summary["quality"] if r["month"] == "2025-03-01" and r["mode"] == "yellow")
     assert (row["valid_share"], row["status"]) == (valid_rows / 10_000, status)
     assert check(summary, "quality_drift")["status"] == status
+    if status == "fail":
+        assert check(summary, "quality_drift")["summary"].startswith(
+            "1 of 15 month × mode rows below 85% valid (D26): yellow 2025-03 (84.99%)")
 
 
-@pytest.mark.parametrize("valid_rows, listed", [(9_600, False), (9_599, True)])   # 3.00 vs 3.01 points
-def test_quality_drift_is_listed_not_failed(valid_rows, listed, report_path):
+@pytest.mark.parametrize("valid_rows, points", [
+    (9_600, None),       # 3.00 points below: not listed
+    (9_599, "3.01"),     # 3.01 points below: listed
+    (9_000, "9.00"),     # 90%: below SPEC's old 95% floor, above D26's 85%, so listed but not failed
+])
+def test_quality_drift_is_listed_not_failed(valid_rows, points, report_path):
     write_world()
-    # uber: 99.00%, 99.00% and 96.00% (or 95.99%); median 99.00%
+    # uber: 99.00%, 99.00% and 96.00% (or 95.99%, or 90.00%); median 99.00%
     write_quality(valid={("2025-04", "uber"): valid_rows})
     summary = run()
     result = check(summary, "quality_drift")
     assert result["status"] == "pass"
-    if listed:
-        assert result["summary"] == ("All 15 month × mode rows at least 95% valid; 1 more than 3 points below "
-                                     "the mode's median (listed): uber 2025-04 (3.01 pts)")
-        assert "95.99% *drift −3.01 pts*" in report_path.read_text()
+    if points:
+        assert result["summary"] == ("All 15 month × mode rows at least 85% valid (D26); 1 more than 3 points "
+                                     f"below the mode's median (listed): uber 2025-04 ({points} pts)")
+        assert f"{valid_rows / 100:.2f}% *drift −{points} pts*" in report_path.read_text()
     else:
         assert result["summary"].endswith("none more than 3 points below its mode's median")
 
