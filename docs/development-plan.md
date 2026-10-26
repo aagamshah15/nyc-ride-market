@@ -117,13 +117,23 @@ All gate checks run in the integrator space. G1, G3, G4, G5 and G6 are SPEC §11
 |---|---|---|
 | G1 | 1 Nov | `make ingest` works for any month; `reports/schema_discovery.md` covers 2024-01 → 2026-08; every raw column mapped or ignored; `cbd_zones.csv` draft + `reports/cbd_zones.md`; airports confirmed |
 | G2 | ~8 Nov (passed 25 Oct, see gate log) | `make month MONTH=2025-03` runs end to end on real data: rows in = rows out; every aggregate table built; `make validate` runs and that month ties out within ±2%; `python -m pipeline.metrics --all` runs |
-| G3 | 15 Nov | `make backfill FROM=2024-01 TO=2026-08` clean; **`make validate` passes**; pytest covers the cleaning flags and every metric |
+| G3 | 15 Nov (passed 26 Oct, see gate log) | `make backfill FROM=2024-01 TO=2026-08` clean; **`make validate` passes**; pytest covers the cleaning flags and every metric |
 | G4 | 29 Nov | every SPEC §6 metric has output; congestion and pay-rise studies written up; Q1–Q15 each has a generated finding; `make publish` writes every contract file |
 | G5 | 10 Dec | every route builds, including 263 zone pages; data budgets pass; palette and dark mode in place |
 | G6 | 14 Dec | methods page complete; L18 review closed; phone layout checked; refresh workflow ran once end to end; v1 deployed |
 
 ### Gate log
 
+- **G3, 26 Oct 2026 — passed** (after D26 and D27 merged to `main` as `ac095b4`). `make backfill FROM=2024-01 TO=2026-08` re-ran all 32 months. A DNS outage and the Mac's idle sleep broke 2025-08 twice; it was resumed under `caffeinate -i` and finished in 4 minutes. Rows match at every stage in all 32 months, and no clean row is flagged for zone 265 alone (D26).
+  - `make validate` **exits 0**, all five checks pass:
+    - **tie-out:** all 31 FHVHV months within ±2%, plus 2026-06 excepted (D27). Yellow (10 months outside) and green (19 outside) are reported, not gated.
+    - **quality:** all 128 month × mode rows ≥ 85% (D26); 8 drift months listed, yellow's 2025-05 → 2025-11 fare episode and Lyft 2025-08.
+    - **CBD list:** core 98.92%.
+    - **schema:** 96 files.
+    - **fees:** 100%.
+  - `python -m pipeline.metrics --all`: 24 metrics, exit 0.
+  - `reports/validation.md` committed.
+  - SPEC §11 phase 2 is done except "pytest covers … every metric": L10's five congestion and pay-rise metrics are tested on L10's branch, not merged yet.
 - **G3, back-fill 26 Oct 2026 — not passed.** `make backfill FROM=2024-01 TO=2026-08` ran all 32 months in about 10 minutes (exit 0). Rows match at every stage in every month; clean files take 19 GB and aggregates 215 MB.
   - `make validate`:
     - **pass:** CBD list (core 98.92%), schema, fees.
