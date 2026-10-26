@@ -13,11 +13,12 @@ Default rows (pickup on the month's 4th at 08:10, dropoff 20 min later):
 - fhvhv: Uber (HV0003), zone 161 → 236, 3.2 miles, trip_time 1200, request 4 min before pickup;
   fare 18.50, tolls 0, bcf 0.51, sales tax 1.64, congestion surcharge 2.75, airport fee 0, tips 3.00,
   driver pay 14.20, every Y/N flag 'N', cbd_congestion_fee 1.50 (from 2025-01)
-- yellow: zone 161 → 236, 3.2 miles, card (payment_type 1); fare 18.40, extra 1.00, MTA tax 0.50,
-  tip 4.00, tolls 0, improvement surcharge 1.00, congestion surcharge 2.50, Airport_fee 0,
-  cbd_congestion_fee 0.75 (from 2025-01)
-- green: zone 74 → 75, 2.0 miles, card, street hail (trip_type 1); fare 12.10, extra 1.00, MTA tax
-  0.50, tip 2.00, tolls 0, improvement surcharge 1.00, congestion surcharge 0, cbd_congestion_fee 0
+- yellow: VendorID 2, zone 161 → 236, 3.2 miles, card (payment_type 1); fare 18.40, extra 1.00,
+  MTA tax 0.50, tip 4.00, tolls 0, improvement surcharge 1.00, congestion surcharge 2.50,
+  Airport_fee 0, cbd_congestion_fee 0.75 (from 2025-01)
+- green: VendorID 2, zone 74 → 75, 2.0 miles, card, street hail (trip_type 1); fare 12.10,
+  extra 1.00, MTA tax 0.50, tip 2.00, tolls 0, improvement surcharge 1.00, congestion surcharge 0,
+  cbd_congestion_fee 0
 
 A cab's ``total_amount`` is the sum of its money columns unless a row sets it.
 """

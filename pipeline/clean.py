@@ -14,9 +14,9 @@ Each dataset of the month (fhvhv, yellow, green) goes through, one file at a tim
    ``payment_type`` → ``is_card``); columns that share a unified column keep their map names
    (``bcf``, ``sales_tax``); the range's constants and NULL columns are added under the unified name.
    So the SQL files below read the same names whatever the month's range.
-3. ``sql/clean/{hvfhv,yellow,green}.sql`` turns ``src`` into the 24 SPEC §4 columns (view
-   ``unified``); ``sql/clean/derive.sql`` adds the derived columns and flags (view ``clean``) in the
-   order and types of ``CLEAN_TRIPS_SCHEMA`` (tests/factories.py).
+3. ``sql/clean/{hvfhv,yellow,green}.sql`` turns ``src`` into the 25 unified columns, SPEC §4's
+   plus ``vendor_id`` (D25) (view ``unified``); ``sql/clean/derive.sql`` adds the derived columns
+   and flags (view ``clean``) in the order and types of ``CLEAN_TRIPS_SCHEMA`` (tests/factories.py).
 4. One ``COPY`` per mode writes a self-contained file, ``mode`` and ``month`` included (D18), into a
    staging folder under data/clean/.
 

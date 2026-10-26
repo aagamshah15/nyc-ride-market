@@ -34,7 +34,7 @@
 - [x] Log rows in, rows out and flag counts per mode
 - [x] One month in memory at a time; the SQL does the work
 
-- [ ] D25: carry `vendor_id`, the cab files' `VendorID` (SMALLINT, NULL for HVFHV), as the last unified column after `street_hail` (`schema_map.UNIFIED_COLUMNS`, `config/schema_map.yaml`); output still equals `CLEAN_TRIPS_SCHEMA`
+- [x] D25: carry `vendor_id`, the cab files' `VendorID` (SMALLINT, NULL for HVFHV), as the last unified column after `street_hail` (`schema_map.UNIFIED_COLUMNS`, `config/schema_map.yaml`); output still equals `CLEAN_TRIPS_SCHEMA`
 
 ## Tests (expected values worked out by hand)
 
@@ -61,6 +61,7 @@ _Only this lane writes here. Newest first._
 
 | Date | State | Note |
 |---|---|---|
+| 25 Oct 2026 | D25 applied | Merged `integrator/d24-d25` (e92d1c0). `vendor_id` (SMALLINT) is carried after `street_hail`: the cab `VendorID` through the map, NULL for HVFHV (the map's `nulls`); every file still equals `CLEAN_TRIPS_SCHEMA`. 39 clean tests pass. `make test`: 339 passed, 12 skipped, 1 failed, the expected L07 `agg_vendor_month` test; the site build passes on its own. Real months not re-run, as the integrator asked; the 2024-01 and 2026-08 files in the shared folder still lack `vendor_id` until the integrator's re-run |
 | 24 Oct 2026 | done | Built and tested; 38 clean tests and `make test` green. Real runs on 2024-01 and 2026-08 (the integrator's substitute for the brief's 2024-03 and 2025-03, since those two months are already downloaded and fall before and after pricing). Rows out = rows in = manifest for every dataset. Flag shares are under Hand-off. **Gate risk:** green (both months) and yellow 2026-08 are below SPEC §8's 95% valid share |
 | 24 Oct 2026 | started | |
 
@@ -68,6 +69,7 @@ _Only this lane writes here. Newest first._
 
 **Hand-off**
 - Built:
+  - D25: `vendor_id` is the 25th unified column. `VendorID` alone feeds it, so `src` holds it as `vendor_id`; the cab SQL casts it to SMALLINT, and HVFHV gets NULL from the map's `nulls`. Flags don't read it, so vendor 6's trips are cleaned like any other.
   - `pipeline/clean.py`: `make clean MONTH=YYYY-MM` / `python -m pipeline.clean --month YYYY-MM` (exits 1 with a message naming the file when the month can't be cleaned); `clean_month(month)` for scripts returns rows, valid rows and flag counts per mode. `STUB_LANE` removed.
   - Per raw file: DESCRIBE → `schema_map.find_problems` with types (unmapped column first, then missing column or changed type; the error names the file, e.g. `raw/yellow/2025-03.parquet`, and the column) → `schema_map.resolve` and `select_range` build the view `src`. A raw column that alone feeds a unified column takes the unified name and keeps its raw value (`Airport_fee` → `airport_fee`, `payment_type` → `is_card`, `total_amount` → `rider_total_ex_tip`). Columns that share one (`bcf`, `sales_tax`; `extra`, `mta_tax`, `improvement_surcharge`) keep their map names. The range's `constant` and `nulls` are added under the unified name. So `sql/clean/*.sql` reads the same names in every month range (the 2024 `cbd_fee` constant and the 2025+ `cbd_congestion_fee` column both arrive as `src.cbd_fee`).
   - `sql/clean/{hvfhv,yellow,green}.sql`: `src` → the 24 SPEC §4 columns in order, with the map's rules. `clean.py` checks the column list against `schema_map.UNIFIED_COLUMNS`. Licence codes come from `hv_license` in `config/sources.yaml`; any other code, or a NULL, stops the run, listing the codes and their row counts.
@@ -75,16 +77,16 @@ _Only this lane writes here. Newest first._
   - Output: one `COPY` per mode with rows (zstd), each file self-contained with `mode` and `month` (D18), written first to `data/clean/.staging-{month}-{pid}/`. Only after all three datasets pass (rows in = the manifest's `rows`, rows out = rows in, per mode and in total) are the files renamed into `mode={mode}/month={YYYY-MM}/part-0.parquet`, one `os.replace` each. A mode with no rows this time loses its old file. The staging folder is always removed.
   - `tests/fixtures/raw/raw_trips.py`: raw files built in code with the real files' column names, order and types (yellow's `Airport_fee`, `cbd_congestion_fee` from 2025-01, cab `request_source` from 2026-06), a manifest entry per file and a small zone lookup.
 - Checked:
-  - `tests/test_clean_columns.py` (16), `tests/test_clean_flags.py` (14), `tests/test_clean_run.py` (8), with expected values worked out by hand in comments:
+  - `tests/test_clean_columns.py` (17), `tests/test_clean_flags.py` (14), `tests/test_clean_run.py` (8), with expected values worked out by hand in comments:
     - every flag at its boundary: duration 0 / 1 / 10800 / 10801 / −60 s from `trip_time`, and 0 / 10800 / 10801 / −814 s from cab timestamps; miles 0 / 0.01 / 100 / 100.01 / −1; fare 0 / 0.01 / −3; zones 264, 265 and NULL at either end; wait −1 / 0 / 3600 / 3601 s; pickups at 28 Feb 00:00 (inside), 27 Feb 23:59:59 and 27 Feb 00:00 (outside), 1 Apr 23:59:59 (inside), 2 Apr 00:00 (outside) for the March file;
     - `is_valid` ignoring `f_wait`; NULL measures setting their flags; a NULL request giving NULL `wait_s` and no `f_wait`; a duration beyond INTEGER (NULL and flagged);
     - `hour_of_week` Sunday 00:30 → 0, Saturday 23:10 → 167, Tuesday 08:10 → 56;
     - `period` at 2025-01-04 23:59:59 (pre_cp), 2025-01-05 00:00 (post_cp), 2025-07-31 23:59:59 (post_cp) and 2025-08-01 00:00 (post_pay);
     - `rider_total_ex_tip` 24.90 (HVFHV) and 24.15 (yellow); `cbd_fee` NULL → 0 for all three; 2024 files with no cbd column → 0; `Airport_fee` and `airport_fee` spellings; green `airport_fee` 0, `street_hail`, `is_card`; licence codes to modes, and an unknown code;
     - boroughs, airports and the core and wide CBD flags (Central Park is wide only);
-    - an unmapped, a missing and a retyped column, each naming file and column; `month` = the file's month for a 28 Feb pickup in the March file; exact schema per mode file;
+    - cab `VendorID` 1, 2, 6 and 7 coming through as `vendor_id` and NULL for Uber and Lyft (D25); an unmapped, a missing and a retyped column, each naming file and column; `month` = the file's month for a 28 Feb pickup in the March file; exact schema per mode file;
     - rows out = rows in with flagged rows kept; a manifest mismatch; a missing raw file, manifest entry or zone lookup; a re-run replacing the month and dropping an emptied mode; a failed run (green fails after fhvhv and yellow staged) leaving the previous files intact; the CLI.
-  - `make test` green: 338 passed, 12 skipped, site build OK.
+  - `make test` green on 24 Oct: 338 passed, 12 skipped, site build OK. After D25 (25 Oct): 339 passed, 12 skipped, 1 failed (L07's `agg_vendor_month`, expected until L07 lands); the site build passes.
   - Real runs (`NYC_DATA_DIR` = the shared data folder), about 2.8 s per month on this Mac, peak RSS 1.4–1.5 GB; both months together take 1.1 GB on disk. Every file's schema equals `CLEAN_TRIPS_SCHEMA`. Totals: 22,685,105 rows for 2024-01 and 23,870,883 for 2026-08, equal to the manifest's rows. Every flag count was recounted with a separate query straight on the raw files and matched exactly.
   - Flag shares (share of the mode's rows; `other_hv` has no rows in either month):
 

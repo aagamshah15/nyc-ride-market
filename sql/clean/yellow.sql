@@ -1,5 +1,5 @@
 -- yellow · SPEC §4 · lane L06
--- One yellow-cab file → the 24 SPEC §4 unified columns, in SPEC order.
+-- One yellow-cab file → the 25 unified columns (SPEC §4 plus vendor_id, D25), in SPEC order.
 --
 -- Input  view `src` (pipeline/clean.py), built from config/schema_map.yaml for the file's month range:
 --        a raw column that alone feeds a unified column appears under the unified name, holding the
@@ -17,6 +17,7 @@
 --   rider_total_ex_tip   total_amount − tip_amount (src.rider_total_ex_tip holds total_amount)
 --   tips                 tip_amount, which cab files record for card payments only
 --   is_card              payment_type = 1 (src.is_card holds payment_type)
+--   vendor_id            VendorID, the technology provider (D25)
 
 SELECT
     src.mode::VARCHAR                                              AS mode,
@@ -42,5 +43,6 @@ SELECT
     src.shared_match::BOOLEAN                                      AS shared_match,
     src.wav_request::BOOLEAN                                       AS wav_request,
     src.wav_match::BOOLEAN                                         AS wav_match,
-    src.street_hail::BOOLEAN                                       AS street_hail
+    src.street_hail::BOOLEAN                                       AS street_hail,
+    src.vendor_id::SMALLINT                                        AS vendor_id
 FROM src
