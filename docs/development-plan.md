@@ -116,7 +116,7 @@ All gate checks run in the integrator space. G1, G3, G4, G5 and G6 are SPEC §11
 | Gate | Target | Passes when |
 |---|---|---|
 | G1 | 1 Nov | `make ingest` works for any month; `reports/schema_discovery.md` covers 2024-01 → 2026-08; every raw column mapped or ignored; `cbd_zones.csv` draft + `reports/cbd_zones.md`; airports confirmed |
-| G2 | ~8 Nov (run 25 Oct, see gate log) | `make month MONTH=2025-03` runs end to end on real data: rows in = rows out; every aggregate table built; `make validate` runs and that month ties out within ±2%; `python -m pipeline.metrics --all` runs |
+| G2 | ~8 Nov (passed 25 Oct, see gate log) | `make month MONTH=2025-03` runs end to end on real data: rows in = rows out; every aggregate table built; `make validate` runs and that month ties out within ±2%; `python -m pipeline.metrics --all` runs |
 | G3 | 15 Nov | `make backfill FROM=2024-01 TO=2026-08` clean; **`make validate` passes**; pytest covers the cleaning flags and every metric |
 | G4 | 29 Nov | every SPEC §6 metric has output; congestion and pay-rise studies written up; Q1–Q15 each has a generated finding; `make publish` writes every contract file |
 | G5 | 10 Dec | every route builds, including 263 zone pages; data budgets pass; palette and dark mode in place |
@@ -124,6 +124,13 @@ All gate checks run in the integrator space. G1, G3, G4, G5 and G6 are SPEC §11
 
 ### Gate log
 
+- **G2, re-run 25 Oct 2026 — passed** (after D24 and D25 merged to `main` as `1ed9094`). `make month MONTH=2025-03`: 20 s, peak memory about 5.2 GB. Rows match at every stage for fhvhv, yellow and green, all ten aggregate tables were written, and the raw files were deleted.
+  - `make validate`, 2025-03:
+    - **tie-out passes for all three classes:** FHVHV +0.00%; green −0.05% (1,222 vendor-6 records left out); yellow +1.16% (334 left out).
+    - **also passing:** CBD list (core 98.74%), schema (96 files; the CloudFront rate limit cost a 3-minute wait), fees (100%).
+    - **still failing:** quality, yellow 91.68% and green 92.55% below 95%. That's deferred to G3 by the user; G3 fails on it unless the rule is decided.
+  - `python -m pipeline.metrics --all`: 24 metrics, exit 0. WAV match: Uber 100%, Lyft 99.98%. Shared match: Uber 52.3%; Lyft has no requests (NULL).
+  - `reports/schema_discovery.md` was regenerated (lists `vendor_id`). The partial `reports/validation.md` isn't committed.
 - **G2, 25 Oct 2026 — not passed yet.** `make month MONTH=2025-03` ran end to end in 23 s, peak memory about 5 GB. Rows match at every stage: manifest = clean = `agg_zone_hour.trips_all` = `agg_quality_month.rows` for fhvhv (20,536,879), yellow (4,145,257) and green (51,539). All nine aggregate tables were written, and the raw files were deleted.
   - `make validate` on 2025-03:
     - **pass:** CBD list (core 98.74%; wide 96.06%, reported), schema (96 files), fees (100% exact).
