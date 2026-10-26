@@ -124,6 +124,12 @@ All gate checks run in the integrator space. G1, G3, G4, G5 and G6 are SPEC §11
 
 ### Gate log
 
+- **G3, back-fill 26 Oct 2026 — not passed.** `make backfill FROM=2024-01 TO=2026-08` ran all 32 months in about 10 minutes (exit 0). Rows match at every stage in every month; clean files take 19 GB and aggregates 215 MB.
+  - `make validate`:
+    - **pass:** CBD list (core 98.92%), schema, fees.
+    - **quality fails:** 57 of 128 month × mode rows below 95%. Green is below in all 32 months, yellow in 21, Lyft in 4, Uber in none.
+    - **tie-out fails:** 27 of 96 month × class rows. FHVHV is +0.00% except 2026-06 (−2.14%: TLC's figure exceeds the rows in its own unchanged file). Green runs +2.1% to +3.0% with all vendors from 2024-12. D25's vendor-6 exclusion over-corrects it to −4% to −10% from 2025-07, because vendor 6 matched the 2025-03 gap by coincidence. Yellow drifts to +4% through 2026-05, then falls to about 0 from 2026-06.
+  - Both rules wait on the user.
 - **G2, re-run 25 Oct 2026 — passed** (after D24 and D25 merged to `main` as `1ed9094`). `make month MONTH=2025-03`: 20 s, peak memory about 5.2 GB. Rows match at every stage for fhvhv, yellow and green, all ten aggregate tables were written, and the raw files were deleted.
   - `make validate`, 2025-03:
     - **tie-out passes for all three classes:** FHVHV +0.00%; green −0.05% (1,222 vendor-6 records left out); yellow +1.16% (334 left out).
