@@ -28,7 +28,9 @@ def write_full_fixture(data_dir):
       pay: 1,000 miles per row and driver pay 2,000 → $2.000 a mile; from W32 (after the transition
              week) 2,100 in 2025 (+5.0%) and 2,020 in 2024 (+1.0%). Net of 2024: 1.05 ÷ 1.01 − 1 = +4.0%.
     agg_zone_hour: pickups per day zone 161 100 → 90 (−10.0%), zone 236 200 → 220 (+10.0%), zone 132
-    50 → 50 (under the 100-a-day floor for the zone tables)."""
+    50 → 50 (under the 100-a-day floor for the zone tables), zone 264 300 → 100 (unknown zone: kept by
+    the metric, left out of the report's zone tables). Default sums elsewhere: driver pay 1,391.6 over
+    117,600 seconds in every row → pay per hour with a passenger 1,391.6 ÷ 32.67 h = $42.60."""
     rows = []
     for year in (2024, 2025):
         for week in range(1, 53):
@@ -42,7 +44,7 @@ def write_full_fixture(data_dir):
                                      "mode": mode, "zone_list": zone_list, "cbd_group": group, "trips_all": trips,
                                      "miles": 1000.0, "driver_pay": pay if mode in HV_MODES else None})
     write_agg("agg_week_cbd", agg_table("agg_week_cbd", rows))
-    per_day = {161: (100, 90), 236: (200, 220), 132: (50, 50)}
+    per_day = {161: (100, 90), 236: (200, 220), 132: (50, 50), 264: (300, 100)}
     write_agg("agg_zone_hour", agg_table("agg_zone_hour", [
         {"month": date(year, month, 1), "pu_zone": zone, "trips_all": per_day[zone][year - 2024]
          * calendar.monthrange(year, month)[1]}
@@ -122,15 +124,21 @@ def test_reports_are_filled_from_the_metrics(full, reports):
     for week in ("W03 | 13 Jan 2025", "W04 | 20 Jan 2025"):
         assert f"| {week} | Martin Luther King Jr. Day is in ISO week 3 in 2024" in cp
     assert "| Martin Luther King Jr. Day | Mon 15 Jan (W03) | Mon 20 Jan (W04) | both weeks excluded |" in cp
-    assert "2 zones had at least 100 pickups a day in 2024." in cp
+    assert "2 map zones (1 to 263) had at least 100 pickups a day in 2024; 1 of them had fewer pickups a day in 2025." in cp
     assert "| 161 | Midtown Center | core | 100 | 90 | −10.0% |" in cp
     assert "| 236 | Upper East Side North | — | 200 | 220 | +10.0% |" in cp
-    assert "| 132 |" not in cp
+    assert "| 132 |" not in cp and "| 264 |" not in cp
+    # group growth: core treated 5,000 → 4,700 (−6.0%), wide 5,500 → 5,225 (−5.0%); controls flat
+    assert "| All modes | −6.0% | +0.0% | −5.0% | +0.0% |" in cp
+    assert "| Yellow cab | −6.0% | +0.0% | −5.0% | +0.0% |" in cp
     # pay rise: medians of 12 weeks either side of W31
     assert "| Ride-hail | Driver pay per mile | $2.000 | $2.100 | +5.0% | $2.000 | $2.020 | +1.0% | +4.0% |" in pay
     assert "| 0 | W31 | 28 Jul 2025 | $2.000 | $2.000 |" in pay and "| transition |" in pay
     assert "| 2025 | W19 to W43 | 5 May 2025 to 26 Oct 2025 | W31 (week of 28 Jul 2025) | none |" in pay
     assert "| 2024 | W19 to W43 | 6 May 2024 to 27 Oct 2024 | W31 (week of 29 Jul 2024) | none |" in pay
+    # monthly context: L09's pay_per_hour, ride_hail (uber only here)
+    assert "| Jan 2024 | $42.60 | — | — | — |" in pay
+    assert "| Mar 2025 | $42.60 | +0.0% | $42.60 | +0.0% |" in pay
 
 
 def test_reports_are_reproducible(full, reports):
@@ -146,11 +154,14 @@ def test_validation_status_comes_from_the_summary(full, reports):
     assert "Validation gate (`make validate`): **pass**." in (reports / studies.PAY_REPORT).read_text()
 
 
-def test_committed_reports_are_templates():
-    for name in (studies.CP_REPORT, studies.PAY_REPORT):
+def test_committed_reports_have_every_block(full):
+    results = studies.run_metrics()
+    for name, blocks in ((studies.CP_REPORT, studies.congestion_blocks(results, "")),
+                         (studies.PAY_REPORT, studies.pay_blocks(results, ""))):
         text = (common.REPORTS_DIR / name).read_text()
-        assert narrative(text) == text.replace("_Not generated yet: run `python -m pipeline.studies` after G3._\n", "")
-        assert "caused" not in text.replace('never "caused"', "")
+        studies.fill_blocks(text, blocks)                 # raises if a block is missing or unknown
+        assert "Not generated yet" not in text
+        assert "caused" not in text
 
 
 # --- CLI and errors ------------------------------------------------------------
@@ -167,7 +178,7 @@ def test_missing_aggregates_fail_cleanly(data_dir, reports, capsys):
         studies.main(["--reports-dir", str(reports)])
     assert exit_info.value.code == 1
     assert capsys.readouterr().err.startswith("studies: ")
-    assert "Not generated yet" in (reports / studies.CP_REPORT).read_text()
+    assert (reports / studies.CP_REPORT).read_text() == (common.REPORTS_DIR / studies.CP_REPORT).read_text()
 
 
 def test_stale_holiday_weeks_stop_the_run(full, reports, monkeypatch, capsys):

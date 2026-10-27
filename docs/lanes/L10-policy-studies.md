@@ -47,10 +47,16 @@ _Only this lane writes here. Newest first._
 
 | Date | State | Note |
 |---|---|---|
+| 27 Oct | written up from real data | Merged `main` (G3 passed) and ran `python -m pipeline.studies` on the validated 2024-01 → 2026-08 aggregates. I wrote the Findings in both reports by hand from the generated tables and checked that a rerun reproduces both reports byte for byte. Added two generated tables built from existing metric outputs: "Growth of each group" (from `cp_effect`) and monthly pay per hour with a passenger (L09's `pay_per_hour`). The report's zone tables are now limited to map zones 1–263 and give a count of falling zones. One item is recorded under Blocked (the trip-mix metric); the findings don't depend on it. |
 | 25 Oct | built on fixtures; real numbers and narrative wait for G3 | All five metrics, `pipeline/studies.py`, the `excluded_holiday_weeks` key and both report templates are built. 36 lane tests pass (hand-worked values), L09's `run_all` passes with the L10 metrics in, and `make test` is green. The reports' generated tables, the findings and every real number wait for the back-filled aggregates at G3. |
 | 24 Oct | in progress | Five metrics, `pipeline/studies.py`, the periods.yaml holiday key and both report templates are built. `tests/test_cp_effect.py` (15 tests) passes, and L09's `run_all` passes on its full fixture. Still to do: tests for `cp_weekly_trips`, `cp_zone_change`, `pay_event` and the studies CLI, then the hand-off. The real numbers and narrative wait for G3. |
 
-**Blocked:** none
+**Blocked:** one item, not stopping the write-up.
+- *Trip-mix metric (27 Oct).* Two checks in the reports are exploratory and not published as tables, because they need a metric the contract doesn't have:
+  - ride-hail zone trips got slightly longer, not shorter, in 2025;
+  - miles and minutes per trip moved alike in 2024 and 2025 across W31.
+
+  Both would be publishable with valid trips, miles and duration_s summed per week × cbd_group × mode, either as a new `cp_trip_mix` metric or as columns added to `cp_weekly_trips`. Either is a `contracts/metrics.md` change for the integrator. Until then the reports state the checks in words only, marked exploratory.
 
 **Hand-off**
 - Built:
@@ -92,3 +98,10 @@ _Only this lane writes here. Newest first._
   2. For the integrator, optional: have the runner expose periods.yaml's `excluded_holiday_weeks` as a view, so `cp_effect` reads it instead of carrying a copy. That's a change to L09's `pipeline/metrics.py` and the contract's view list.
   3. For the integrator and L11: if the drivers page needs a before/after pay number, add a `pay_event_summary` metric to `contracts/metrics.md`. Until then, use the same rule as the report (medians of the 12 weeks either side, offset 0 dropped).
   4. L19 (2027): with 2023 data, a placebo run of 2024 against 2023 on the same weeks (development plan §9). `holiday_weeks(base_year, study_year)` already takes the years.
+  5. For the integrator and the user, from the 27 Oct write-up: check `driver_pay_rise: 2025-08-01` (SPEC §3.3, `config/periods.yaml`) against TLC's published rule.
+     - The event study finds no rise at that date.
+     - Monthly ride-hail pay per hour with a passenger steps up between February and March 2025 (+4.5% on the month), after which 2025 runs 4–6% above 2024.
+     - The date feeds `events.json` and the drivers page (L11, L15). The report gives the three readings that fit the data and doesn't choose between them.
+  6. For L11 and L15, from the 27 Oct write-up:
+     - Per-company congestion estimates (Uber, Lyft) drift in opposite directions through 2025, so ride-hail combined is the safer site figure.
+     - The yellow-cab trips estimate moves by about 10 points between the lists (−7.8% core, −18.1% wide) because yellow's comparison group grew very fast. Its finding sentence should carry that caveat or use the all-modes and ride-hail figures.
