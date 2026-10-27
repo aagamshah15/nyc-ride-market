@@ -161,6 +161,7 @@ All gate checks run in the integrator space. G1, G3, G4, G5 and G6 are SPEC §11
 
 - Before Wave 1: settle §7 with the user (done 23 Oct); run L00 (done 23 Oct) and L01 (done 24 Oct; contracts and D15–D18 approved). Repo: https://github.com/aagamshah15/nyc-ride-market (public); Pages: https://aagamshah15.github.io/nyc-ride-market/ (source GitHub Actions, deploys from `main` only).
 - Merge order: L00 → L01 → L02, L04, L05 → L03 → L06 → L07 → L08, L09 → L10 → L11 → pages → L17 → L18.
+- **Standing approval (user, 27 Oct 2026):** the integrator merges a lane into `main` and pushes once its test-merge passes `make test`, without asking each time. Any SPEC change, decision or tolerance change still goes to the user first.
 - Run the real-data jobs: the G2 month, the back-fill, `make validate`, `make publish`.
 - Route each validation failure to the lane that owns the cause. Never widen a tolerance without asking the user.
 - Keep the §2 Status column current; record decision changes in `docs/decisions.md`.
