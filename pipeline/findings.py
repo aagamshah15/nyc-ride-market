@@ -404,13 +404,17 @@ def zone_waits(*, mode, wait_p50, thin, month):
             f"{month_label(month)}")
 
 
-def zone_top_destinations(*, name, dest_share, month):
+def zone_top_destinations(*, name, dest_share, left_city_share, month):
+    """``name``: the top destination among the mapped zones. ``left_city_share``: the share of trips
+    to "Outside of NYC" when it outranks every mapped zone, else None."""
+    left = "" if _missing(left_city_share) else f"; {share(left_city_share)} of trips left the city"
     if _missing(name):
-        return f"No destination had enough trips from here in {month_label(month)} to list"
+        where = "in the city " if left else ""
+        return f"No destination {where}had enough trips from here in {month_label(month)} to list{left}"
     text = f"{name} was the top destination from here in {month_label(month)}"
     if not _missing(dest_share):
         text += f", with {share(dest_share)} of trips"
-    return text
+    return text + left
 
 
 # --- airports ----------------------------------------------------------------
@@ -419,11 +423,13 @@ def airports_list(codes: list[str]) -> str:
     return join_and([AIRPORT_NAMES.get(code, code) for code in codes])
 
 
-def airports_title(*, mode, top_share, airports, month):
-    if _missing(mode, top_share) or not airports:
+def airports_title(*, mode, top_share, airports, dropoff_only, month):
+    """``airports``: counted both ways; ``dropoff_only``: counted for trips to the airport only."""
+    places = ([f"to and from {airports_list(airports)}"] if airports else []) + \
+             ([f"to {airports_list(dropoff_only)}"] if dropoff_only else [])
+    if _missing(mode, top_share) or not places:
         return None
-    return (f"{cap(noun(mode))} carried {share(top_share)} of trips to and from {airports_list(airports)} "
-            f"in {month_label(month)}")
+    return f"{cap(noun(mode))} carried {share(top_share)} of trips {' and '.join(places)} in {month_label(month)}"
 
 
 def airports_split(*, leaders, month):
@@ -470,12 +476,28 @@ def congestion_title(*, trips_effect):
     return f"Congestion pricing had an estimated effect of {effect(trips_effect)} on trips touching the zone"
 
 
-def congestion_effects(*, lowest, highest):
-    """``lowest`` and ``highest``: (mode, median weekly estimated effect on trips)."""
-    if not lowest or not highest or lowest[0] == highest[0]:
+def _main_effects(by_mode: dict) -> list[tuple[str, float]]:
+    """Ride-hail and yellow cabs, the modes Q2 reads by (combined ride-hail, as L10's report does)."""
+    return [(m, by_mode[m]) for m in ("ride_hail", "yellow") if not _missing(by_mode.get(m))]
+
+
+def _green_effect(by_mode: dict, green_share) -> str:
+    """Green cabs apart, with their share of NYC trips so the reader sees how small they are."""
+    if _missing(by_mode.get("green")):
+        return ""
+    size = "" if _missing(green_share) else f", {share(green_share)} of NYC trips,"
+    return f"green cabs{size} came out at {effect(by_mode['green'])}"
+
+
+def congestion_effects(*, by_mode, green_share):
+    """``by_mode``: median weekly estimated effect on trips, core list, for ride_hail, yellow and green."""
+    main = _main_effects(by_mode)
+    if not main:
         return None
-    return (f"Estimated effects on trips touching the zone ranged from {effect(lowest[1])} for "
-            f"{noun(lowest[0])} to {effect(highest[1])} for {noun(highest[0])}")
+    text = ("By mode, the estimated effect on trips touching the zone was "
+            + join_and([f"{effect(v)} for {noun(m)}" for m, v in main]))
+    green = _green_effect(by_mode, green_share)
+    return text + (f"; {green}" if green else "")
 
 
 def congestion_weekly_effect(*, p10, p90):
@@ -611,19 +633,19 @@ def q1(*, rh_share, change, zones_up, zones_total, month):
     return finding("Q1", text, rh_share, "share")
 
 
-def q2(*, all_modes, by_company):
+def q2(*, all_modes, by_mode, green_share):
     """``all_modes``: (median, p10, p90) estimated effect on trips, all modes, core zone list;
-    ``by_company``: {company: median}."""
+    ``by_mode``: {mode: median} for ride_hail, yellow and green; ``green_share``: green's share of trips."""
     if not all_modes or _missing(all_modes[0]):
         return finding("Q2", None, None, "effect")
     median, p10, p90 = all_modes
     text = f"Congestion pricing had an estimated effect of {effect(median)} on trips touching the zone"
     if not _missing(p10, p90):
         text += f" (weekly range {effect(p10)} to {effect(p90)})"
-    known = {m: v for m, v in by_company.items() if not _missing(v)}
-    if known:
-        mode = max(known, key=lambda m: abs(known[m]))
-        text += f"; among companies it was largest for {noun(mode)}, at {effect(known[mode])}"
+    if main := _main_effects(by_mode):
+        text += "; by mode, " + join_and([f"{noun(m)} {effect(v)}" for m, v in main])
+        if green := _green_effect(by_mode, green_share):
+            text += f", while {green}"
     return finding("Q2", text, median, "effect")
 
 
@@ -687,8 +709,8 @@ def q8(*, waits, longest, month):
     return finding("Q8", text, first_wait, "seconds")
 
 
-def q9(*, mode, top_share, airports, fare_mean, busiest_hour, month):
-    text = airports_title(mode=mode, top_share=top_share, airports=airports, month=month)
+def q9(*, mode, top_share, airports, dropoff_only, fare_mean, busiest_hour, month):
+    text = airports_title(mode=mode, top_share=top_share, airports=airports, dropoff_only=dropoff_only, month=month)
     if text:
         if not _missing(fare_mean):
             text += f"; the mean fare to Manhattan was {usd(fare_mean)} before tip"

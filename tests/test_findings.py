@@ -109,15 +109,35 @@ def test_q4_lyft_against_uber():
         "value": 23, "unit": "count", "page": "/companies/lyft", "featured": False}
 
 
-def test_q2_congestion_effect():
-    # all modes: median −0.06, p10 −0.0826, p90 −0.0402; the largest company effect by size is
-    # yellow's −0.071 (Uber −0.0584, Lyft −0.03, green +0.01).
+def test_q2_congestion_effect_by_mode():
+    # all modes: median −0.06, p10 −0.0826, p90 −0.0402; by mode ride-hail −0.0813 and yellow −0.0777;
+    # green, 0.17% of NYC trips, comes apart with its share.
     result = findings.q2(all_modes=(-0.06, -0.0826, -0.0402),
-                         by_company={"uber": -0.0584, "lyft": -0.03, "yellow": -0.071, "green": 0.01})
+                         by_mode={"ride_hail": -0.0813, "yellow": -0.0777, "green": 0.0411}, green_share=0.0017)
     assert result["text"] == ("Congestion pricing had an estimated effect of −6.0% on trips touching the zone "
-                              "(weekly range −8.3% to −4.0%); among companies it was largest for yellow cabs, "
-                              "at −7.1%")
+                              "(weekly range −8.3% to −4.0%); by mode, ride-hail apps −8.1% and yellow cabs −7.8%, "
+                              "while green cabs, 0.2% of NYC trips, came out at +4.1%")
     assert (result["value"], result["unit"], result["featured"]) == (-0.06, "effect", True)
+    assert findings.congestion_effects(by_mode={"ride_hail": -0.0813, "yellow": -0.0777, "green": 0.0411},
+                                       green_share=0.0017) == (
+        "By mode, the estimated effect on trips touching the zone was −8.1% for ride-hail apps and −7.8% for "
+        "yellow cabs; green cabs, 0.2% of NYC trips, came out at +4.1%")
+
+
+def test_destination_sentences():
+    assert findings.zone_top_destinations(name="Park Slope", dest_share=0.041, left_city_share=0.071,
+                                          month=AUG26) == (
+        "Park Slope was the top destination from here in Aug 2026, with 4.1% of trips; 7.1% of trips left the city")
+    assert findings.zone_top_destinations(name=None, dest_share=None, left_city_share=0.25, month=AUG26) == \
+        "No destination in the city had enough trips from here in Aug 2026 to list; 25% of trips left the city"
+    assert findings.zone_top_destinations(name=None, dest_share=None, left_city_share=None, month=AUG26) == \
+        "No destination had enough trips from here in Aug 2026 to list"
+
+
+def test_airports_named_by_direction():
+    assert findings.airports_title(mode="uber", top_share=0.63, airports=["JFK", "LGA"], dropoff_only=["EWR"],
+                                   month=AUG26) == \
+        "Uber carried 63% of trips to and from JFK and LaGuardia and to Newark in Aug 2026"
 
 
 def test_q14_fee_money():
@@ -164,7 +184,7 @@ def test_pay_per_hour_is_with_a_passenger():
 
 def test_congestion_results_are_estimated_effects():
     sentences = [findings.congestion_title(trips_effect=-0.06),
-                 findings.congestion_effects(lowest=("uber", -0.09), highest=("green", 0.01)),
+                 findings.congestion_effects(by_mode={"ride_hail": -0.08, "yellow": -0.07}, green_share=None),
                  findings.congestion_weekly_effect(p10=-0.08, p90=-0.04),
                  findings.q3(fpm_effect=0.025, driver_share_effect=-0.004)["text"]]
     for text in sentences:

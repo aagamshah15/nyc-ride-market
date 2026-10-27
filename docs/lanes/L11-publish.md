@@ -46,10 +46,10 @@ _Only this lane writes here. Newest first._
 
 | Date | State | Note |
 |---|---|---|
+| 27 Oct 2026 | done | Integrator's four findings fixes for G4: Newark pickups left out of pickup-share sentences; destinations ranked among zones 1–263; Q2 and the effects subtitle by mode; Q12's zone checked (shared-ride requests by pickup zone, correct). |
 | 27 Oct 2026 | done | Built on factory aggregates and checked with a real run on the G3 aggregates (2024-01 → 2026-08). Main merged in (D24–D27, L10's metrics). |
 
-**Blocked:** one contract gap for the integrator; it doesn't hold up this lane.
-- **`taxi_zones.example.geojson` only has Polygon features.** L04's real map has 12 MultiPolygon zones, so `assert_matches_contract` fails on the copied map (`coordinates` nest one level deeper). The map itself passes `zones.geojson_problems`. Fix in `contracts/`: add a MultiPolygon feature to the example (the checker merges items, so it would still reject Polygons), or check the geojson only down to `geometry.type`. The tests use the mock grid map, which is all Polygons.
+**Blocked:** none. (The zone-map example gap, Polygon only, was fixed on `main` in bc1ef2c; the real map now passes.)
 
 **Hand-off**
 - **Built:**
@@ -71,7 +71,7 @@ _Only this lane writes here. Newest first._
     - L10's metrics go through the runner
   - `tests/test_findings.py` (48): formats, hand-worked sentences, language rules and missing values.
   - `make test`: 474 passed, 13 skipped; the site builds.
-  - Real run: `NYC_DATA_DIR=<shared data> python -m pipeline.publish` writes 278 files in under 2 seconds, `validated: true`. Every route is within budget; the largest zone file is 39.6 KB and the largest route (`/congestion-pricing`) about 685 KB. Every JSON file matches its contract; the zone map doesn't (see Blocked). **Not committed:** `site/src/data/` is left for the integrator.
+  - Real run: `NYC_DATA_DIR=<shared data> python -m pipeline.publish` writes 278 files in under 2 seconds, `validated: true`. Every route is within budget; the largest zone file is 39.6 KB and the largest route (`/congestion-pricing`) about 685 KB. Every file, the zone map included, matches its contract. **Not committed:** `site/src/data/` is left for the integrator.
 - **Known limits (choices made where the contract is silent):**
   - A zone is thin with fewer than 100 trips (all rows, from `trip_share`) in the month. No metric gives per-zone valid trips; the gap is about 2%.
   - Zone `wait_p50`/`wait_p90` (zone tiles and the index) are the leading ride-hail app's percentiles, by trips that month, because percentiles can't be combined across apps. The waits subtitle names the app.
@@ -79,11 +79,14 @@ _Only this lane writes here. Newest first._
   - `compare` row `fare_per_min` is `fare_rates.fare_per_min`, a city-wide mean (ratio of sums); `fpm_median` is the median from `fare_dist`.
   - The "varies most" sentences (prices subtitle, Q7) consider only zone × company cells with at least 5,000 trips (`VOLATILITY_MIN_TRIPS`). Smaller yellow-cab cells reach p90 ÷ p10 of 130× to 740×. The data rows keep every cell.
   - The highest-fare borough sentence considers the five boroughs only: EWR, the zone-1 pickups, comes out at $47.12/mile.
+  - Pickup-share sentences (airports title, `split` and `share_trend` subtitles, Q9) leave out Newark pickups (`NO_PICKUP_SHARES`). TLC ride-hail doesn't pick up there: Aug 2026 has 122 records, 121 of them yellow. Newark drop-offs are counted. The data rows and the `yellow_share` tile keep the pickups; the difference is about 0.01 pts.
+  - Top-destination sentences and the `top_destination` tile name a mapped zone (1–263). "Outside of NYC" (zone 265, D26) stays in the data rows, and gets its own clause ("…; 5.3% of trips left the city") when it outranks every mapped zone: 39 zones in Aug 2026, at 3.7% to 34%.
+  - Q2 and the congestion `effects` subtitle read by mode on the core list: combined ride-hail and yellow, with green apart and its share of NYC trips. The Uber and Lyft weekly effects drift in opposite directions (L10's report). The all-modes figure (−4.2%) is smaller than both ride-hail (−8.1%) and yellow (−7.8%) because of the mode mix (L10's report explains it); the sentence doesn't try to explain that.
+  - Q12's "the most came from" zone counts Uber and Lyft shared-ride requests (`shared_req`, valid trips flagged `shared_request`) by pickup zone in the latest month. LaGuardia leads narrowly (10,663, 3.9%) over JFK (9,909).
   - Q6 compares ride-hail pay per hour with a passenger (and fare per mile) in Aug 2025, the month the minimum-pay rise began, with Jul 2025. It is descriptive, not an estimate; the event-study chart carries the seasonal reference.
   - Event labels ("Congestion pricing starts", "Driver minimum pay rises 5%") are constants in `publish.py`, because `periods.yaml` has no labels.
   - Changes on a year earlier come from unrounded values; tiles are rounded per `contracts/README.md` §2 afterwards.
 - **Follow-ups:**
-  - Integrator: the geojson example (Blocked).
-  - L14: "Outside of NYC" (zone 265, valid since D26) is the top destination of 39 zones. Its name comes straight from the TLC lookup; the page may want to say it covers every out-of-city place.
+  - L14: `top_destinations` rows still include "Outside of NYC" (zone 265), often first. The tile and subtitle now name a mapped zone, so the table may want to label 265 as every out-of-city place, or show it apart.
   - L06/L08 (data quality, to look at): yellow-cab cells in outer zones have p10 fare per mile near zero (Richmond Hill p90 ÷ p10 = 676 in Aug 2026). Zone 1 (Newark Airport) has 15 pickups a day, 99% yellow, at $47 a mile.
   - Real numbers to sanity-check on review (G4): Q11 is 100% for both apps (D24); Lyft leads Uber in only 1 zone; shared-ride requests fell 51% on a year earlier; pay per hour with a passenger is $63–65.

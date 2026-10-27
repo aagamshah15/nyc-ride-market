@@ -116,15 +116,18 @@ def od_rows() -> list[dict]:
             {"month": month, "mode": "yellow", "pu_zone": 132, "do_zone": 161, "trips_valid": 20,
              "rider_total_ex_tip": 1_400.0},
             {"month": month, "mode": "lyft", "pu_zone": 236, "do_zone": 161, "trips_valid": 25},
+            {"month": month, "mode": "uber", "pu_zone": 161, "do_zone": 265, "trips_valid": 60},   # Outside of NYC
+            {"month": month, "mode": "uber", "pu_zone": 236, "do_zone": 265, "trips_valid": 20},
         ]
     return rows
 
 
 def airport_rows() -> list[dict]:
+    newark = [("EWR", "from", "yellow", 15, 10), ("EWR", "to", "uber", 7, 20)]   # pickups: a few cab records
     cells = {AUG26: [("JFK", "from", "uber", 15, 60), ("JFK", "from", "yellow", 15, 40), ("JFK", "to", "uber", 7, 50),
-                     ("LGA", "from", "uber", 15, 30), ("LGA", "from", "yellow", 15, 20)],
+                     ("LGA", "from", "uber", 15, 30), ("LGA", "from", "yellow", 15, 20)] + newark,
              AUG25: [("JFK", "from", "uber", 15, 50), ("JFK", "from", "yellow", 15, 50), ("JFK", "to", "uber", 7, 50),
-                     ("LGA", "from", "uber", 15, 30), ("LGA", "from", "yellow", 15, 20)]}
+                     ("LGA", "from", "uber", 15, 30), ("LGA", "from", "yellow", 15, 20)] + newark}
     return [{"month": month, "airport": airport, "direction": direction, "mode": mode, "hour_of_day": hour,
              "trips_valid": n} for month, rows in cells.items() for airport, direction, mode, hour, n in rows]
 
@@ -297,9 +300,10 @@ HAND_WORKED = {
           "pickups rose in 1 of 4 zones",
     # All modes, core list. Weekly treated growth ÷ control growth − 1: W10 (900 + 980) ÷ 2,000 − 1 =
     # −0.06, W11 −0.11, W12 −0.01. Median −0.06; p10 −0.11 + 0.2 × 0.05 = −0.10; p90 −0.06 + 0.8 × 0.05
-    # = −0.02. Uber's weeks −0.10, −0.20, 0 (median −0.10) outweigh yellow's −0.02.
+    # = −0.02. By mode: ride-hail is Uber alone here, weeks −0.10, −0.20, 0 (median −0.10); yellow −0.02
+    # every week. No green rows, so no green clause.
     "Q2": "Congestion pricing had an estimated effect of −6.0% on trips touching the zone (weekly range −10.0% to "
-          "−2.0%); among companies it was largest for Uber, at −10.0%",
+          "−2.0%); by mode, ride-hail apps −10.0% and yellow cabs −2.0%",
     # Ride-hail is Uber alone here. Fare per mile: treated 19,503 ÷ 17,730 = 1.10 against control 1.00 → +10%.
     # Driver share: 13,120 ÷ 19,503 against 13,120 ÷ 17,730 → 17,730 ÷ 19,503 − 1 = −9.09% ("−9.1%").
     "Q3": "For ride-hail trips touching the zone, congestion pricing had an estimated effect of +10.0% on fare per "
@@ -317,10 +321,11 @@ HAND_WORKED = {
     # City-wide medians 240 s and 270 s; the longest zone median is Lyft's 600 s in zone 236.
     "Q8": "Uber riders waited a median 4.0 min from request to pickup in Aug 2026, Lyft riders 4.5 min; the "
           "longest median wait was 10.0 min, for Lyft riders in Upper East Side North",
-    # Airport trips in Aug 2026: Uber 60 + 50 + 30 = 140 of 200 (70%). To Manhattan from JFK: rider
-    # totals 3,200 + 1,400 over 40 + 20 trips = $76.67. Hour 15 has 150 trips, hour 7 has 50.
-    "Q9": "Uber carried 70% of trips to and from JFK and LaGuardia in Aug 2026; the mean fare to Manhattan was "
-          "$76.67 before tip, and trips peaked at 3 pm",
+    # Airport trips in Aug 2026 without Newark's 10 pickups: Uber 60 + 50 + 30 + 20 = 160 of 220 (73%).
+    # To Manhattan from JFK: rider totals 3,200 + 1,400 over 40 + 20 trips = $76.67. Hour 15 has 160
+    # trips, hour 7 has 70.
+    "Q9": "Uber carried 73% of trips to and from JFK and LaGuardia and to Newark in Aug 2026; the mean fare to "
+          "Manhattan was $76.67 before tip, and trips peaked at 3 pm",
     # Yellow leads zone 132 (500 of 800). A year earlier: 132 (400 of 800) and zone 2 (70 of 100).
     "Q10": "Yellow cabs carried more pickups than any other mode in 1 zone in Aug 2026, down from 2 a year earlier",
     # Fees: 1,500 + 600 + 750 + 75 = $2,925 against 2,500 a year earlier (+17.0%); Uber the most.
@@ -374,8 +379,36 @@ def test_thin_and_empty_zones_give_nulls(site):
     assert empty["hour_heatmap"] == [] and empty["top_destinations"] == []
     busy = site["files"]["zones/161.json"]
     assert busy["flags"] == {"cbd": True, "cbd_borderline": False, "airport": None, "thin": False}
-    assert busy["tiles"]["top_destination"] == "Upper East Side North"
     assert site["files"]["zones/132.json"]["flags"]["airport"] == "JFK"
+
+
+def test_destinations_rank_mapped_zones(site):
+    """Zone 265, every out-of-city place, keeps its data row but isn't named the top destination; it
+    gets its own clause when it outranks every mapped zone."""
+    midtown = site["files"]["zones/161.json"]
+    assert [d["do_zone"] for d in midtown["top_destinations"]] == [265, 236, 132]
+    assert midtown["tiles"]["top_destination"] == "Upper East Side North"
+    # 40 and 60 of zone 161's 1,000 valid trips
+    assert midtown["subtitles"]["top_destinations"] == (
+        "Upper East Side North was the top destination from here in Aug 2026, with 4.0% of trips; "
+        "6.0% of trips left the city")
+    ues = site["files"]["zones/236.json"]                       # 25 to Midtown Center, 20 out of the city
+    assert ues["subtitles"]["top_destinations"] == (
+        "Midtown Center was the top destination from here in Aug 2026, with 3.1% of trips")
+
+
+def test_newark_pickups_stay_out_of_share_sentences(site):
+    """Newark's few pickup records aren't who wins the airport; its drop-offs are counted."""
+    airports = site["files"]["airports.json"]
+    assert airports["title"] == "Uber carried 73% of trips to and from JFK and LaGuardia and to Newark in Aug 2026"
+    # JFK pickups: Uber 60 of 100; LaGuardia: 30 of 50. Newark (yellow 10 of 10) isn't named.
+    assert airports["subtitles"]["split"] == "In Aug 2026, Uber led pickups at JFK (60%) and LaGuardia (60%)"
+    # Yellow without Newark pickups: 60 of 220 against 70 of 220 → −4.5 pts (with them, −4.3 pts).
+    assert airports["subtitles"]["share_trend"] == \
+        "Yellow cabs' share of airport trips fell 4.5 pts between Aug 2025 and Aug 2026"
+    # The data rows and the tile keep them: yellow 70 of 230.
+    assert {(r["airport"], r["direction"], r["mode"]) for r in airports["split"]} >= {("EWR", "from", "yellow")}
+    assert airports["tiles"]["yellow_share"] == 0.3043
 
 
 # --- language rules (CLAUDE.md) -------------------------------------------------
