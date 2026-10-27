@@ -63,8 +63,8 @@ def _signed(v: float, text: str) -> str:
 def count(n: float) -> str:
     """Exact below 1,000; 3 significant figures with commas; "x.y million" from 10 million."""
     a = abs(n)
-    if a < 1000:
-        text = _fixed(a, 1)
+    if a < 1000:   # toLocaleString rounds the shortest decimal form of the number, not its binary value
+        text = f"{Decimal(repr(a)).quantize(Decimal('0.1'), rounding=ROUND_HALF_UP):,f}"
         return _sign(n) + (text[:-2] if text.endswith(".0") else text)
     exact = Decimal(a)
     rounded = exact.quantize(Decimal(1).scaleb(exact.adjusted() - 2), rounding=ROUND_HALF_UP)
@@ -115,7 +115,8 @@ usd_per_hour = _usd_per("hour")
 
 def seconds(s: float) -> str:
     """Waits in minutes, 1 decimal."""
-    return f"{_sign(s)}{_fixed(abs(s) / 60, 1)} min"
+    minutes = s / 60
+    return f"{'-' if minutes < 0 else ''}{_fixed(abs(minutes), 1)} min"   # format.js uses toFixed here
 
 
 def trips_per_hour(x: float) -> str:
@@ -384,8 +385,9 @@ def zone_share_trend(*, rh_share, change, month, prior):
         return None
     if change is None:
         return f"Ride-hail apps carried {share(rh_share)} of pickups here in {month_label(month)}"
-    return (f"Ride-hail apps' share of pickups here {moved(change)} between {month_label(prior)} and "
-            f"{month_label(month)}, to {share(rh_share)}")
+    movement = moved(change)
+    return (f"Ride-hail apps' share of pickups here {movement} between {month_label(prior)} and "
+            f"{month_label(month)}, {'at' if movement == 'held steady' else 'to'} {share(rh_share)}")
 
 
 def zone_hour_heatmap(*, peak_hour, peak_trips, window, month):
@@ -538,7 +540,7 @@ def drivers_event_study(*, before, after, reference_before, reference_after):
     and the same weeks a year earlier."""
     if not before or not after or _missing(before[1], after[1]):
         return None
-    text = (f"Ride-hail driver pay per minute went from {usd_per_minute(before[1])} in the "
+    text = (f"Ride-hail driver pay per minute with a passenger went from {usd_per_minute(before[1])} in the "
             f"{week_label(before[0])} to {usd_per_minute(after[1])} in the {week_label(after[0])}")
     if reference_before and reference_after and not _missing(reference_before[1], reference_after[1]):
         text += (f"; in the same weeks a year earlier it went from {usd_per_minute(reference_before[1])} "
@@ -593,8 +595,8 @@ def prices_by_borough(*, borough, fare_per_mile, window, month):
 def prices_volatility(*, zone_name, mode, volatility, month):
     if _missing(zone_name, mode, volatility):
         return None
-    return (f"Fares per mile varied most for {noun(mode)} trips from {zone_name} in {month_label(month)}, "
-            f"where the 90th-percentile fare per mile was {ratio(volatility)} the 10th")
+    return (f"Fares per mile varied most for {FARE_NOUNS.get(mode, mode)} trips from {zone_name} in "
+            f"{month_label(month)}, where the 90th-percentile fare per mile was {ratio(volatility)} the 10th")
 
 
 # --- Q1–Q15 (home findings) ----------------------------------------------------
@@ -655,7 +657,7 @@ def q6(*, pay_after, pay_before, fpm_change, rise_month, before_month):
     if _missing(pay_after):
         return finding("Q6", None, None, "usd_per_hour")
     text = (f"Ride-hail drivers earned {usd(pay_after)} per hour with a passenger in "
-            f"{month_label(rise_month)}, the month the minimum-pay rise took effect")
+            f"{month_label(rise_month)}, the month the minimum-pay rise began")
     if not _missing(pay_before) and pay_before:
         text += f", {rel_change(pay_after / pay_before - 1)} on {month_label(before_month)}"
     if not _missing(fpm_change):
@@ -666,7 +668,7 @@ def q6(*, pay_after, pay_before, fpm_change, rise_month, before_month):
 def q7(*, fpm_median, zone_name, mode, volatility, month):
     text = prices_title(fpm_median=fpm_median, month=month)
     if text and not _missing(zone_name, mode, volatility):
-        text += (f"; fares per mile varied most for {noun(mode)} trips from {zone_name}, where the "
+        text += (f"; fares per mile varied most for {FARE_NOUNS.get(mode, mode)} trips from {zone_name}, where the "
                  f"90th percentile was {ratio(volatility)} the 10th")
     return finding("Q7", text, fpm_median, "usd_per_mile")
 

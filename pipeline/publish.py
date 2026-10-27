@@ -21,6 +21,7 @@ import shutil
 import sys
 from collections import defaultdict
 from datetime import date, datetime, timezone
+from itertools import product
 from pathlib import Path
 
 import yaml
@@ -42,6 +43,13 @@ AIRPORT_ORDER = ("JFK", "LGA", "EWR")
 DIRECTIONS = ("from", "to")
 THIN_TRIPS = 100                         # contracts/README.md §4: a zone below this is thin
 HEATMAP_MIN_SHARE = 0.10                 # contracts/README.md §1: heatmap modes
+# Zone × company cells a "varies most" sentence may name. Smaller cells give unstable p90 ÷ p10
+# (yellow-cab cells of a few hundred to 3,000 trips reach 130× to 740× in Aug 2026); the data
+# rows keep every cell.
+VOLATILITY_MIN_TRIPS = 5_000
+TILE_DIGITS = {"count": 1, "share": 4, "usd": 2, "usd_per_mile": 3, "usd_per_minute": 3,   # contracts §2
+               "usd_per_hour": 2, "seconds": 0, "trips_per_hour": 3, "ratio": 3, "effect": 4}
+NYC_BOROUGHS = ("Bronx", "Brooklyn", "Manhattan", "Queens", "Staten Island")   # for sentences naming one
 TLC_CLASSES = {"FHV - High Volume": "ride_hail", "Yellow": "yellow", "Green": "green"}
 EVENT_LABELS = {"congestion_pricing_start": "Congestion pricing starts",
                 "driver_pay_rise": "Driver minimum pay rises 5%"}
@@ -156,11 +164,11 @@ class Outputs:
 class Site:
     """Every published file, built from metric outputs for the latest month in the data."""
 
-    def __init__(self, outputs: Outputs, *, generated_at: str, validated: bool, summary: dict | None):
+    def __init__(self, outputs: Outputs, *, generated_at: str):
         self.out = outputs
         self.generated_at = generated_at
-        self.validated = validated
-        self.summary = summary
+        self.validated = False
+        self.summary: dict | None = None
         share_rows = outputs.rows("share_monthly")
         if not share_rows:
             raise PublishError("share_monthly has no rows: there are no aggregates to publish")
@@ -188,12 +196,15 @@ class Site:
         except KeyError:
             raise PublishError(f"zone lookup has no LocationID {zone}") from None
 
-    def _yoy(self, tiles: dict, prior: dict) -> dict:
-        """``yoy`` for ``tiles`` by each tile's kind in site/tiles.yaml, against ``prior`` values."""
-        yoy = {}
-        for key, value in tiles.items():
-            kind = self.tile_registry[key]["yoy"]
-            before = prior.get(key)
+    def _tiles(self, now: dict, prior: dict) -> tuple[dict, dict]:
+        """``(tiles, yoy)`` from unrounded values: each tile rounded for its unit, and its change
+        versus ``prior`` (the same month a year earlier) by its kind in site/tiles.yaml."""
+        tiles, yoy = {}, {}
+        for key, value in now.items():
+            meta = self.tile_registry[key]
+            digits = TILE_DIGITS.get(meta["unit"])
+            tiles[key] = value if digits is None or isinstance(value, int) else _r(value, digits)
+            before, kind = prior.get(key), meta["yoy"]
             if kind == "relative":
                 yoy[key] = _r(_rel(value, before), 4)
             elif kind == "pts":
@@ -202,7 +213,7 @@ class Site:
                 yoy[key] = None if value is None or before is None else value - before
             else:
                 yoy[key] = None
-        return yoy
+        return tiles, yoy
 
     # --- shared values -------------------------------------------------------
 
@@ -292,12 +303,12 @@ class Site:
             fees[r["month"]] += r["cbd_fee"] or 0.0
 
         def tiles_for(month: str) -> dict:
-            return {"trips_per_day": _r(self.trips_per_day(month), 1),
-                    "rh_share": _r(self.mode_share(month, "ride_hail"), 4),
-                    "platform_share": _r(ds.get((month, "ride_hail"), {}).get("platform_share"), 4),
-                    "cbd_fees_last_month": _r(fees.get(month), 2)}
+            return {"trips_per_day": self.trips_per_day(month),
+                    "rh_share": self.mode_share(month, "ride_hail"),
+                    "platform_share": ds.get((month, "ride_hail"), {}).get("platform_share"),
+                    "cbd_fees_last_month": fees.get(month)}
 
-        tiles = tiles_for(m)
+        tiles, yoy = self._tiles(tiles_for(m), tiles_for(p))
         first = self.months[0]
         changes = {c: _pts(self.mode_share(m, c), self.mode_share(first, c)) for c in COMPANIES}
         mover = _argmax({c: None if v is None else abs(v) for c, v in changes.items()})
@@ -305,8 +316,8 @@ class Site:
                 "title": findings.home_title(rh_share=tiles["rh_share"], month=m),
                 "subtitles": {"share_trend": findings.home_share_trend(
                     mode=mover, change=changes.get(mover), first_month=first, month=m)},
-                "tiles": tiles, "yoy": self._yoy(tiles, tiles_for(p)),
-                "findings": self.findings()}
+                "tiles": tiles, "yoy": yoy,
+                "findings": [f for f in self.findings() if f]}
 
     def company(self, mode: str) -> dict:
         m, p = self.month, self.prior
@@ -320,14 +331,13 @@ class Site:
         rates = {(r["month"], r["mode"]): r for r in self.out.rows("fare_rates")}
 
         def tiles_for(month: str) -> dict:
-            return {"trips_per_day": _r(self.share.get((month, mode), {}).get("trips_per_day"), 1),
-                    "share": _r(self.mode_share(month, mode), 4),
-                    "fpm_median": _r(fpm.get((month, mode), {}).get("fpm_p50"), 3),
-                    "driver_share": None if cab else _r(ds.get((month, mode), {}).get("driver_share"), 4),
-                    "tip_rate": _r(tips.get((month, mode), {}).get("tip_rate"), 4)}
+            return {"trips_per_day": self.share.get((month, mode), {}).get("trips_per_day"),
+                    "share": self.mode_share(month, mode),
+                    "fpm_median": fpm.get((month, mode), {}).get("fpm_p50"),
+                    "driver_share": None if cab else ds.get((month, mode), {}).get("driver_share"),
+                    "tip_rate": tips.get((month, mode), {}).get("tip_rate")}
 
-        tiles, before = tiles_for(m), tiles_for(p)
-        yoy = self._yoy(tiles, before)
+        tiles, yoy = self._tiles(tiles_for(m), tiles_for(p))
         wav_now = {r["mode"]: r for r in wav if r["month"] == m}
         shared_now = {r["mode"]: r for r in shared if r["month"] == m}
 
@@ -419,10 +429,10 @@ class Site:
                  "top_mode": info["top_mode"], "cbd": z in self.cbd_core, "thin": info["thin"]}
                 for z, info in zs.items()]
         busiest = max(rows, key=lambda r: r["trips_per_day"] or 0)
-        tiles = {"zones_yellow_leads": counts["yellow_leads"], "zones_lyft_beats_uber": counts["lyft_ahead"],
-                 "zones_rh_share_up": counts["rh_up"]}
-        prior = {"zones_yellow_leads": counts["yellow_leads_prior"],
-                 "zones_lyft_beats_uber": counts["lyft_ahead_prior"]}
+        tiles, yoy = self._tiles({"zones_yellow_leads": counts["yellow_leads"],
+                                  "zones_lyft_beats_uber": counts["lyft_ahead"], "zones_rh_share_up": counts["rh_up"]},
+                                 {"zones_yellow_leads": counts["yellow_leads_prior"],
+                                  "zones_lyft_beats_uber": counts["lyft_ahead_prior"]})
         return {**self.env(),
                 "title": findings.zones_title(zones_now=counts["yellow_leads"],
                                               zones_prior=counts["yellow_leads_prior"], month=m),
@@ -435,7 +445,7 @@ class Site:
                                                             zones_prior=counts["yellow_leads_prior"], month=m),
                     "table": findings.zones_table(name=busiest["name"] if busiest["trips_per_day"] else None,
                                                   trips_per_day=busiest["trips_per_day"], month=m)},
-                "tiles": tiles, "yoy": self._yoy(tiles, prior), "rows": rows}
+                "tiles": tiles, "yoy": yoy, "rows": rows}
 
     def zone_files(self) -> dict[str, dict]:
         m, p = self.month, self.prior
@@ -472,15 +482,14 @@ class Site:
                        if (r["mode_share_in_zone"] or 0) >= HEATMAP_MIN_SHARE]
             dests = destinations[z]
             wait, wait_prior = info["wait"], info["wait_prior"]
-            tiles = {"trips_per_day": _r(info["trips_per_day"], 1), "rh_share": _r(info["rh_share"], 4),
-                     "wait_p50": None if thin else _r(wait.get("wait_p50"), 0),
-                     "wait_p90": None if thin else _r(wait.get("wait_p90"), 0),
-                     "top_destination": dests[0]["name"] if dests else None}
-            prior = {"trips_per_day": _r(info["prior_trips_per_day"], 1),
-                     "wait_p50": None if thin else _r(wait_prior.get("wait_p50"), 0),
-                     "wait_p90": None if thin else _r(wait_prior.get("wait_p90"), 0)}
-            yoy = self._yoy(tiles, prior)
-            yoy["rh_share"] = _r(info["rh_change"], 4)
+            tiles, yoy = self._tiles(
+                {"trips_per_day": info["trips_per_day"], "rh_share": info["rh_share"],
+                 "wait_p50": None if thin else wait.get("wait_p50"),
+                 "wait_p90": None if thin else wait.get("wait_p90"),
+                 "top_destination": dests[0]["name"] if dests else None},
+                {"trips_per_day": info["prior_trips_per_day"], "wait_p50": wait_prior.get("wait_p50"),
+                 "wait_p90": wait_prior.get("wait_p90")})
+            yoy["rh_share"] = _r(info["rh_change"], 4)     # zone_share_change's own change
             files[f"zones/{z}.json"] = {
                 **self.env(), "zone": z, "name": name, "borough": self.lookup[z]["Borough"],
                 "flags": {"cbd": z in self.cbd_core, "cbd_borderline": z in self.cbd_borderline,
@@ -539,12 +548,15 @@ class Site:
             hourly[r["hour"]] += r["trips_per_day"] or 0.0
         busiest = _argmax(dict(hourly))
 
-        tiles = {"trips_per_day": _r(sum(r["trips_per_day"] for r in latest), 1) if latest else None,
-                 "yellow_share": _r(yellow_now, 4), "fare_to_manhattan_mean": _r(fare_mean(m), 2),
-                 "busiest_hour": busiest}
-        prior = {"trips_per_day": _r(total_prior / _days(p), 1) if total_prior else None,
-                 "yellow_share": _r(yellow_prior, 4),
-                 "fare_to_manhattan_mean": _r(fare_mean(p), 2) if self.has_prior else None}
+        def trips_per_day(month: str) -> float | None:
+            rows = [r["trips_per_day"] for r in share_rows if r["month"] == month]
+            return sum(rows) if rows else None
+
+        tiles, yoy = self._tiles(
+            {"trips_per_day": trips_per_day(m), "yellow_share": yellow_now,
+             "fare_to_manhattan_mean": fare_mean(m), "busiest_hour": busiest},
+            {"trips_per_day": trips_per_day(p), "yellow_share": yellow_prior,
+             "fare_to_manhattan_mean": fare_mean(p) if self.has_prior else None})
 
         trend: dict[tuple, dict[str, int]] = defaultdict(lambda: defaultdict(int))
         for r in share_rows:
@@ -561,7 +573,8 @@ class Site:
             if (leader := _argmax(pickups)) is not None:
                 leaders.append((airport, leader, pickups[leader]))
 
-        fares = sorted(self.out.rows("airport_fares", to_month=m), key=lambda r: (_airport_rank(r["airport"]), _mode_rank(r["mode"])))
+        fares = sorted(self.out.rows("airport_fares", to_month=m),
+                       key=lambda r: (_airport_rank(r["airport"]), _mode_rank(r["mode"])))
         fares_out = [{"airport": r["airport"], "mode": r["mode"], "fare_mean": _r(r["fare_mean"], 2),
                       "fare_base_mean": _r(r["fare_base_mean"], 2), "fare_per_mile": _r(r["fare_per_mile"], 3),
                       "trips_per_day": _r(r["trips"] / _days(m), 1)} for r in fares]
@@ -592,13 +605,15 @@ class Site:
                     airport=focus, fare_mean=focus_mean,
                     cheapest=(cheapest["mode"], cheapest["fare_mean"]) if cheapest else None,
                     dearest=(dearest["mode"], dearest["fare_mean"]) if dearest else None, month=m)},
-            "tiles": tiles, "yoy": self._yoy(tiles, prior),
+            "tiles": tiles, "yoy": yoy,
             "split": [{"airport": r["airport"], "direction": r["direction"], "mode": r["mode"],
                        "trips_per_day": _r(r["trips_per_day"], 1), "share": _r(r["share"], 4)} for r in latest],
             "share_trend": share_trend,
             "by_hour": [{"airport": r["airport"], "direction": r["direction"], "hour": r["hour"], "mode": r["mode"],
-                         "trips_per_day": _r(r["trips_per_day"], 1)} for r in sorted(by_hour, key=lambda r: (_airport_rank(r["airport"]), _direction_rank(r["direction"]),
-                                                       r["hour"], _mode_rank(r["mode"])))],
+                         "trips_per_day": _r(r["trips_per_day"], 1)}
+                        for r in sorted(by_hour, key=lambda r: (_airport_rank(r["airport"]),
+                                                                _direction_rank(r["direction"]), r["hour"],
+                                                                _mode_rank(r["mode"])))],
             "fares": fares_out,
         }
 
@@ -624,13 +639,15 @@ class Site:
         growth = {}
         if len(years) >= 2:
             base, year = years[0], years[-1]
+            series = {(r["cbd_group"], r["iso_year"], r["iso_week"]): r["trips_per_day"]
+                      for r in trips if r["mode"] == "all" and r["trips_per_day"] is not None}
+            # weeks with both groups in both years; every week has 7 days, so summing the weekly
+            # rates is a ratio of sums
+            weeks = set.intersection(*({w for (g, y, w) in series if (g, y) == key}
+                                       for key in product(("treated", "control"), (base, year))))
             for group in ("treated", "control"):
-                series = {(r["iso_year"], r["iso_week"]): r["trips_per_day"]
-                          for r in trips if r["cbd_group"] == group and r["mode"] == "all"}
-                weeks = sorted({w for (y, w) in series if y == base} & {w for (y, w) in series if y == year})
-                before = sum(series[(base, w)] or 0.0 for w in weeks)
-                after = sum(series[(year, w)] or 0.0 for w in weeks)
-                growth[group] = _rel(after, before)
+                growth[group] = _rel(sum(series[(group, year, w)] for w in weeks),
+                                     sum(series[(group, base, w)] for w in weeks))
 
         start_year = int(start[:4])
         change = [r for r in self.out.rows("cp_zone_change") if r["pu_zone"] in ZONE_IDS]
@@ -639,8 +656,8 @@ class Site:
         excluded = sorted({(r["iso_year"], r["iso_week"], r["exclusion_reason"]) for r in weekly if r["excluded"]},
                           key=lambda t: (t[0], t[1], t[2] or ""))
 
-        tiles = {"trips_effect": _r(trips_all.get("median"), 4), "fpm_effect": _r(fpm_rh.get("median"), 4),
-                 "fees_to_date": _r(total_fees, 2) if fees else None}
+        tiles, yoy = self._tiles({"trips_effect": trips_all.get("median"), "fpm_effect": fpm_rh.get("median"),
+                                  "fees_to_date": total_fees if fees else None}, {})
         self.congestion_facts = {"trips_all": trips_all, "company_effects": company_effects,
                                  "fpm_rh": fpm_rh.get("median"),
                                  "ds_rh": effect.get(("driver_share", "ride_hail", "core"), {}).get("median")}
@@ -663,7 +680,7 @@ class Site:
                     fell=sum(r["change"] < 0 for r in measured), total=len(measured),
                     fell_cbd=sum(r["change"] < 0 for r in in_zone), total_cbd=len(in_zone),
                     year=start_year, base_year=start_year - 1)},
-            "tiles": tiles, "yoy": self._yoy(tiles, {}),
+            "tiles": tiles, "yoy": yoy,
             "effects": [{"metric": r["metric"], "mode": r["mode"], "zone_list": r["zone_list"],
                          "median": _r(r["median"], 4), "p10": _r(r["p10"], 4), "p90": _r(r["p90"], 4),
                          "weeks": r["weeks"]} for r in summary],
@@ -692,15 +709,13 @@ class Site:
         tlc_now = hv.get(tlc_month, {})
         tlc_prior = hv.get(_shift(tlc_month, -12), {}) if tlc_month else {}
 
-        tiles = {"pay_per_hour": _r(pph_at.get((m, "ride_hail"), {}).get("pay_per_hour"), 2),
-                 "driver_share": _r(ds_at.get((m, "ride_hail"), {}).get("driver_share"), 4),
-                 "trips_per_hour_worked": _r(tlc_now.get("trips_per_hour_worked"), 3),
-                 "active_drivers": _int(tlc_now.get("unique_drivers"))}
-        prior = {"pay_per_hour": _r(pph_at.get((p, "ride_hail"), {}).get("pay_per_hour"), 2),
-                 "driver_share": _r(ds_at.get((p, "ride_hail"), {}).get("driver_share"), 4),
-                 "trips_per_hour_worked": _r(tlc_prior.get("trips_per_hour_worked"), 3),
-                 "active_drivers": _int(tlc_prior.get("unique_drivers"))}
-        yoy = self._yoy(tiles, prior)
+        def tiles_for(month: str, tlc: dict) -> dict:
+            return {"pay_per_hour": pph_at.get((month, "ride_hail"), {}).get("pay_per_hour"),
+                    "driver_share": ds_at.get((month, "ride_hail"), {}).get("driver_share"),
+                    "trips_per_hour_worked": tlc.get("trips_per_hour_worked"),
+                    "active_drivers": _int(tlc.get("unique_drivers"))}
+
+        tiles, yoy = self._tiles(tiles_for(m, tlc_now), tiles_for(p, tlc_prior))
 
         event = self.out.rows("pay_event")
         rh_event = {(r["year"], r["week_offset"]): r for r in event if r["mode"] == "ride_hail"}
@@ -759,17 +774,20 @@ class Site:
         hour_fpm = {r["hour_of_week"]: r["fare_per_mile"] for r in by_hour if r["mode"] == "all"}
         cheapest, dearest = _argmin(hour_fpm), _argmax(hour_fpm)
 
-        tiles = {"fpm_median": _r(dist_at.get((m, "all"), {}).get("fpm_p50"), 3),
-                 "volatility": _r(vol_at.get((m, 0, "all"), {}).get("volatility"), 3),
-                 "cheapest_hour": cheapest, "dearest_hour": dearest}
-        prior = {"fpm_median": _r(dist_at.get((p, "all"), {}).get("fpm_p50"), 3),
-                 "volatility": _r(vol_at.get((p, 0, "all"), {}).get("volatility"), 3)}
+        tiles, yoy = self._tiles(
+            {"fpm_median": dist_at.get((m, "all"), {}).get("fpm_p50"),
+             "volatility": vol_at.get((m, 0, "all"), {}).get("volatility"),
+             "cheapest_hour": cheapest, "dearest_hour": dearest},
+            {"fpm_median": dist_at.get((p, "all"), {}).get("fpm_p50"),
+             "volatility": vol_at.get((p, 0, "all"), {}).get("volatility")})
 
         zone_vol = [r for r in vol if r["month"] == m and r["pu_zone"] in ZONE_IDS and r["mode"] in COMPANIES]
-        widest = max((r for r in zone_vol if r["volatility"] is not None), key=lambda r: r["volatility"], default=None)
+        widest = max((r for r in zone_vol if r["volatility"] is not None and r["n"] >= VOLATILITY_MIN_TRIPS),
+                     key=lambda r: r["volatility"], default=None)
         company_fpm = {c: dist_at.get((m, c), {}).get("fpm_p50") for c in COMPANIES}
         low_mode, high_mode = _argmin(company_fpm), _argmax(company_fpm)
-        borough_fpm = {r["pu_borough"]: r["fare_per_mile"] for r in by_borough if r["mode"] == "all"}
+        borough_fpm = {r["pu_borough"]: r["fare_per_mile"] for r in by_borough
+                       if r["mode"] == "all" and r["pu_borough"] in NYC_BOROUGHS}
         top_borough = _argmax(borough_fpm)
 
         self.price_facts = {"widest": widest}
@@ -790,7 +808,7 @@ class Site:
                     zone_name=self.zone_name(widest["pu_zone"]) if widest else None,
                     mode=widest["mode"] if widest else None, volatility=widest["volatility"] if widest else None,
                     month=m)},
-            "tiles": tiles, "yoy": self._yoy(tiles, prior),
+            "tiles": tiles, "yoy": yoy,
             "fpm_by_mode": [{"month": r["month"], "mode": r["mode"], "fpm_p10": _r(r["fpm_p10"], 3),
                              "fpm_p50": _r(r["fpm_p50"], 3), "fpm_p90": _r(r["fpm_p90"], 3),
                              "fpmin_p50": _r(r["fpmin_p50"], 3)} for r in dist],
@@ -899,8 +917,9 @@ class Site:
 
     # --- everything ----------------------------------------------------------
 
-    def build(self) -> dict[str, dict]:
+    def build(self, validated: bool, summary: dict | None) -> dict[str, dict]:
         """Every JSON file, keyed by its path under site/src/data/ (the zone map is copied apart)."""
+        self.validated, self.summary = validated, summary
         files: dict[str, dict] = {
             "events.json": self.events(),
             "tiles.json": self.tiles(),
@@ -977,12 +996,9 @@ def publish(out_dir: Path | None = None, dev: bool = False, now: datetime | None
     geojson = zones.geojson_path()
     if map_problems := zones.geojson_problems(geojson):
         raise PublishError("zone map: " + "; ".join(map_problems[:5]))
-    outputs = Outputs()
-    as_of = max(r["month"] for r in outputs.rows("share_monthly"))[:7] if outputs.rows("share_monthly") else None
-    if as_of is None:
-        raise PublishError("share_monthly has no rows: there are no aggregates to publish")
-    validated, summary = load_validation(as_of, dev)
-    files = Site(outputs, generated_at=generated_at, validated=validated, summary=summary).build()
+    site = Site(Outputs(), generated_at=generated_at)
+    validated, summary = load_validation(site.as_of, dev)
+    files = site.build(validated, summary)
 
     texts = {path: dumps(obj) for path, obj in files.items()}
     sizes = {path: len(text.encode()) for path, text in texts.items()}
