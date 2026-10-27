@@ -219,8 +219,10 @@ class MockSite:
         return {**self.env(), "events": [
             {"id": "congestion_pricing_start", "date": str(self.periods["congestion_pricing_start"]),
              "label": "Congestion pricing starts"},
+            {"id": "driver_pay_inflation_step", "date": str(self.periods["driver_pay_inflation_step"]),
+             "label": "Per-minute minimum pay +3.9% (inflation)"},
             {"id": "driver_pay_rise", "date": str(self.periods["driver_pay_rise"]),
-             "label": "Driver minimum pay rises 5%"},
+             "label": "New driver minimum-pay rule"},
         ]}
 
     def tiles(self) -> dict:
@@ -286,6 +288,18 @@ class MockSite:
                                  "matched": matched, "match_rate": _r(matched / requests, 4)})
             return rows
 
+        def wav_rows() -> list[dict]:
+            """D29: completed WAV-requested trips and the share of trips in a WAV."""
+            rows = []
+            for i, month in enumerate(self.months):
+                for rh in RIDE_HAIL:
+                    trips = int(self.tpd[month] * self.share[month][rh] * _days(month))
+                    wav_trips = int(trips * self.jitter(0.09, 0.1))
+                    rows.append({"month": _month_iso(month), "mode": rh, "trips": trips,
+                                 "wav_requests": int(self.jitter(30_000 * (1 + 0.01 * i), 0.1)),
+                                 "wav_trips": wav_trips, "wav_share": _r(wav_trips / trips, 4)})
+            return rows
+
         compare_values = {
             "trips_per_day": ("count", lambda c: _r(self.tpd[m] * self.share[m][c], 1)),
             "share": ("share", lambda c: _r(self.share[m][c], 4)),
@@ -294,7 +308,7 @@ class MockSite:
             "driver_share": ("share", lambda c: None if c in ("yellow", "green") else _r(self.driver_share(c, n - 1), 4)),
             "tip_rate": ("share", lambda c: _r(tip[c], 4)),
             "wait_p50": ("seconds", lambda c: None if c in ("yellow", "green") else _r(self.jitter(290), 0)),
-            "wav_match_rate": ("share", lambda c: None if c in ("yellow", "green") else _r(self.jitter(0.86), 4)),
+            "wav_share": ("share", lambda c: None if c in ("yellow", "green") else _r(self.jitter(0.09), 4)),
             "shared_match_rate": ("share", lambda c: None if c in ("yellow", "green") else _r(self.jitter(0.41), 4)),
         }
         compare = [{"metric": metric, "unit": unit, **{c: value(c) for c in COMPANIES}}
@@ -332,7 +346,7 @@ class MockSite:
             "tip_rate": [{"month": _month_iso(month), "mode": c, "tip_rate": _r(self.jitter(tip[c], 0.05), 4),
                           "card_only": c in ("yellow", "green")}
                          for month in self.months for c in COMPANIES],
-            "wav": match_rows(0.86, 30_000),
+            "wav": wav_rows(),
             "shared": match_rows(0.41, 120_000),
             "compare": compare,
             "lyft_vs_uber": lyft_vs_uber,

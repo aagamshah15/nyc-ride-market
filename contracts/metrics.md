@@ -7,7 +7,8 @@ One SQL file per metric in `sql/metrics/` (SPEC §6). Each is a single `SELECT` 
 - **Params.** `$to_month` DATE, default the latest month in `agg_zone_hour`. `$window` INTEGER months ending at `$to_month`, default 3. `$top_n` INTEGER, default 10. The runner fills defaults; SQL never hard-codes a month.
 - **Ratios of sums only** (CLAUDE.md), with `NULLIF(denominator, 0)`.
 - **Rows.** Metric rows use `is_valid` sums except trip counts and shares, which use `trips_all` (SPEC §4.2), and fee revenue, which `agg_fees_month` sums over every row (D23).
-- **Match rates** (`wav_match_rate`, `shared_match_rate`): `matched` counts trips that requested and got a match (D24, applied in `agg_zone_hour`), so `match_rate` is at most 1.
+- **Shared match rate** (`shared_match_rate`): `matched` counts trips that requested and got a match (D24, applied in `agg_zone_hour`), so `match_rate` is at most 1.
+- **Accessible service** (`wav_service`, D29): trip records hold completed trips only, so a WAV match rate can't be measured. `wav_requests` counts completed trips that requested a WAV; `wav_share` is the share of valid trips that ran in a WAV, requested or not.
 - **"Prior" and "change"** (`share_prior`, `gap_prior`, `change`, `gap_change`) compare `$to_month` with the same month a year earlier.
 - **`zone_hour_profile.mode_share_in_zone`** is the mode's share of the zone's trips over the whole window and all hours; the zone heatmap keeps modes at 10% or more (contracts/README.md §1).
 - **Mode groups** (`ride_hail`, `taxi`, `all`) are extra rows with that value in `mode`, only where the Modes column lists them. See contracts/README.md §2.
@@ -43,7 +44,7 @@ Owner is L09 unless marked L10.
 | `wait_time` | Q8 | — | month × pu_zone × mode (`pu_zone = 0` city-wide) | `uber`, `lyft` | `month, pu_zone, mode, wait_p50, wait_p90, wait_mean` | agg_zone_month_dist, agg_zone_hour |
 | `wait_by_hour` | Q8 | to_month, window | pu_zone × hour × mode (`pu_zone = 0` city-wide) | `uber`, `lyft` | `pu_zone, hour SMALLINT, mode, wait_mean` | agg_zone_hour |
 | `tip_rate` | Q13 | — | month × pu_borough × mode (`pu_borough = 'all'` city-wide) | each | `month, pu_borough, mode, tips, fare_base, tip_rate, card_only BOOLEAN` | agg_zone_hour, ref_zones |
-| `wav_match_rate` | Q11 | — | month × mode | `uber`, `lyft` | `month, mode, requests, matched, match_rate` | agg_zone_hour |
+| `wav_service` | Q11 | — | month × mode | `uber`, `lyft` | `month, mode, trips, wav_requests, wav_trips, wav_share` (`trips = SUM(trips_valid)`, `wav_requests = SUM(wav_req)`, `wav_trips = SUM(wav_trips)`, `wav_share = SUM(wav_trips) / SUM(trips_valid)`; D29) | agg_zone_hour |
 | `shared_match_rate` | Q12 | — | month × pu_zone × mode (`pu_zone = 0` city-wide) | `uber`, `lyft` | `month, pu_zone, mode, requests, matched, match_rate` | agg_zone_hour |
 | `fee_revenue` | Q14 | — | month × mode | each | `month, mode, cbd_fee, trips_with_cbd_fee, congestion_surcharge, airport_fee` | agg_fees_month |
 | `airport_share` | Q9 | — | month × airport × direction × mode | each | `month, airport, direction, mode, trips, trips_per_day, share` (share within airport × direction) | agg_airport |
