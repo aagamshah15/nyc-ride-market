@@ -24,6 +24,7 @@ The two policy analyses: a year-over-year difference-in-differences for congesti
 - [x] Pay rise: 12 ISO weeks before and after 2025-08-01; HVFHV `driver_pay / miles`, `driver_pay / minute` and `fare_base / miles`; the same weeks of 2024 as the seasonal reference; W31 as a transition week (D12)
 - [x] `pipeline/studies.py` writes the report tables. The narrative is written by hand: "estimated effect", never "caused"; limits from SPEC §12
 - [x] Sanity sections in each report: the weekly series per group, and which weeks were excluded and why
+- [ ] D28: call 1 Aug 2025 "the new minimum-pay rule (per-mile floor down, per-minute floor up)", never "the 5% pay rise"; note TLC's 1 Mar 2025 CPI-W per-minute step (`driver_pay_inflation_step`) in the pay-rise report
 
 ## Tests
 

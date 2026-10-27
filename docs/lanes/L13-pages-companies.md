@@ -20,6 +20,7 @@ One template, `companies/[company].md`, rendering Uber, Lyft, yellow and green, 
 - [ ] Charts: share trend; fare-per-mile distribution; tip rate (for taxis the chart says card-only); accessible (WAV) match rate and shared match rate, which are ride-hail only, with a plain "not reported for this mode" state on taxi pages
 - [ ] Comparison block from the `compare` rows
 - [ ] Q4 on the Uber and Lyft pages: where Lyft beats Uber on share and whether the gap is growing, from the contract fields
+- [ ] D29: the `wav` block is accessible *service*, not a match rate: chart `wav_share` (share of trips in a WAV) and show `wav_requests` (completed WAV-requested trips) from the company file's `wav` rows; caption that unfulfilled requests aren't in TLC's trip records. `compare` uses `wav_share`
 
 ## Page rules (all page lanes)
 
