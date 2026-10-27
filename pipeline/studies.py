@@ -47,6 +47,11 @@ MODE_LABELS = {"all": "All modes", "ride_hail": "Ride-hail", "taxi": "Cabs", "ub
                "other_hv": "Other ride-hail", "yellow": "Yellow cab", "green": "Green cab"}
 CP_METRICS = {"trips": "Trips", "fare_per_mile": "Base fare per mile",
               "driver_share": "Driver share of base fare"}
+EVENT_NOTES = {   # config/periods.yaml dates marked on the monthly pay table (D28)
+    "driver_pay_inflation_step": "TLC's annual CPI-W step: per-minute minimum +3.92%",
+    "driver_pay_rise": "new minimum-pay rule: per-mile floor down, per-minute floor up",
+}
+SUPERSCRIPTS = "¹²³⁴⁵⁶⁷⁸⁹"
 PAY_MEASURES = {"pay_per_mile": "Driver pay per mile", "pay_per_min": "Driver pay per minute with a passenger",
                 "fare_per_mile": "Base fare per mile"}
 
@@ -452,14 +457,22 @@ def _pay_monthly(pay_per_hour: list[dict]) -> str:
     """Ride-hail pay per hour with a passenger by month (L09's pay_per_hour; uber + lyft), against
     the month before and the same month a year earlier."""
     values = {r["month"]: r["pay_per_hour"] for r in pay_per_hour if r["mode"] == "ride_hail"}
+    periods = common.load_yaml("periods.yaml")
+    events = sorted((periods[key], key, note) for key, note in EVENT_NOTES.items() if key in periods)
+    events = [e for e in events if date(e[0].year, e[0].month, 1) in values]
+    marks = {date(day.year, day.month, 1): SUPERSCRIPTS[i] for i, (day, _, _) in enumerate(events)}
     body = []
     for month in sorted(values):
         before = values.get(date(month.year - (month.month == 1), (month.month - 2) % 12 + 1, 1))
         prior = values.get(date(month.year - 1, month.month, 1))
-        body.append([f"{month:%b %Y}", _hourly(values[month]), _pct(_ratio(values[month], before)),
+        label = f"{month:%b %Y}" + (f" {marks[month]}" if month in marks else "")
+        body.append([label, _hourly(values[month]), _pct(_ratio(values[month], before)),
                      _hourly(prior), _pct(_ratio(values[month], prior))])
-    return _table(["Month", "Pay per hour with a passenger", "Change on the month before", "A year earlier",
-                   "Change on a year earlier"], body, {1, 2, 3, 4})
+    table = _table(["Month", "Pay per hour with a passenger", "Change on the month before", "A year earlier",
+                    "Change on a year earlier"], body, {1, 2, 3, 4})
+    notes = [f"{SUPERSCRIPTS[i]} {day.day} {day:%b %Y}: {note} (`{key}` in config/periods.yaml)."
+             for i, (day, key, note) in enumerate(events)]
+    return "\n\n".join([table, *notes])
 
 
 def pay_blocks(results: dict[str, pa.Table], source: str) -> dict[str, str]:

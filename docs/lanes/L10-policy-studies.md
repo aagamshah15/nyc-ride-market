@@ -48,6 +48,8 @@ _Only this lane writes here. Newest first._
 
 | Date | State | Note |
 |---|---|---|
+| 27 Oct | D28 applied | Merged `main` (D28). `reports/pay_rise.md` now calls 1 Aug 2025 the new minimum-pay rule (per-mile floor down, per-minute floor up) and uses D28's Q6 wording. TLC's 5% is described as its sample-trip figure against 2024 rates, including the March step. The monthly context table marks Mar 2025 (`driver_pay_inflation_step`) and Aug 2025 (`driver_pay_rise`) from `config/periods.yaml`, with notes under the table. No other generated block changed. The event study, W31 and `pay_event` are unchanged. |
+| 27 Oct | pay-rise narrative revised | Added a sourced "What the rule changed" section to `reports/pay_rise.md`. I checked every figure against the text of TLC's Notice of Promulgation (adopted 25 June 2025; it states no effective date). Re-read the findings against the rule: the March step is the CPI-W per-minute step; per mile, no rise is expected because the floor fell; per minute, a rise is expected only where the floor binds. Tables, metrics, `config/periods.yaml`, SPEC, the publish event label and the Q6 wording are unchanged (the integrator is asking the user about those). |
 | 27 Oct | written up from real data | Merged `main` (G3 passed) and ran `python -m pipeline.studies` on the validated 2024-01 → 2026-08 aggregates. I wrote the Findings in both reports by hand from the generated tables and checked that a rerun reproduces both reports byte for byte. Added two generated tables built from existing metric outputs: "Growth of each group" (from `cp_effect`) and monthly pay per hour with a passenger (L09's `pay_per_hour`). The report's zone tables are now limited to map zones 1–263 and give a count of falling zones. One item is recorded under Blocked (the trip-mix metric); the findings don't depend on it. |
 | 25 Oct | built on fixtures; real numbers and narrative wait for G3 | All five metrics, `pipeline/studies.py`, the `excluded_holiday_weeks` key and both report templates are built. 36 lane tests pass (hand-worked values), L09's `run_all` passes with the L10 metrics in, and `make test` is green. The reports' generated tables, the findings and every real number wait for the back-filled aggregates at G3. |
 | 24 Oct | in progress | Five metrics, `pipeline/studies.py`, the periods.yaml holiday key and both report templates are built. `tests/test_cp_effect.py` (15 tests) passes, and L09's `run_all` passes on its full fixture. Still to do: tests for `cp_weekly_trips`, `cp_zone_change`, `pay_event` and the studies CLI, then the hand-off. The real numbers and narrative wait for G3. |
@@ -99,10 +101,12 @@ _Only this lane writes here. Newest first._
   2. For the integrator, optional: have the runner expose periods.yaml's `excluded_holiday_weeks` as a view, so `cp_effect` reads it instead of carrying a copy. That's a change to L09's `pipeline/metrics.py` and the contract's view list.
   3. For the integrator and L11: if the drivers page needs a before/after pay number, add a `pay_event_summary` metric to `contracts/metrics.md`. Until then, use the same rule as the report (medians of the 12 weeks either side, offset 0 dropped).
   4. L19 (2027): with 2023 data, a placebo run of 2024 against 2023 on the same weeks (development plan §9). `holiday_weeks(base_year, study_year)` already takes the years.
-  5. For the integrator and the user, from the 27 Oct write-up: check `driver_pay_rise: 2025-08-01` (SPEC §3.3, `config/periods.yaml`) against TLC's published rule.
-     - The event study finds no rise at that date.
-     - Monthly ride-hail pay per hour with a passenger steps up between February and March 2025 (+4.5% on the month), after which 2025 runs 4–6% above 2024.
-     - The date feeds `events.json` and the drivers page (L11, L15). The report gives the three readings that fit the data and doesn't choose between them.
+  5. ~~Check `driver_pay_rise: 2025-08-01` against TLC's published rule.~~ Answered by the integrator on 27 Oct, and the report now has a "What the rule changed" section:
+     - The March 2025 step is the CPI-W per-minute increase (3.92%).
+     - The 1 August rule lowered the per-mile floor (about −5.5%) and raised the per-minute floor (about +8.8%).
+     - TLC's "5%" is for one sample trip and includes March.
+
+     Whether to change `config/periods.yaml`, SPEC §3.3, the publish event label or the Q6 wording is a user decision the integrator is taking; L10 changed none of them.
   6. For L11 and L15, from the 27 Oct write-up:
      - Per-company congestion estimates (Uber, Lyft) drift in opposite directions through 2025, so ride-hail combined is the safer site figure.
      - The yellow-cab trips estimate moves by about 10 points between the lists (−7.8% core, −18.1% wide) because yellow's comparison group grew very fast. Its finding sentence should carry that caveat or use the all-modes and ride-hail figures.
