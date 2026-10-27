@@ -138,7 +138,8 @@ The indicators CSV has columns `Month/Year, License Class, Trips Per Day, Farebo
 
 ```yaml
 congestion_pricing_start: 2025-01-05   # MTA Congestion Relief Zone toll begins
-driver_pay_rise: 2025-08-01            # TLC minimum pay +5%
+driver_pay_inflation_step: 2025-03-01  # TLC annual CPI-W step: per-minute minimum +3.92% (D28)
+driver_pay_rise: 2025-08-01            # TLC minimum-pay rule: per-mile floor down, per-minute floor up (D28)
 fees:
   cbd_fee_hvfhv: 1.50                  # per trip, peak and overnight
   cbd_fee_taxi: 0.75                   # yellow and green, per trip
@@ -209,7 +210,7 @@ Stored in `data/agg/{table}.parquet`. `aggregate.py MONTH=` deletes and rewrites
 
 | Table | Grain | Columns |
 |---|---|---|
-| `agg_zone_hour` | month × mode × pu_zone × hour_of_week | `trips_all, trips_valid, miles, duration_s, fare_base, rider_total_ex_tip, driver_pay, tips, card_trips, card_tips, card_fare_base, wait_s_sum, wait_n, cbd_fee, shared_req, shared_match, wav_req, wav_match` |
+| `agg_zone_hour` | month × mode × pu_zone × hour_of_week | `trips_all, trips_valid, miles, duration_s, fare_base, rider_total_ex_tip, driver_pay, tips, card_trips, card_tips, card_fare_base, wait_s_sum, wait_n, cbd_fee, shared_req, shared_match, wav_req, wav_match, wav_trips` (D29) |
 | `agg_zone_month_dist` | month × mode × pu_zone | `n, fpm_p10, fpm_p50, fpm_p90, fpmin_p50, wait_p50, wait_p90` (fpm = fare_base / miles; only zones × modes with n ≥ 100) |
 | `agg_od_month` | month × mode × pu_zone × do_zone | `trips_valid, miles, duration_s, fare_base, driver_pay` (keep pairs with ≥ 20 trips that month) |
 | `agg_airport` | month × mode × airport × direction × hour_of_day | `trips_valid, miles, duration_s, fare_base, rider_total_ex_tip, tips` (direction ∈ from, to) |
@@ -259,7 +260,7 @@ GROUP BY month, mode;
 
 **Tip rate** (Q13): HVFHV `SUM(tips) / SUM(fare_base)`; taxis `SUM(card_tips) / SUM(card_fare_base)` (card trips only, state this on every chart).
 
-**Accessible match rate** (Q11): `SUM(wav_match) / SUM(wav_req)`. **Shared match rate** (Q12): `SUM(shared_match) / SUM(shared_req)`.
+**Accessible service** (Q11, D29): completed trips that requested a WAV, `SUM(wav_req)`, and the share of trips in a WAV, `SUM(wav_trips) / SUM(trips_valid)`, HVFHV only. Trip records hold completed trips only, so a match rate can't be measured; say so wherever Q11 appears. **Shared match rate** (Q12): `SUM(shared_match) / SUM(shared_req)`.
 
 **Fee revenue** (Q14): `agg_fees_month.cbd_fee` by month and mode.
 
@@ -433,12 +434,12 @@ Every page, metric and finding traces back to one of these. Q1, Q2, Q5 and Q9 ca
 | Q3 | Who absorbed the $1.50 fee: did ride-hail fares or driver pay move after 5 Jan 2025? | MTA, driver groups |
 | Q4 | Where does Lyft beat Uber on share, and is the gap growing? | Lyft and Uber strategy |
 | Q5 | What share of the rider's fare reaches the driver, by company and over time? | Driver groups, TLC |
-| Q6 | Did the 5% pay rise on 1 Aug 2025 raise driver pay per hour, and did fares rise with it? | TLC, platforms |
+| Q6 | Did the new minimum-pay rule of 1 Aug 2025 (per-mile floor down, per-minute floor up) raise driver pay per hour, and did fares rise with it? (D28) | TLC, platforms |
 | Q7 | What do riders pay per mile and per minute by company, hour and borough, and where is pricing most volatile? | Riders, journalists, platforms |
 | Q8 | How long do riders wait from request to pickup, by zone and hour? | TLC, outer-borough officials |
 | Q9 | At JFK, LaGuardia and Newark, who wins the airport trip, at what fare, and when? | Taxi fleets, Port Authority, platforms |
 | Q10 | Where do yellow cabs still win against ride-hail, and is that ground shrinking? | Medallion owners, fleets |
-| Q11 | How often are wheelchair-accessible requests matched, by company? | TLC accessibility |
+| Q11 | How many trips that requested a wheelchair-accessible vehicle does each company complete, and what share of all its trips run in one? (D29) | TLC accessibility |
 | Q12 | Are shared rides coming back, and where? | Platforms, MTA |
 | Q13 | How do tipping rates differ by company, borough and payment type? | Drivers, platforms |
 | Q14 | How much congestion-fee money does each mode generate per month? | MTA finance |
