@@ -42,13 +42,13 @@ The integrator keeps the Status column current.
 | [L07](lanes/L07-aggregate.md) | Aggregate | `pipeline/aggregate.py`, `sql/agg/` | 2 | L01 approved | — | built on fixtures, merged 24 Oct (D23 included); real run at G2 |
 | [L08](lanes/L08-validate.md) | Validation gate | `pipeline/validate.py`, `sql/validate/` | 2 | L01 approved | — | built on fixtures, merged 24 Oct; real run at G2 |
 | [L09](lanes/L09-metrics.md) | Metrics library | `sql/metrics/` (all but L10's), `pipeline/metrics.py` | 2 | L01 approved | Q1, Q4–Q15 | built on fixtures, merged 24 Oct; real run at G2 |
-| [L10](lanes/L10-policy-studies.md) | Policy studies | `sql/metrics/cp_*.sql`, `pay_event.sql`, `pipeline/studies.py` | 3 | L09 runner exists | Q2, Q3, Q6 | merged 26 Oct; metrics run on real data; findings narrative next |
-| [L11](lanes/L11-publish.md) | Publish and findings | `pipeline/publish.py`, `pipeline/findings.py`, `site/src/data/` | 3 | L09 runner exists | all | not started |
-| [L12](lanes/L12-pages-home-methods.md) | Pages: Home + Methods | `index.md`, `methods.md` | 4 | L05 done | home | not started |
-| [L13](lanes/L13-pages-companies.md) | Pages: Companies | `companies/[company].md` | 4 | L05 done | Q4, Q5, Q11–Q13 | not started |
-| [L14](lanes/L14-pages-zones.md) | Pages: Zones | `zones/[zone].md`, `zones/index.md` | 4 | L05 done | Q1, Q8, Q10 | not started |
-| [L15](lanes/L15-pages-congestion-drivers.md) | Pages: Congestion + Drivers | `congestion-pricing.md`, `drivers.md` | 4 | L05 done | Q2, Q3, Q5, Q6, Q14, Q15 | not started |
-| [L16](lanes/L16-pages-airports-prices.md) | Pages: Airports + Prices | `airports.md`, `prices.md` | 4 | L05 done | Q7, Q9 | not started |
+| [L10](lanes/L10-policy-studies.md) | Policy studies | `sql/metrics/cp_*.sql`, `pay_event.sql`, `pipeline/studies.py` | 3 | L09 runner exists | Q2, Q3, Q6 | done: write-ups from the G3 aggregates merged 27 Oct (`daa0739`); pay-rise narrative being sharpened with the TLC rule's terms |
+| [L11](lanes/L11-publish.md) | Publish and findings | `pipeline/publish.py`, `pipeline/findings.py`, `site/src/data/` | 3 | L09 runner exists | all | done: merged 27 Oct (`84824ca`); a real validated publish writes 278 files within budget |
+| [L12](lanes/L12-pages-home-methods.md) | Pages: Home + Methods | `index.md`, `methods.md` | 4 | L05 done | home | running in the cloud since 27 Oct; reports by draft PR from `lane/L12-…` |
+| [L13](lanes/L13-pages-companies.md) | Pages: Companies | `companies/[company].md` | 4 | L05 done | Q4, Q5, Q11–Q13 | running in the cloud since 27 Oct; reports by draft PR from `lane/L13-…` |
+| [L14](lanes/L14-pages-zones.md) | Pages: Zones | `zones/[zone].md`, `zones/index.md` | 4 | L05 done | Q1, Q8, Q10 | running in the cloud since 27 Oct; reports by draft PR from `lane/L14-…` |
+| [L15](lanes/L15-pages-congestion-drivers.md) | Pages: Congestion + Drivers | `congestion-pricing.md`, `drivers.md` | 4 | L05 done | Q2, Q3, Q5, Q6, Q14, Q15 | running in the cloud since 27 Oct; reports by draft PR from `lane/L15-…` |
+| [L16](lanes/L16-pages-airports-prices.md) | Pages: Airports + Prices | `airports.md`, `prices.md` | 4 | L05 done | Q7, Q9 | running in the cloud since 27 Oct; reports by draft PR from `lane/L16-…` |
 | [L17](lanes/L17-refresh-deploy.md) | Refresh and deploy | `.github/workflows/refresh.yml`, release scripts | 4 | L11 writes real data; GitHub repo exists | — | not started |
 | [L18](lanes/L18-launch-review.md) | Launch review | `reports/launch_review.md` | 5 | G5 | all | not started |
 
@@ -124,6 +124,10 @@ All gate checks run in the integrator space. G1, G3, G4, G5 and G6 are SPEC §11
 
 ### Gate log
 
+- **L10 and L11 merged, 27 Oct 2026.** The test-merge of both onto `main` passed `make test` (473 passed, site built); merged as `daa0739` and `84824ca`, CI green.
+  - L11's real publish (278 files, `validated: true`) passes every contract once the zone-map check accepts MultiPolygons: 12 real zones are MultiPolygons. The checker now checks a geometry down to its type, and the mock splits zone 2 (`bc1ef2c`).
+  - Open for the user (SPEC wording): Q6 and the event label call 1 Aug 2025 a "5% pay rise". The TLC rule adopted 25 June 2025 lowered the effective per-mile floor (about −5.5%) and raised the per-minute floor (about +8.8%); the 5% is one sample trip against 2024 rates, including the 1 March 2025 CPI-W per-minute step (+3.92%).
+  - Open for the user (SPEC wording): Q11's WAV match rate is about 100% for both apps by construction. Trip records hold completed trips only, so unmatched WAV requests never appear (2025-03: Uber 39,879 of 39,879, Lyft 16,612 of 16,615).
 - **G3, 26 Oct 2026 — passed** (after D26 and D27 merged to `main` as `ac095b4`). `make backfill FROM=2024-01 TO=2026-08` re-ran all 32 months. A DNS outage and the Mac's idle sleep broke 2025-08 twice; it was resumed under `caffeinate -i` and finished in 4 minutes. Rows match at every stage in all 32 months, and no clean row is flagged for zone 265 alone (D26).
   - `make validate` **exits 0**, all five checks pass:
     - **tie-out:** all 31 FHVHV months within ±2%, plus 2026-06 excepted (D27). Yellow (10 months outside) and green (19 outside) are reported, not gated.
