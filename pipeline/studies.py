@@ -1,7 +1,8 @@
 """Tables for the congestion-pricing and pay-rise write-ups in reports/.
 
 ``python -m pipeline.studies`` runs the five policy metrics (cp_effect, cp_effect_summary,
-cp_weekly_trips, cp_zone_change, pay_event) over the aggregates and rewrites the generated
+cp_weekly_trips, cp_zone_change, pay_event), plus L09's pay_per_hour for context, over the
+aggregates and rewrites the generated
 blocks of reports/congestion_pricing.md and reports/pay_rise.md: everything between
 ``<!-- BEGIN generated: NAME -->`` and ``<!-- END generated: NAME -->``. The narrative around
 the blocks is written by hand and left alone. The same aggregates give the same reports.
@@ -36,9 +37,11 @@ HOLIDAYS_BEGIN = (f"# BEGIN {HOLIDAYS_KEY}: written by `python -m pipeline.studi
 HOLIDAYS_END = f"# END {HOLIDAYS_KEY}"
 
 METRICS = ("cp_effect", "cp_effect_summary", "cp_weekly_trips", "cp_zone_change", "pay_event")
+CONTEXT_METRICS = ("pay_per_hour",)                  # L09's monthly series, for the pay-rise report's context
 CP_REPORT, PAY_REPORT = "congestion_pricing.md", "pay_rise.md"
 HEADLINE_LIST, SENSITIVITY_LIST = "core", "wide"     # D21: core is the headline; wide is the sensitivity result
 ZONE_MIN_TRIPS_PER_DAY = 100                         # zone-change tables skip zones smaller than this in 2024
+MAP_ZONES = range(1, 264)                            # zone tables: 264 is unknown, 265 outside NYC (D26)
 
 MODE_LABELS = {"all": "All modes", "ride_hail": "Ride-hail", "taxi": "Cabs", "uber": "Uber", "lyft": "Lyft",
                "other_hv": "Other ride-hail", "yellow": "Yellow cab", "green": "Green cab"}
@@ -172,6 +175,11 @@ def _usd(value: float | None) -> str:
     return "—" if value is None else f"${value:.3f}"
 
 
+def _hourly(value: float | None) -> str:
+    """Dollars per hour, 2 decimals (contracts/README.md §3)."""
+    return "—" if value is None else f"${value:.2f}"
+
+
 def _count(value: float | None) -> str:
     return "—" if value is None else f"{value:,.0f}"
 
@@ -208,8 +216,8 @@ def _modes_in(rows: list[dict]) -> list[str]:
 # --- inputs ------------------------------------------------------------------
 
 def run_metrics() -> dict[str, pa.Table]:
-    """The five policy metrics over the aggregates in ``NYC_DATA_DIR``."""
-    return {name: metrics.run(name) for name in METRICS}
+    """The five policy metrics and the context metrics over the aggregates in ``NYC_DATA_DIR``."""
+    return {name: metrics.run(name) for name in METRICS + CONTEXT_METRICS}
 
 
 def provenance() -> str:
@@ -297,6 +305,22 @@ def _weekly_trips(weekly: list[dict]) -> str:
     return "\n\n".join(parts) or "_No rows._"
 
 
+def _group_growth(effects: list[dict]) -> str:
+    """Median weekly trip growth (2025 over the same ISO week of 2024) of each group: the two
+    numbers each week's trips effect is a ratio of. Weeks left out of the summary are left out here."""
+    trips = [r for r in effects if r["metric"] == "trips" and not r["excluded"]]
+    rows = []
+    for mode in _modes_in(trips):
+        cells = []
+        for zone_list in (HEADLINE_LIST, SENSITIVITY_LIST):
+            for column in ("growth_treated", "growth_control"):
+                values = [r[column] for r in trips
+                          if r["mode"] == mode and r["zone_list"] == zone_list and r[column] is not None]
+                cells.append(_pct(statistics.median(values) - 1) if values else "—")
+        rows.append([MODE_LABELS[mode], *cells])
+    return _table(["Mode", "Core: treated", "Core: control", "Wide: treated", "Wide: control"], rows, {1, 2, 3, 4})
+
+
 def _excluded_weeks(effects: list[dict]) -> str:
     start = common.load_yaml("periods.yaml")["congestion_pricing_start"]
     rows = [[_week(1), _day(_iso_monday(STUDY_YEAR, 1)),
@@ -318,7 +342,8 @@ def _holidays() -> str:
 
 def _zone_change(zones: list[dict]) -> str:
     names, lists = _zone_names(), _zone_lists()
-    big = [z for z in zones if z["change"] is not None and z["trips_per_day_2024"] >= ZONE_MIN_TRIPS_PER_DAY]
+    big = [z for z in zones if z["pu_zone"] in MAP_ZONES and z["change"] is not None
+           and z["trips_per_day_2024"] >= ZONE_MIN_TRIPS_PER_DAY]
 
     def rows(selected: list[dict]) -> list[list[str]]:
         return [[str(z["pu_zone"]), names.get(z["pu_zone"], "—"), lists.get(z["pu_zone"], "—"),
@@ -328,7 +353,9 @@ def _zone_change(zones: list[dict]) -> str:
     headers = ["Zone", "Name", "Zone list", f"Pickups/day {BASE_YEAR}", f"Pickups/day {STUDY_YEAR}", "Change"]
     falls = sorted(big, key=lambda z: (z["change"], z["pu_zone"]))[:10]
     rises = sorted(big, key=lambda z: (-z["change"], z["pu_zone"]))[:10]
-    return (f"{len(big)} zones had at least {ZONE_MIN_TRIPS_PER_DAY} pickups a day in {BASE_YEAR}.\n\n"
+    fewer = sum(z["change"] < 0 for z in big)
+    return (f"{len(big)} map zones (1 to 263) had at least {ZONE_MIN_TRIPS_PER_DAY} pickups a day "
+            f"in {BASE_YEAR}; {fewer} of them had fewer pickups a day in {STUDY_YEAR}.\n\n"
             f"**Largest falls**\n\n{_table(headers, rows(falls), {3, 4, 5})}\n\n"
             f"**Largest rises**\n\n{_table(headers, rows(rises), {3, 4, 5})}")
 
@@ -341,6 +368,7 @@ def congestion_blocks(results: dict[str, pa.Table], source: str) -> dict[str, st
         "effects_core": _effects_core(summary),
         "effects_wide": _effects_wide(summary),
         "weekly_effects": _weekly_effects(effects),
+        "group_growth": _group_growth(effects),
         "weekly_trips": _weekly_trips(results["cp_weekly_trips"].to_pylist()),
         "excluded_weeks": _excluded_weeks(effects),
         "holidays": _holidays(),
@@ -420,12 +448,27 @@ def _pay_weeks(event: list[dict]) -> str:
                    "Offsets with no ride-hail data"], rows)
 
 
+def _pay_monthly(pay_per_hour: list[dict]) -> str:
+    """Ride-hail pay per hour with a passenger by month (L09's pay_per_hour; uber + lyft), against
+    the month before and the same month a year earlier."""
+    values = {r["month"]: r["pay_per_hour"] for r in pay_per_hour if r["mode"] == "ride_hail"}
+    body = []
+    for month in sorted(values):
+        before = values.get(date(month.year - (month.month == 1), (month.month - 2) % 12 + 1, 1))
+        prior = values.get(date(month.year - 1, month.month, 1))
+        body.append([f"{month:%b %Y}", _hourly(values[month]), _pct(_ratio(values[month], before)),
+                     _hourly(prior), _pct(_ratio(values[month], prior))])
+    return _table(["Month", "Pay per hour with a passenger", "Change on the month before", "A year earlier",
+                   "Change on a year earlier"], body, {1, 2, 3, 4})
+
+
 def pay_blocks(results: dict[str, pa.Table], source: str) -> dict[str, str]:
     event = results["pay_event"].to_pylist()
     return {
         "provenance": source,
         "summary": _pay_summary(event),
         "weekly": _pay_weekly(event),
+        "monthly": _pay_monthly(results["pay_per_hour"].to_pylist()),
         "weeks": _pay_weeks(event),
     }
 
