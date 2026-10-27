@@ -1,7 +1,7 @@
--- Quality drift (SPEC §8): share of valid rows per month × mode.
+-- Quality drift (SPEC §8; D26): share of valid rows per month × mode.
 --
 -- Inputs  months_checked(month), agg_quality_month (views set up by pipeline/validate.py)
--- Params  $min_valid_pct   fail when valid_rows / rows is below this percentage (95)
+-- Params  $min_valid_pct   fail when valid_rows / rows is below this percentage (85 per D26; SPEC had 95)
 --         $drift_points    list a month more than this many points below its mode's median (3)
 -- Output  one row per month × mode:
 --   month, mode, rows, valid_rows

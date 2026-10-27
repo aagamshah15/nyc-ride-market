@@ -29,7 +29,7 @@ UNIFIED_COLUMNS = (
     "mode", "month", "request_ts", "pickup_ts", "dropoff_ts", "pu_zone", "do_zone", "miles",
     "duration_s", "fare_base", "tips", "tolls", "airport_fee", "congestion_surcharge", "cbd_fee",
     "other_fees", "rider_total_ex_tip", "driver_pay", "is_card", "shared_request", "shared_match",
-    "wav_request", "wav_match", "street_hail",
+    "wav_request", "wav_match", "street_hail", "vendor_id",   # vendor_id per D25
 )
 
 # Ways a range covers a unified column other than through a raw column.

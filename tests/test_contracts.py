@@ -154,16 +154,17 @@ def test_metric_names_are_unique_and_snake_case():
 
 # --- factories ---------------------------------------------------------------
 
-SPEC_CLEAN_COLUMNS = {   # SPEC §4, §4.1, §4.2 (+ D9 wide-list flags)
+SPEC_CLEAN_COLUMNS = {   # SPEC §4, §4.1, §4.2 (+ D9 wide-list flags, D25 vendor_id)
     "mode", "month", "request_ts", "pickup_ts", "dropoff_ts", "pu_zone", "do_zone", "miles",
     "duration_s", "fare_base", "tips", "tolls", "airport_fee", "congestion_surcharge", "cbd_fee",
     "other_fees", "rider_total_ex_tip", "driver_pay", "is_card", "shared_request", "shared_match",
     "wav_request", "wav_match", "street_hail", "wait_s", "hour_of_week", "pu_borough", "do_borough",
     "airport_pu", "airport_do", "cbd_pu", "cbd_do", "cbd_touch", "period", "f_time", "f_miles",
     "f_fare", "f_zone", "f_wait", "is_valid", "cbd_pu_wide", "cbd_do_wide", "cbd_touch_wide",
+    "vendor_id",                                               # D25
 }
 
-SPEC_AGG_COLUMNS = {     # SPEC §5 (+ D7–D10, D15)
+SPEC_AGG_COLUMNS = {     # SPEC §5 (+ D7–D10, D15, D25)
     "agg_zone_hour": "month mode pu_zone hour_of_week trips_all trips_valid miles duration_s fare_base "
                      "rider_total_ex_tip driver_pay tips card_trips card_tips card_fare_base wait_s_sum "
                      "wait_n cbd_fee shared_req shared_match wav_req wav_match",
@@ -178,6 +179,7 @@ SPEC_AGG_COLUMNS = {     # SPEC §5 (+ D7–D10, D15)
     "agg_quality_month": "month mode rows valid_rows f_time f_miles f_fare f_zone f_wait",
     "agg_cbd_pairs": "month mode pu_zone do_zone trips_all trips_cbd_fee",
     "agg_fee_values": "month mode cbd_fee trips",
+    "agg_vendor_month": "month mode vendor_id rows",          # D25
     "ref_indicators": "month",
 }
 

@@ -6,3 +6,16 @@ driver_pay_rise: 2025-08-01            # TLC minimum pay +5%
 fees:
   cbd_fee_hvfhv: 1.50                  # per trip, peak and overnight
   cbd_fee_taxi: 0.75                   # yellow and green, per trip
+
+# BEGIN excluded_holiday_weeks: written by `python -m pipeline.studies --holidays` (lane L10). Don't edit by hand.
+# 2025 ISO weeks left out of the congestion effect (SPEC §6): each US federal holiday that
+# falls in different ISO weeks in 2024 and 2025 removes both weeks. sql/metrics/cp_effect.sql
+# and cp_effect_summary.sql mirror this list; tests/test_cp_effect.py checks they match.
+excluded_holiday_weeks:
+  - iso_week: 3
+    holiday: "Martin Luther King Jr. Day"
+    reason: "Martin Luther King Jr. Day is in ISO week 3 in 2024 (Mon 15 Jan) and week 4 in 2025 (Mon 20 Jan)"
+  - iso_week: 4
+    holiday: "Martin Luther King Jr. Day"
+    reason: "Martin Luther King Jr. Day is in ISO week 3 in 2024 (Mon 15 Jan) and week 4 in 2025 (Mon 20 Jan)"
+# END excluded_holiday_weeks

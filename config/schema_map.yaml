@@ -1,4 +1,4 @@
-# Raw column → SPEC §4 unified column, per dataset and month range. Owned by L03.
+# Raw column → SPEC §4 unified column, per dataset and month range. Built by L03; changed through the integrator.
 # Built from reports/schema_discovery.md (the footer of every file in scope), not from the dictionaries alone.
 # Loaded and checked by pipeline/schema_map.py; `python -m pipeline.discover --check` runs it over every file.
 #
@@ -50,7 +50,7 @@ fhvhv:
       access_a_ride_flag: "trip run for the MTA's Access-A-Ride service; not in SPEC §4"
     constant:
       cbd_fee: 0                       # cbd_congestion_fee starts in the 2025-01 file
-    nulls: [is_card, street_hail]
+    nulls: [is_card, street_hail, vendor_id]
     derived: &fhvhv_derived
       month: "first day of the file's month"
       rider_total_ex_tip: "fare_base + tolls + other_fees + congestion_surcharge + airport_fee + cbd_fee"
@@ -61,7 +61,7 @@ fhvhv:
       <<: *fhvhv_columns
       cbd_congestion_fee:   {unified: cbd_fee, type: DOUBLE, rule: "COALESCE(cbd_congestion_fee, 0)"}
     ignore: *fhvhv_ignore
-    nulls: [is_card, street_hail]
+    nulls: [is_card, street_hail, vendor_id]
     derived: *fhvhv_derived
 
 yellow:
@@ -83,8 +83,8 @@ yellow:
       improvement_surcharge: {unified: other_fees, type: DOUBLE, rule: "other_fees = extra + mta_tax + improvement_surcharge"}
       total_amount:          {unified: rider_total_ex_tip, type: DOUBLE, rule: "rider_total_ex_tip = total_amount - tip_amount"}
       payment_type:          {unified: is_card, type: BIGINT, rule: "= 1"}
+      VendorID:              {unified: vendor_id, type: INTEGER, rule: "technology provider; the tie-out leaves out tie_out_exclude_vendors (D25)"}
     ignore: &yellow_ignore
-      VendorID: "TPEP technology provider code; not a company or mode"
       passenger_count: "driver-entered passenger count; not in SPEC §4"
       RatecodeID: "rate code (standard, JFK flat fare, Newark, ...); not in SPEC §4"
       store_and_fwd_flag: "record held in the vehicle before upload; not in SPEC §4"
@@ -136,8 +136,8 @@ green:
       total_amount:          {unified: rider_total_ex_tip, type: DOUBLE, rule: "rider_total_ex_tip = total_amount - tip_amount"}
       payment_type:          {unified: is_card, type: BIGINT, rule: "= 1"}
       trip_type:             {unified: street_hail, type: BIGINT, rule: "= 1"}
+      VendorID:              {unified: vendor_id, type: INTEGER, rule: "technology provider; the tie-out leaves out tie_out_exclude_vendors (D25)"}
     ignore: &green_ignore
-      VendorID: "LPEP technology provider code; not a company or mode"
       passenger_count: "driver-entered passenger count; not in SPEC §4"
       RatecodeID: "rate code (standard, JFK flat fare, Newark, ...); not in SPEC §4"
       store_and_fwd_flag: "record held in the vehicle before upload; not in SPEC §4"

@@ -59,7 +59,8 @@ def test_resolve_maps_raw_columns_as_spelled():
     assert mapping["cbd_congestion_fee"] == "cbd_fee"
     assert mapping["total_amount"] == "rider_total_ex_tip"
     assert [c for c, u in mapping.items() if u == "other_fees"] == ["extra", "mta_tax", "improvement_surcharge"]
-    assert "VendorID" not in mapping                                      # ignored
+    assert mapping["VendorID"] == "vendor_id"                             # D25
+    assert "passenger_count" not in mapping                               # ignored
     assert list(mapping) == [c for c in YELLOW_2025 if c in mapping]      # file order
 
 

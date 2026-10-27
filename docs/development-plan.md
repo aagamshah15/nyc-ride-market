@@ -42,7 +42,7 @@ The integrator keeps the Status column current.
 | [L07](lanes/L07-aggregate.md) | Aggregate | `pipeline/aggregate.py`, `sql/agg/` | 2 | L01 approved | — | built on fixtures, merged 24 Oct (D23 included); real run at G2 |
 | [L08](lanes/L08-validate.md) | Validation gate | `pipeline/validate.py`, `sql/validate/` | 2 | L01 approved | — | built on fixtures, merged 24 Oct; real run at G2 |
 | [L09](lanes/L09-metrics.md) | Metrics library | `sql/metrics/` (all but L10's), `pipeline/metrics.py` | 2 | L01 approved | Q1, Q4–Q15 | built on fixtures, merged 24 Oct; real run at G2 |
-| [L10](lanes/L10-policy-studies.md) | Policy studies | `sql/metrics/cp_*.sql`, `pay_event.sql`, `pipeline/studies.py` | 3 | L09 runner exists | Q2, Q3, Q6 | not started |
+| [L10](lanes/L10-policy-studies.md) | Policy studies | `sql/metrics/cp_*.sql`, `pay_event.sql`, `pipeline/studies.py` | 3 | L09 runner exists | Q2, Q3, Q6 | merged 26 Oct; metrics run on real data; findings narrative next |
 | [L11](lanes/L11-publish.md) | Publish and findings | `pipeline/publish.py`, `pipeline/findings.py`, `site/src/data/` | 3 | L09 runner exists | all | not started |
 | [L12](lanes/L12-pages-home-methods.md) | Pages: Home + Methods | `index.md`, `methods.md` | 4 | L05 done | home | not started |
 | [L13](lanes/L13-pages-companies.md) | Pages: Companies | `companies/[company].md` | 4 | L05 done | Q4, Q5, Q11–Q13 | not started |
@@ -116,11 +116,44 @@ All gate checks run in the integrator space. G1, G3, G4, G5 and G6 are SPEC §11
 | Gate | Target | Passes when |
 |---|---|---|
 | G1 | 1 Nov | `make ingest` works for any month; `reports/schema_discovery.md` covers 2024-01 → 2026-08; every raw column mapped or ignored; `cbd_zones.csv` draft + `reports/cbd_zones.md`; airports confirmed |
-| G2 | ~8 Nov | `make month MONTH=2025-03` runs end to end on real data: rows in = rows out; every aggregate table built; `make validate` runs and that month ties out within ±2%; `python -m pipeline.metrics --all` runs |
-| G3 | 15 Nov | `make backfill FROM=2024-01 TO=2026-08` clean; **`make validate` passes**; pytest covers the cleaning flags and every metric |
+| G2 | ~8 Nov (passed 25 Oct, see gate log) | `make month MONTH=2025-03` runs end to end on real data: rows in = rows out; every aggregate table built; `make validate` runs and that month ties out within ±2%; `python -m pipeline.metrics --all` runs |
+| G3 | 15 Nov (passed 26 Oct, see gate log) | `make backfill FROM=2024-01 TO=2026-08` clean; **`make validate` passes**; pytest covers the cleaning flags and every metric |
 | G4 | 29 Nov | every SPEC §6 metric has output; congestion and pay-rise studies written up; Q1–Q15 each has a generated finding; `make publish` writes every contract file |
 | G5 | 10 Dec | every route builds, including 263 zone pages; data budgets pass; palette and dark mode in place |
 | G6 | 14 Dec | methods page complete; L18 review closed; phone layout checked; refresh workflow ran once end to end; v1 deployed |
+
+### Gate log
+
+- **G3, 26 Oct 2026 — passed** (after D26 and D27 merged to `main` as `ac095b4`). `make backfill FROM=2024-01 TO=2026-08` re-ran all 32 months. A DNS outage and the Mac's idle sleep broke 2025-08 twice; it was resumed under `caffeinate -i` and finished in 4 minutes. Rows match at every stage in all 32 months, and no clean row is flagged for zone 265 alone (D26).
+  - `make validate` **exits 0**, all five checks pass:
+    - **tie-out:** all 31 FHVHV months within ±2%, plus 2026-06 excepted (D27). Yellow (10 months outside) and green (19 outside) are reported, not gated.
+    - **quality:** all 128 month × mode rows ≥ 85% (D26); 8 drift months listed, yellow's 2025-05 → 2025-11 fare episode and Lyft 2025-08.
+    - **CBD list:** core 98.92%.
+    - **schema:** 96 files.
+    - **fees:** 100%.
+  - `python -m pipeline.metrics --all`: 24 metrics, exit 0.
+  - `reports/validation.md` committed.
+  - **SPEC §11 phase 2 is done** as of the L10 merge (`5b07c37`, 26 Oct): pytest covers the cleaning flags and all 29 metrics (396 tests), and all five L10 metrics run on the real aggregates (`--all` exit 0).
+- **G3, back-fill 26 Oct 2026 — not passed.** `make backfill FROM=2024-01 TO=2026-08` ran all 32 months in about 10 minutes (exit 0). Rows match at every stage in every month; clean files take 19 GB and aggregates 215 MB.
+  - `make validate`:
+    - **pass:** CBD list (core 98.92%), schema, fees.
+    - **quality fails:** 57 of 128 month × mode rows below 95%. Green is below in all 32 months, yellow in 21, Lyft in 4, Uber in none.
+    - **tie-out fails:** 27 of 96 month × class rows. FHVHV is +0.00% except 2026-06 (−2.14%: TLC's figure exceeds the rows in its own unchanged file). Green runs +2.1% to +3.0% with all vendors from 2024-12. D25's vendor-6 exclusion over-corrects it to −4% to −10% from 2025-07, because vendor 6 matched the 2025-03 gap by coincidence. Yellow drifts to +4% through 2026-05, then falls to about 0 from 2026-06.
+  - Both rules wait on the user.
+- **G2, re-run 25 Oct 2026 — passed** (after D24 and D25 merged to `main` as `1ed9094`). `make month MONTH=2025-03`: 20 s, peak memory about 5.2 GB. Rows match at every stage for fhvhv, yellow and green, all ten aggregate tables were written, and the raw files were deleted.
+  - `make validate`, 2025-03:
+    - **tie-out passes for all three classes:** FHVHV +0.00%; green −0.05% (1,222 vendor-6 records left out); yellow +1.16% (334 left out).
+    - **also passing:** CBD list (core 98.74%), schema (96 files; the CloudFront rate limit cost a 3-minute wait), fees (100%).
+    - **still failing:** quality, yellow 91.68% and green 92.55% below 95%. That's deferred to G3 by the user; G3 fails on it unless the rule is decided.
+  - `python -m pipeline.metrics --all`: 24 metrics, exit 0. WAV match: Uber 100%, Lyft 99.98%. Shared match: Uber 52.3%; Lyft has no requests (NULL).
+  - `reports/schema_discovery.md` was regenerated (lists `vendor_id`). The partial `reports/validation.md` isn't committed.
+- **G2, 25 Oct 2026 — not passed yet.** `make month MONTH=2025-03` ran end to end in 23 s, peak memory about 5 GB. Rows match at every stage: manifest = clean = `agg_zone_hour.trips_all` = `agg_quality_month.rows` for fhvhv (20,536,879), yellow (4,145,257) and green (51,539). All nine aggregate tables were written, and the raw files were deleted.
+  - `make validate` on 2025-03:
+    - **pass:** CBD list (core 98.74%; wide 96.06%, reported), schema (96 files), fees (100% exact).
+    - **tie-out:** FHVHV +0.00%, yellow +1.17%, **green +2.37% fail**. Green's gap is TLC not counting VendorID 6 records (1,222 trips); without them green is −0.05%.
+    - **quality:** yellow 91.68% and green 92.55% are below 95%. That rule is deferred until the back-fill.
+  - `python -m pipeline.metrics --all`: all 24 L09 metrics run, exit 0. **WAV and shared match rates are wrong (>1)**: `wav_match` counts every trip in an accessible vehicle, not only those that requested one.
+  - `reports/validation.md` from this partial run isn't committed (L08: commit at G3).
 
 ---
 
@@ -128,6 +161,7 @@ All gate checks run in the integrator space. G1, G3, G4, G5 and G6 are SPEC §11
 
 - Before Wave 1: settle §7 with the user (done 23 Oct); run L00 (done 23 Oct) and L01 (done 24 Oct; contracts and D15–D18 approved). Repo: https://github.com/aagamshah15/nyc-ride-market (public); Pages: https://aagamshah15.github.io/nyc-ride-market/ (source GitHub Actions, deploys from `main` only).
 - Merge order: L00 → L01 → L02, L04, L05 → L03 → L06 → L07 → L08, L09 → L10 → L11 → pages → L17 → L18.
+- **Standing approval (user, 27 Oct 2026):** the integrator merges a lane into `main` and pushes once its test-merge passes `make test`, without asking each time. Any SPEC change, decision or tolerance change still goes to the user first.
 - Run the real-data jobs: the G2 month, the back-fill, `make validate`, `make publish`.
 - Route each validation failure to the lane that owns the cause. Never widen a tolerance without asking the user.
 - Keep the §2 Status column current; record decision changes in `docs/decisions.md`.
