@@ -46,6 +46,7 @@ AIRPORTS = {1: "EWR", 132: "JFK", 138: "LGA"}
 ZONES = range(1, 264)
 EFFECT_MODES = ("uber", "lyft", "yellow", "green", "ride_hail", "all")
 HEATMAP_MIN_SHARE = 0.10   # contracts/README.md §1 Size
+MULTIPOLYGON_ZONE = 2      # Jamaica Bay: one of the 12 real zones that are MultiPolygons
 
 # Published data file → its example in contracts/site/.
 EXAMPLES = {
@@ -663,19 +664,29 @@ class MockSite:
 
     def geojson(self) -> dict:
         """A 17 × 16 grid over the NYC bounding box. Exterior rings run clockwise, as d3-geo
-        expects (mapshaper's default output); RFC 7946 order would fill the whole globe."""
+        expects (mapshaper's default output); RFC 7946 order would fill the whole globe.
+        Zone MULTIPOLYGON_ZONE is split in two, as 12 real zones are MultiPolygons."""
         west, east, south, north = -74.26, -73.70, 40.49, 40.92
         cols, rows = 17, 16
         dx, dy = (east - west) / cols, (north - south) / rows
+
+        def ring(x0: float, x1: float, y0: float, y1: float) -> list:
+            return [[x0, y1], [x1, y1], [x1, y0], [x0, y0], [x0, y1]]
+
         features = []
         for z, info in self.zones.items():
             col, row = (z - 1) % cols, (z - 1) // cols
             x0, x1 = round(west + col * dx, 5), round(west + (col + 1) * dx, 5)
             y1, y0 = round(north - row * dy, 5), round(north - (row + 1) * dy, 5)
+            if z == MULTIPOLYGON_ZONE:
+                left, right = round(x0 + 0.4 * (x1 - x0), 5), round(x0 + 0.6 * (x1 - x0), 5)
+                geometry = {"type": "MultiPolygon",
+                            "coordinates": [[ring(x0, left, y0, y1)], [ring(right, x1, y0, y1)]]}
+            else:
+                geometry = {"type": "Polygon", "coordinates": [ring(x0, x1, y0, y1)]}
             features.append({"type": "Feature",
                              "properties": {"LocationID": z, "zone": info["name"], "borough": info["borough"]},
-                             "geometry": {"type": "Polygon",
-                                          "coordinates": [[[x0, y1], [x1, y1], [x1, y0], [x0, y0], [x0, y1]]]}})
+                             "geometry": geometry})
         return {"type": "FeatureCollection", "features": features}
 
     def build(self) -> dict[str, dict]:

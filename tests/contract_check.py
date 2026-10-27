@@ -4,6 +4,8 @@ Objects must have exactly the example's keys; values must have the example's JSO
 every item of an array must match the example's items (merged into one template).
 ``null`` is allowed anywhere (contracts/README.md §4), and an empty example array or a
 ``null`` example value leaves that position unconstrained.
+A GeoJSON geometry is checked down to its ``type`` (Polygon or MultiPolygon) and an array of
+``coordinates``: the two nest to different depths, and zones.geojson_problems checks the rings.
 
 Owned by L01; changed through the integrator.
 """
@@ -11,6 +13,11 @@ Owned by L01; changed through the integrator.
 from __future__ import annotations
 
 MAX_ERRORS = 50
+GEOMETRY_TYPES = ("Polygon", "MultiPolygon")
+
+
+def _is_geometry(value) -> bool:
+    return isinstance(value, dict) and value.keys() == {"type", "coordinates"} and value["type"] in GEOMETRY_TYPES
 
 
 def _kind(value) -> str:
@@ -49,7 +56,10 @@ def contract_errors(actual, example, path: str = "$") -> list[str]:
     if actual_kind != example_kind:
         return [f"{path}: expected {example_kind}, got {actual_kind}"]
     errors: list[str] = []
-    if example_kind == "object":
+    if _is_geometry(example):
+        if not _is_geometry(actual) or not isinstance(actual["coordinates"], list):
+            errors.append(f"{path}: expected a Polygon or MultiPolygon geometry")
+    elif example_kind == "object":
         errors += [f"{path}.{key}: missing" for key in sorted(example.keys() - actual.keys())]
         errors += [f"{path}.{key}: not in contract" for key in sorted(actual.keys() - example.keys())]
         for key in sorted(example.keys() & actual.keys()):

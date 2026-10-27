@@ -294,3 +294,30 @@ def test_checker_reports_departures(actual, problem):
 def test_assert_matches_contract_raises():
     with pytest.raises(AssertionError, match="missing"):
         assert_matches_contract({}, {"a": 1})
+
+
+SQUARE = [[0, 1], [1, 1], [1, 0], [0, 0], [0, 1]]
+POLYGON = {"type": "Polygon", "coordinates": [SQUARE]}
+MULTIPOLYGON = {"type": "MultiPolygon", "coordinates": [[SQUARE], [SQUARE]]}
+
+
+def test_checker_takes_either_geometry_type():
+    """12 real zones are MultiPolygons; an example with only Polygons must still accept them."""
+    for example in (POLYGON, MULTIPOLYGON):
+        for actual in (POLYGON, MULTIPOLYGON):
+            assert contract_errors({"geometry": actual}, {"geometry": example}) == []
+
+
+@pytest.mark.parametrize("actual", [
+    {"type": "Point", "coordinates": [0, 1]},
+    {"type": "Polygon", "coordinates": "x"},
+    {"type": "Polygon", "coordinates": [SQUARE], "bbox": [0, 0, 1, 1]},
+])
+def test_checker_rejects_other_geometries(actual):
+    assert contract_errors({"geometry": actual}, {"geometry": POLYGON}) == [
+        "$.geometry: expected a Polygon or MultiPolygon geometry"]
+
+
+def test_example_map_has_a_multipolygon():
+    features = _example("taxi_zones.example.geojson")["features"]
+    assert {f["geometry"]["type"] for f in features} == {"Polygon", "MultiPolygon"}
