@@ -215,3 +215,37 @@ Reason: over 32 months, ride-hail matches TLC to +0.00% in 30 months, so its tie
 - yellow drifts up to +4% through 2026-05, then falls to about 0 from 2026-06, the month TLC's files gained `request_source`.
 
 Gating on them would fail on TLC's method, not on the pipeline. Rows in, rows out and the manifest still check every cab record exactly (the integrity check in G2 and G3).
+
+## D28 · The 1 Aug 2025 event is a new minimum-pay rule, not a 5% rise; 1 Mar 2025 is a second event
+
+27 Oct 2026 · SPEC §3.3 (`periods.yaml`), Appendix A (Q6) · L10, L11, L15 · **Status: accepted by the user 27 Oct 2026** (from the G4 draft review)
+
+- **Date unchanged:** `driver_pay_rise: 2025-08-01` stays, as do the event study, W31 as the transition week (D12) and the `pay_event` metric.
+- **Wording:** Q6 and the event label name it a *new minimum-pay rule*, never a "5% pay rise". Q6 becomes: "Did the new minimum-pay rule of 1 Aug 2025 (per-mile floor down, per-minute floor up) raise driver pay per hour, and did fares rise with it?" The `events.json` label is "New driver minimum-pay rule".
+- **Second event:** `config/periods.yaml` gains `driver_pay_inflation_step: 2025-03-01`, TLC's annual CPI-W step, which raised only the per-minute minimum (+3.92%). `events.json` lists it with the label "Per-minute minimum pay +3.9% (inflation)". The three events are listed in date order.
+
+Reason: TLC's notice of promulgation for the rule adopted on 25 June 2025 ([driver_pay_rules_6_6_25.pdf](https://www.nyc.gov/assets/tlc/downloads/pdf/driver_pay_rules_6_6_25.pdf)) changes three things for non-WAV trips in the city:
+
+| Change | Effective floor |
+|---|---|
+| Per-mile expense factor $0.762 → $0.850, with its utilization divisor moved from 58% to a new distance-based 68.5% | $1.314 → $1.241 a mile, about −5.5% |
+| Per-minute utilization divisor 58% → 53.3% | about +8.8% |
+| 1 March 2025 CPI-W step, on the per-minute rate only (the notice's footnote 21) | +3.92% |
+
+TLC's "5%" is one sample trip (7.5 miles, 30 minutes) against 2024 rates, with the March step included. News reports give 1 August 2025 as the effective date; the notice itself doesn't state one. L10 found no rise in pay per mile around 1 August and a step in pay between February and March 2025, which this explains.
+
+## D29 · Q11 measures accessible service, not a match rate
+
+27 Oct 2026 · SPEC §5 (`agg_zone_hour`), §6 (Q11 metric), Appendix A (Q11) · L07, L09, L11, L13 · **Status: accepted by the user 27 Oct 2026** (from the G4 draft review)
+
+- **Question:** Q11 becomes "How many trips that requested a wheelchair-accessible vehicle does each company complete, and what share of all its trips run in one?" Unfulfilled requests aren't in TLC's trip records, so every page that shows Q11 says so.
+- **Aggregate:** `agg_zone_hour` gains `wav_trips` (BIGINT): valid rows with `wav_match`, whether or not the trip asked for a WAV; ride-hail only, NULL for cabs. `wav_req` and D24's `wav_match` stay as they are.
+- **Metric:** `wav_match_rate` is replaced by **`wav_service`** (month × mode, `uber` and `lyft`), with columns `month, mode, trips, wav_requests, wav_trips, wav_share`:
+  - `trips = SUM(trips_valid)`
+  - `wav_requests = SUM(wav_req)`: completed trips that requested a WAV
+  - `wav_trips = SUM(wav_trips)`
+  - `wav_share = SUM(wav_trips) / SUM(trips_valid)`
+- **Site:** the company files' `wav` rows carry the same six fields. The `compare` key `wav_match_rate` becomes `wav_share` ("Share of trips in a wheelchair-accessible vehicle").
+- **Unchanged:** the shared-ride match rate (Q12) and D24.
+
+Reason: a trip record exists only for a completed trip, and a trip that asked for a WAV and didn't get one isn't completed. So `SUM(wav_match) / SUM(wav_req)` is about 100% by construction: in 2025-03, Uber matched 39,879 of 39,879 requests and Lyft 16,612 of 16,615. The data can show how many WAV-requested trips each company completed, and how much of its fleet's work ran in accessible vehicles (2025-03: 1,362,901 of Uber's 14,547,181 trip records, 9.4%).

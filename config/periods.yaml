@@ -2,7 +2,8 @@
 # L10 (Policy studies) adds the excluded holiday weeks for the congestion effect (SPEC §6).
 
 congestion_pricing_start: 2025-01-05   # MTA Congestion Relief Zone toll begins
-driver_pay_rise: 2025-08-01            # TLC minimum pay +5%
+driver_pay_inflation_step: 2025-03-01  # TLC annual CPI-W step: per-minute minimum +3.92% (D28)
+driver_pay_rise: 2025-08-01            # TLC minimum-pay rule: per-mile floor down, per-minute floor up (D28)
 fees:
   cbd_fee_hvfhv: 1.50                  # per trip, peak and overnight
   cbd_fee_taxi: 0.75                   # yellow and green, per trip
