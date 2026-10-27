@@ -90,19 +90,23 @@ def test_contract_types_follow_first_typed_use_and_defaults():
     assert schema.field("airport").type == pa.string()     # default text column
     assert schema.field("share").type == pa.float64()
     assert metrics.contract_schema("quality_month").field("rows").type == pa.int64()
+    wav = metrics.contract_schema("wav_service")                 # D29 counts are BIGINT
+    assert [wav.field(c).type for c in ("trips", "wav_requests", "wav_trips", "wav_share")] == \
+        [pa.int64(), pa.int64(), pa.int64(), pa.float64()]
     with pytest.raises(metrics.ContractError):
         metrics.contract_schema("no_such_metric")
 
 
 def test_check_contract_rejects_wrong_order_and_type():
     good = pa.table({"month": pa.array([date(2025, 3, 1)]), "mode": ["uber"],
-                     "requests": pa.array([1], pa.int64()), "matched": pa.array([1], pa.int64()),
-                     "match_rate": [1.0]})
-    metrics.check_contract("wav_match_rate", good)
-    with pytest.raises(metrics.ContractError, match="match_rate"):
-        metrics.check_contract("wav_match_rate", good.select(["month", "mode", "matched", "requests", "match_rate"]))
+                     "trips": pa.array([10], pa.int64()), "wav_requests": pa.array([1], pa.int64()),
+                     "wav_trips": pa.array([1], pa.int64()), "wav_share": [0.1]})
+    metrics.check_contract("wav_service", good)
+    with pytest.raises(metrics.ContractError, match="wav_share"):
+        metrics.check_contract("wav_service", good.select(["month", "mode", "trips", "wav_trips", "wav_requests",
+                                                           "wav_share"]))
     with pytest.raises(metrics.ContractError):
-        metrics.check_contract("wav_match_rate", good.set_column(2, "requests", pa.array([1.0])))
+        metrics.check_contract("wav_service", good.set_column(3, "wav_requests", pa.array([1.0])))
 
 
 # --- views and parameters ------------------------------------------------------
@@ -198,9 +202,9 @@ def test_cli_all(full):
 
 
 def test_cli_one_metric_prints_csv(full):
-    result = _cli("wav_match_rate")
+    result = _cli("wav_service")
     assert result.returncode == 0, result.stderr
-    assert result.stdout.splitlines()[0] == '"month","mode","requests","matched","match_rate"'
+    assert result.stdout.splitlines()[0] == '"month","mode","trips","wav_requests","wav_trips","wav_share"'
     assert len(result.stdout.splitlines()) == 1 + len(MONTHS) * 2
 
 

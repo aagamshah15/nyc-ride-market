@@ -50,7 +50,7 @@ _DEFAULT_TYPES = {
                 "zone_list", "cbd_group", "exclusion_reason"),
     "SMALLINT": ("do_zone", "iso_year", "iso_week", "year"),
     "BIGINT": ("n", "requests", "matched", "rows", "valid_rows", "f_time", "f_miles", "f_fare",
-               "f_zone", "f_wait", "trips_with_cbd_fee"),
+               "f_zone", "f_wait", "trips_with_cbd_fee", "wav_requests", "wav_trips"),
 }
 
 

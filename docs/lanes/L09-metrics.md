@@ -41,6 +41,7 @@ _Only this lane writes here. Newest first._
 
 | Date | State | Note |
 |---|---|---|
+| 27 Oct | D29 applied | `wav_match_rate` replaced by `wav_service`: month × mode for uber and lyft, with `trips` = valid trips, `wav_requests`, `wav_trips` and `wav_share` = wav_trips ÷ valid trips. The runner types `wav_requests` and `wav_trips` as BIGINT; please add both to the BIGINT bullet in `contracts/metrics.md` |
 | 24 Oct | done on fixtures | All 24 L09 metrics, the runner and 25 test files. `make test` green (211 passed, 7 skipped). Not yet run on real aggregates (none exist); the integrator runs `--all` at G2 |
 | 24 Oct | started | |
 
