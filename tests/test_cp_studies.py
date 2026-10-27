@@ -138,7 +138,11 @@ def test_reports_are_filled_from_the_metrics(full, reports):
     assert "| 2024 | W19 to W43 | 6 May 2024 to 27 Oct 2024 | W31 (week of 29 Jul 2024) | none |" in pay
     # monthly context: L09's pay_per_hour, ride_hail (uber only here)
     assert "| Jan 2024 | $42.60 | — | — | — |" in pay
-    assert "| Mar 2025 | $42.60 | +0.0% | $42.60 | +0.0% |" in pay
+    assert "| Mar 2025 ¹ | $42.60 | +0.0% | $42.60 | +0.0% |" in pay      # D28's two dated events, marked
+    assert "| Aug 2025 ² | $42.60 |" in pay and "| Apr 2025 | $42.60 |" in pay
+    assert ("¹ 1 Mar 2025: TLC's annual CPI-W step: per-minute minimum +3.92% "
+            "(`driver_pay_inflation_step` in config/periods.yaml).") in pay
+    assert "² 1 Aug 2025: new minimum-pay rule: per-mile floor down, per-minute floor up" in pay
 
 
 def test_reports_are_reproducible(full, reports):
