@@ -46,6 +46,7 @@ _Only this lane writes here. Newest first._
 
 | Date | State | Note |
 |---|---|---|
+| 27 Oct 2026 | done | D28 and D29: three events in date order; Q6 and the event-study subtitle from `pay_event` net of 2024 (L10's medians), "new minimum-pay rule"; Q11, the `wav` subtitles and rows, and the `compare` key from `wav_service`. Tests stub `wav_service` until L09's SQL is on the branch. |
 | 27 Oct 2026 | done | Integrator's four findings fixes for G4: Newark pickups left out of pickup-share sentences; destinations ranked among zones 1–263; Q2 and the effects subtitle by mode; Q12's zone checked (shared-ride requests by pickup zone, correct). |
 | 27 Oct 2026 | done | Built on factory aggregates and checked with a real run on the G3 aggregates (2024-01 → 2026-08). Main merged in (D24–D27, L10's metrics). |
 
@@ -83,10 +84,12 @@ _Only this lane writes here. Newest first._
   - Top-destination sentences and the `top_destination` tile name a mapped zone (1–263). "Outside of NYC" (zone 265, D26) stays in the data rows, and gets its own clause ("…; 5.3% of trips left the city") when it outranks every mapped zone: 39 zones in Aug 2026, at 3.7% to 34%.
   - Q2 and the congestion `effects` subtitle read by mode on the core list: combined ride-hail and yellow, with green apart and its share of NYC trips. The Uber and Lyft weekly effects drift in opposite directions (L10's report). The all-modes figure (−4.2%) is smaller than both ride-hail (−8.1%) and yellow (−7.8%) because of the mode mix (L10's report explains it); the sentence doesn't try to explain that.
   - Q12's "the most came from" zone counts Uber and Lyft shared-ride requests (`shared_req`, valid trips flagged `shared_request`) by pickup zone in the latest month. LaGuardia leads narrowly (10,663, 3.9%) over JFK (9,909).
-  - Q6 compares ride-hail pay per hour with a passenger (and fare per mile) in Aug 2025, the month the minimum-pay rise began, with Jul 2025. It is descriptive, not an estimate; the event-study chart carries the seasonal reference.
-  - Event labels ("Congestion pricing starts", "Driver minimum pay rises 5%") are constants in `publish.py`, because `periods.yaml` has no labels.
+  - Q6 and the drivers `event_study` subtitle (D28) use `pay_event` as L10's report does, through `studies.before_after`: for ride-hail, the median week in the 12 after the new minimum-pay rule against the median week in the 12 before, leaving out the transition week, net of the same weeks of 2024. On real data that is pay per minute with a passenger −0.9%, pay per mile −1.2% and base fare per mile −2.2%. The text never says "pay rise" or "5%"; a test checks that.
+  - Event labels are constants in `publish.py`, matching the mock generator word for word, because `periods.yaml` has no labels. The three events are listed in date order (D28).
+  - Q11 and the `wav` subtitles (D29) report completed trips that requested a wheelchair-accessible vehicle (`wav_requests`) and the share of all trips that ran in one (`wav_share`). Every one says that unfilled requests aren't in TLC's records; a test checks there is no "match" wording for WAV.
   - Changes on a year earlier come from unrounded values; tiles are rounded per `contracts/README.md` §2 afterwards.
 - **Follow-ups:**
+  - Integrator: the real-data publish needs L07's `agg_zone_hour.wav_trips` (D29) re-aggregated first; until then `wav_service` has no column to read. The worktree's `site/src/data/` is from the run before D28/D29.
   - L14: `top_destinations` rows still include "Outside of NYC" (zone 265), often first. The tile and subtitle now name a mapped zone, so the table may want to label 265 as every out-of-city place, or show it apart.
   - L06/L08 (data quality, to look at): yellow-cab cells in outer zones have p10 fare per mile near zero (Richmond Hill p90 ÷ p10 = 676 in Aug 2026). Zone 1 (Newark Airport) has 15 pickups a day, 99% yellow, at $47 a mile.
   - Real numbers to sanity-check on review (G4): Q11 is 100% for both apps (D24); Lyft leads Uber in only 1 zone; shared-ride requests fell 51% on a year earlier; pay per hour with a passenger is $63–65.

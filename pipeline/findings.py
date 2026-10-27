@@ -284,19 +284,24 @@ def company_tip_rate(*, mode, tip_rate, change, card_only, month):
             f"{month_label(month)}{_on_year_earlier(change, 'pts')}")
 
 
-def company_wav(*, mode, rates, month):
-    """``rates``: {"uber": match rate, "lyft": match rate} for the latest month."""
-    if mode in rates:
-        if _missing(rates[mode]):
+UNFILLED_WAV = "requests that went unfilled aren't in TLC's records"   # D29: trip records are completed trips
+
+
+def company_wav(*, mode, service, month):
+    """``service``: {"uber": (completed WAV-requested trips, share of trips in a WAV), "lyft": …},
+    latest month (D29). There is no match rate: unfilled requests have no trip record."""
+    if mode in service:
+        requests, wav_share = service[mode]
+        if _missing(requests, wav_share):
             return None
-        return (f"{cap(noun(mode))} matched {share(rates[mode])} of wheelchair-accessible requests in "
-                f"{month_label(month)}")
-    known = [(m, r) for m, r in rates.items() if not _missing(r)]
+        return (f"{cap(noun(mode))} completed {count(requests)} trips that requested a wheelchair-accessible "
+                f"vehicle in {month_label(month)}, and {share(wav_share)} of all its trips ran in one; {UNFILLED_WAV}")
+    known = [(m, s) for m, (_, s) in service.items() if not _missing(s)]
     if not known:
         return None
-    others = join_and([f"{noun(m)} {share(r)}" for m, r in known])
-    return (f"Wheelchair-accessible requests aren't reported for {noun(mode)}; in {month_label(month)} "
-            f"the match rate was {others}")
+    return (f"Wheelchair-accessible service isn't reported for {noun(mode)}; in {month_label(month)}, "
+            + join_and([f"{share(s)} of {noun(m)} trips" for m, s in known])
+            + f" ran in a wheelchair-accessible vehicle; {UNFILLED_WAV}")
 
 
 def company_shared(*, mode, requests, matched_share, month):
@@ -557,17 +562,17 @@ def drivers_pay_per_hour(*, pay_per_hour, change, month):
             f"{month_label(month)}{_on_year_earlier(change, 'relative')}")
 
 
-def drivers_event_study(*, before, after, reference_before, reference_after):
-    """Each a (week_start, pay per minute): the last week before and first week after the rise,
-    and the same weeks a year earlier."""
-    if not before or not after or _missing(before[1], after[1]):
+def drivers_event_study(*, pay_per_min, pay_per_mile, weeks, base_year):
+    """Ride-hail changes across the new minimum-pay rule (D28): median week after against median
+    week before, net of the same weeks of ``base_year`` (as L10's report)."""
+    if _missing(pay_per_min, weeks, base_year):
         return None
-    text = (f"Ride-hail driver pay per minute with a passenger went from {usd_per_minute(before[1])} in the "
-            f"{week_label(before[0])} to {usd_per_minute(after[1])} in the {week_label(after[0])}")
-    if reference_before and reference_after and not _missing(reference_before[1], reference_after[1]):
-        text += (f"; in the same weeks a year earlier it went from {usd_per_minute(reference_before[1])} "
-                 f"to {usd_per_minute(reference_after[1])}")
-    return text
+    text = f"Net of the same weeks of {base_year}, ride-hail driver pay per minute with a passenger "
+    text += moved(pay_per_min, "relative")
+    if not _missing(pay_per_mile):
+        text += f" and pay per mile {moved(pay_per_mile, 'relative')}"
+    return text + (f" in the {count(weeks)} weeks after the new minimum-pay rule, against the "
+                   f"{count(weeks)} weeks before")
 
 
 def drivers_hours(*, tph, tlc_month):
@@ -675,16 +680,20 @@ def q5(*, driver_share, change, by_company, month):
     return finding("Q5", text, driver_share, "share")
 
 
-def q6(*, pay_after, pay_before, fpm_change, rise_month, before_month):
-    if _missing(pay_after):
-        return finding("Q6", None, None, "usd_per_hour")
-    text = (f"Ride-hail drivers earned {usd(pay_after)} per hour with a passenger in "
-            f"{month_label(rise_month)}, the month the minimum-pay rise began")
-    if not _missing(pay_before) and pay_before:
-        text += f", {rel_change(pay_after / pay_before - 1)} on {month_label(before_month)}"
-    if not _missing(fpm_change):
-        text += f"; fare per mile {moved(fpm_change, 'relative')} over the same months"
-    return finding("Q6", text, pay_after, "usd_per_hour")
+def q6(*, pay_per_min, pay_per_mile, fare_per_mile, weeks, base_year, rule_month):
+    """Each a change net of the same weeks of ``base_year``: the median week in the ``weeks`` after
+    the new minimum-pay rule against the median week before (D28; L10's pay-rule report)."""
+    if _missing(pay_per_min, weeks, base_year):
+        return finding("Q6", None, None, "effect")
+    text = (f"Over the {count(weeks)} weeks after the new minimum-pay rule of {month_label(rule_month)}, which "
+            f"lowered the per-mile floor and raised the per-minute floor, ride-hail driver pay per minute with "
+            f"a passenger {moved(pay_per_min, 'relative')}")
+    if not _missing(pay_per_mile):
+        text += f" and pay per mile {moved(pay_per_mile, 'relative')}"
+    text += f" against the {count(weeks)} weeks before, net of the same weeks of {base_year}"
+    if not _missing(fare_per_mile):
+        text += f"; base fare per mile {moved(fare_per_mile, 'relative')}"
+    return finding("Q6", text, pay_per_min, "effect")
 
 
 def q7(*, fpm_median, zone_name, mode, volatility, month):
@@ -724,14 +733,17 @@ def q10(*, zones_now, zones_prior, month):
                    zones_now, "count")
 
 
-def q11(*, rates, month):
-    """``rates``: {"uber": wheelchair-accessible match rate, "lyft": …}, latest month."""
-    known = [(m, r) for m, r in rates.items() if not _missing(r)]
+def q11(*, service, month):
+    """``service``: {"uber": (completed WAV-requested trips, share of trips in a WAV), "lyft": …} (D29)."""
+    known = [(m, n, s) for m, (n, s) in service.items() if not _missing(n, s)]
     if not known:
-        return finding("Q11", None, None, "share")
-    text = (f"{noun(known[0][0])} matched {share(known[0][1])} of wheelchair-accessible requests in "
-            f"{month_label(month)}" + "".join(f" and {noun(m)} {share(r)}" for m, r in known[1:]))
-    return finding("Q11", text, known[0][1], "share")
+        return finding("Q11", None, None, "count")
+    first, requests, _ = known[0]
+    text = (f"{noun(first)} completed {count(requests)} trips that requested a wheelchair-accessible vehicle in "
+            f"{month_label(month)}" + "".join(f" and {noun(m)} {count(n)}" for m, n, _ in known[1:])
+            + ", and " + join_and([f"{share(s)} of {possessive(noun(m))} trips" for m, _, s in known])
+            + f" ran in one; {UNFILLED_WAV}")
+    return finding("Q11", text, requests, "count")
 
 
 def q12(*, requests, change, matched_share, top_zone, month):

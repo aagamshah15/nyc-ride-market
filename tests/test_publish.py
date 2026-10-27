@@ -4,9 +4,12 @@ and findings checked against values worked out by hand, on factory aggregates (L
 import importlib.util
 import json
 import re
+from collections import defaultdict
 from datetime import date
 from pathlib import Path
 
+import pyarrow as pa
+import pyarrow.parquet as pq
 import pytest
 import yaml
 from contract_check import assert_matches_contract
@@ -135,8 +138,9 @@ def airport_rows() -> list[dict]:
 def week_rows() -> list[dict]:
     """Congestion weeks 2025-W10…W12 against 2024 (all in March), core list. Treated trips: 1,000 a
     mode in 2024; Uber 900, 800, 1,000 and yellow 980 in 2025. Control: 2,000 both years. Uber's
-    treated 2025 fare is +10% (19,503 against the default 17,730). Pay weeks W30 and W32 have
-    control rows only, so they feed pay_event and give the congestion effect no week."""
+    treated 2025 fare is +10% (19,503 against the default 17,730). Pay weeks W30 and W32 (offsets −1
+    and +1 around the new pay rule) have control rows only, so they feed pay_event and give the
+    congestion effect no week. Driver pay rises 3% from W30 to W32 in 2025 and 1% in 2024."""
     rows = []
     for week, uber_2025 in ((10, 900), (11, 800), (12, 1000)):
         for year in (2024, 2025):
@@ -152,9 +156,11 @@ def week_rows() -> list[dict]:
             monday = date.fromisocalendar(year, week, 1)
             rows.append({"month": date(year, monday.month, 1), "iso_year": year, "iso_week": week, "mode": "uber",
                          "cbd_group": "control",
-                         "driver_pay": 13_776.0 if (year, week) == (2025, 32) else 13_120.0})
+                         "driver_pay": PAY_RULE_PAY.get((year, week), 13_120.0)})
     return rows
 
+
+PAY_RULE_PAY = {(2024, 32): 13_251.2, (2025, 32): 13_513.6}   # +1% and +3% on the default 13,120
 
 FEES = {AUG24: {"uber": 0.0, "lyft": 0.0, "yellow": 0.0, "green": 0.0},
         JUL25: {"uber": 1_200.0, "lyft": 500.0, "yellow": 600.0, "green": 50.0},
@@ -202,6 +208,38 @@ def example(rel: str):
     return json.loads((SITE_CONTRACTS / mock.example_name(rel)).read_text())
 
 
+WAV_SQL = metrics.METRICS_DIR / "wav_service.sql"
+
+
+def stub_wav_service() -> pa.Table:
+    """L09's wav_service (D29) until its SQL is on this branch: the contract's sums over agg_zone_hour,
+    month × mode for Uber and Lyft."""
+    sums = defaultdict(lambda: [0, 0, 0])
+    for r in pq.read_table(common.agg_path("agg_zone_hour")).to_pylist():
+        if r["mode"] in ("uber", "lyft"):
+            cell = sums[(r["month"], r["mode"])]
+            cell[0] += r["trips_valid"]
+            cell[1] += r["wav_req"] or 0
+            cell[2] += r["wav_trips"] or 0
+    rows = [{"month": month, "mode": mode, "trips": trips, "wav_requests": requests, "wav_trips": wav,
+             "wav_share": wav / trips if trips else None}
+            for (month, mode), (trips, requests, wav) in sorted(sums.items())]
+    return pa.Table.from_pylist(rows, schema=metrics.contract_schema("wav_service"))
+
+
+def with_wav_stub(run):
+    def patched(name, **params):
+        if name == "wav_service" and not WAV_SQL.exists():
+            return stub_wav_service()
+        return run(name, **params)
+    return patched
+
+
+@pytest.fixture(autouse=True)
+def wav_service(monkeypatch):
+    monkeypatch.setattr(metrics, "run", with_wav_stub(metrics.run))
+
+
 def load_all(out: Path) -> dict[str, object]:
     return {path.relative_to(out).as_posix(): json.loads(path.read_text())
             for path in sorted(out.rglob("*")) if path.is_file()}
@@ -216,7 +254,7 @@ def site(tmp_path_factory):
     calls = []
     with pytest.MonkeyPatch.context() as mp:
         mp.setenv("NYC_DATA_DIR", str(data))
-        run = metrics.run
+        run = with_wav_stub(metrics.run)
         mp.setattr(metrics, "run", lambda name, **params: calls.append(name) or run(name, **params))
         write_fixture(data)
         publish.main(["--dev", "--out", str(out)])
@@ -261,9 +299,13 @@ def test_tiles_and_events_come_from_config(site):
     files = site["files"]
     assert files["tiles.json"]["tiles"] == yaml.safe_load((SITE_CONTRACTS / "tiles.yaml").read_text())
     periods = common.load_yaml("periods.yaml")
-    assert [(e["id"], e["date"]) for e in files["events.json"]["events"]] == [
+    events = files["events.json"]["events"]
+    assert [(e["id"], e["date"]) for e in events] == [          # date order (D28)
         ("congestion_pricing_start", str(periods["congestion_pricing_start"])),
+        ("driver_pay_inflation_step", str(periods["driver_pay_inflation_step"])),
         ("driver_pay_rise", str(periods["driver_pay_rise"]))]
+    # the labels the site lanes built against, word for word
+    assert events == mock.MockSite(generated_at="2026-10-27T00:00:00Z").events()["events"]
 
 
 def test_zone_map_is_copied(site, tmp_path):
@@ -272,9 +314,9 @@ def test_zone_map_is_copied(site, tmp_path):
 
 
 def test_metrics_run_through_the_runner(site):
-    """Every value comes from metrics.run, L10's five metrics included."""
-    assert L10_METRICS <= set(site["calls"])
-    assert set(site["calls"]) <= set(metrics.available())
+    """Every value comes from metrics.run, L10's five metrics and L09's wav_service included."""
+    assert L10_METRICS | {"wav_service"} <= set(site["calls"])
+    assert set(site["calls"]) <= set(metrics.available()) | {"wav_service"}   # stubbed until L09's SQL lands
 
 
 def test_downloads_list_the_published_sizes(site):
@@ -310,10 +352,13 @@ HAND_WORKED = {
           "mile and −9.1% on the driver share of the base fare",
     # Lyft beats Uber only in zone 236 (400 against 300); a year earlier in no zone.
     "Q4": "Lyft had a bigger share of pickups than Uber in 1 zone in Aug 2026, up from 0 a year earlier",
-    # Pay per hour with a passenger: 1,461.18 ÷ (117,600 s ÷ 3,600) = $44.73 in Aug 2025, against
-    # 1,391.60 ÷ 32.67 h = $42.60 in Jul 2025: +5.0%. Fare per mile is the default in both months.
-    "Q6": "Ride-hail drivers earned $44.73 per hour with a passenger in Aug 2025, the month the minimum-pay rise "
-          "began, +5.0% on Jul 2025; fare per mile held steady over the same months",
+    # pay_event, ride-hail (Uber alone here): the week before (W30) against the week after (W32).
+    # Pay per minute and per mile rise 3% in 2025 and 1% in 2024: net 1.03 ÷ 1.01 − 1 = +1.98%
+    # ("+2.0%"). Base fare per mile doesn't move in either year.
+    "Q6": "Over the 12 weeks after the new minimum-pay rule of Aug 2025, which lowered the per-mile floor and "
+          "raised the per-minute floor, ride-hail driver pay per minute with a passenger rose 2.0% and pay per "
+          "mile rose 2.0% against the 12 weeks before, net of the same weeks of 2024; base fare per mile held "
+          "steady",
     # City-wide median $3.35/mile. The only zone × company cell with 5,000+ trips is Uber in zone 161:
     # 9.0 ÷ 2.0 = 4.5.
     "Q7": "Riders paid a median $3.35/mile in Aug 2026; fares per mile varied most for Uber trips from Midtown "
@@ -326,6 +371,10 @@ HAND_WORKED = {
     # trips, hour 7 has 70.
     "Q9": "Uber carried 73% of trips to and from JFK and LaGuardia and to Newark in Aug 2026; the mean fare to "
           "Manhattan was $76.67 before tip, and trips peaked at 3 pm",
+    # wav_service, Aug 2026. Uber: 6 rows with 1 WAV request and 9 WAV trips each, 1,430 valid trips →
+    # 54 ÷ 1,430 = 3.8%. Lyft: 4 rows, 800 valid trips → 36 ÷ 800 = 4.5%.
+    "Q11": "Uber completed 6 trips that requested a wheelchair-accessible vehicle in Aug 2026 and Lyft 4, and 3.8% "
+           "of Uber's trips and 4.5% of Lyft's trips ran in one; requests that went unfilled aren't in TLC's records",
     # Yellow leads zone 132 (500 of 800). A year earlier: 132 (400 of 800) and zone 2 (70 of 100).
     "Q10": "Yellow cabs carried more pickups than any other mode in 1 zone in Aug 2026, down from 2 a year earlier",
     # Fees: 1,500 + 600 + 750 + 75 = $2,925 against 2,500 a year earlier (+17.0%); Uber the most.
@@ -422,6 +471,7 @@ def generated_text(files: dict) -> list[tuple[str, str]]:
             texts.append((rel, data["title"]))
         texts += [(f"{rel} {key}", text) for key, text in (data.get("subtitles") or {}).items() if text]
         texts += [(f"{rel} {f['question']}", f["text"]) for f in data.get("findings", [])]
+        texts += [(f"{rel} {e['id']}", e["label"]) for e in data.get("events", [])]
     return texts
 
 
@@ -437,6 +487,13 @@ def test_language_rules(site):
             assert "per hour with a passenger" in lower, where
         if re.search(r"\beffects?\b", lower):
             assert not re.search(r"(?<!estimated )\beffects?\b", lower), where
+        # D28: the 1 Aug 2025 change is a new minimum-pay rule, never a "5%" "pay rise" (a "5%" that is
+        # part of a number such as "+2.5%" or "15%" is fine)
+        assert not re.search(r"(?<![\d.])5%", text), where
+        assert not re.search(r"\bpay[- ]rise", lower), where
+        # D29: there's no wheelchair-accessible match rate; unfilled requests aren't in the records
+        if "wheelchair" in lower:
+            assert "match" not in lower and "unfilled aren't in tlc's records" in lower, where
 
 
 # --- the gate, the CLI and stale files ----------------------------------------------

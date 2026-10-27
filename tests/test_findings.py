@@ -149,13 +149,34 @@ def test_q14_fee_money():
     assert result["value"] == 10_627_132.13
 
 
-def test_q6_pay_rise():
-    # $44.73 against $42.60 is +5.0%; fare per mile unchanged reads "held steady".
-    result = findings.q6(pay_after=44.73, pay_before=42.60, fpm_change=0.0, rise_month="2025-08-01",
-                         before_month="2025-07-01")
-    assert result["text"] == ("Ride-hail drivers earned $44.73 per hour with a passenger in Aug 2025, the month "
-                              "the minimum-pay rise began, +5.0% on Jul 2025; fare per mile held steady over "
-                              "the same months")
+def test_q6_new_pay_rule():
+    # Net of the same weeks of 2024: pay per minute −0.9%, pay per mile −1.2%, base fare per mile −2.2%.
+    result = findings.q6(pay_per_min=-0.0091, pay_per_mile=-0.0121, fare_per_mile=-0.0218, weeks=12,
+                         base_year=2024, rule_month="2025-08-01")
+    assert result["text"] == ("Over the 12 weeks after the new minimum-pay rule of Aug 2025, which lowered the "
+                              "per-mile floor and raised the per-minute floor, ride-hail driver pay per minute with "
+                              "a passenger fell 0.9% and pay per mile fell 1.2% against the 12 weeks before, net of "
+                              "the same weeks of 2024; base fare per mile fell 2.2%")
+    assert (result["value"], result["unit"]) == (-0.0091, "effect")
+    assert findings.drivers_event_study(pay_per_min=-0.0091, pay_per_mile=-0.0121, weeks=12, base_year=2024) == (
+        "Net of the same weeks of 2024, ride-hail driver pay per minute with a passenger fell 0.9% and pay per mile "
+        "fell 1.2% in the 12 weeks after the new minimum-pay rule, against the 12 weeks before")
+
+
+def test_q11_accessible_service():
+    # D29: completed WAV-requested trips and the share of trips in a WAV; no match rate.
+    service = {"uber": (39_879, 0.0937), "lyft": (16_612, 0.0851)}
+    result = findings.q11(service=service, month=AUG26)
+    assert result["text"] == ("Uber completed 39,900 trips that requested a wheelchair-accessible vehicle in Aug 2026 "
+                              "and Lyft 16,600, and 9.4% of Uber's trips and 8.5% of Lyft's trips ran in one; "
+                              "requests that went unfilled aren't in TLC's records")
+    assert (result["value"], result["unit"]) == (39_879, "count")
+    assert findings.company_wav(mode="uber", service=service, month=AUG26) == (
+        "Uber completed 39,900 trips that requested a wheelchair-accessible vehicle in Aug 2026, and 9.4% of all its "
+        "trips ran in one; requests that went unfilled aren't in TLC's records")
+    assert findings.company_wav(mode="yellow", service=service, month=AUG26) == (
+        "Wheelchair-accessible service isn't reported for yellow cabs; in Aug 2026, 9.4% of Uber trips and 8.5% of "
+        "Lyft trips ran in a wheelchair-accessible vehicle; requests that went unfilled aren't in TLC's records")
 
 
 def test_thin_and_empty_zone_titles():
