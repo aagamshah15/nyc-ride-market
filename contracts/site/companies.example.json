@@ -99,23 +99,26 @@
     {
       "month": "2024-01-01",
       "mode": "uber",
-      "requests": 32400,
-      "matched": 28405,
-      "match_rate": 0.8767
+      "trips": 13812503,
+      "wav_requests": 31165,
+      "wav_trips": 1342609,
+      "wav_share": 0.0972
     },
     {
       "month": "2024-01-01",
       "mode": "lyft",
-      "requests": 28371,
-      "matched": 24696,
-      "match_rate": 0.8705
+      "trips": 4842707,
+      "wav_requests": 30731,
+      "wav_trips": 412177,
+      "wav_share": 0.0851
     },
     {
       "month": "2024-02-01",
       "mode": "uber",
-      "requests": 31882,
-      "matched": 28300,
-      "match_rate": 0.8876
+      "trips": 13313957,
+      "wav_requests": 32249,
+      "wav_trips": 1260819,
+      "wav_share": 0.0947
     }
   ],
   "shared": [

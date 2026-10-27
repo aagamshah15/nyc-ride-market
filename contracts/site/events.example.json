@@ -9,9 +9,14 @@
       "label": "Congestion pricing starts"
     },
     {
+      "id": "driver_pay_inflation_step",
+      "date": "2025-03-01",
+      "label": "Per-minute minimum pay +3.9% (inflation)"
+    },
+    {
       "id": "driver_pay_rise",
       "date": "2025-08-01",
-      "label": "Driver minimum pay rises 5%"
+      "label": "New driver minimum-pay rule"
     }
   ]
 }
