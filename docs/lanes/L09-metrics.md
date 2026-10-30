@@ -19,6 +19,7 @@ Every SPEC §6 metric defined once, as SQL over the aggregate tables, each with 
 - [x] Filter modes as SPEC says (driver share: `uber`, `lyft`); taxi tip rate uses card trips only
 - [x] `trips_per_hour_worked` reads `ref_indicators` and is marked TLC-reported in its output
 - [x] Output columns match `contracts/metrics.md` exactly (tested)
+- [ ] D29: replace `wav_match_rate` with `wav_service` (month × mode, uber and lyft: `month, mode, trips, wav_requests, wav_trips, wav_share`); a WAV match rate is ~100% by construction because trip records hold completed trips only
 
 ## Tests
 

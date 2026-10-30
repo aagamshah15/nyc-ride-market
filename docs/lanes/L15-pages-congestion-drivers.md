@@ -19,6 +19,7 @@ The lead case-study page on congestion pricing, and the drivers page on pay, pla
 - [ ] Congestion: tiles for the change in zone trips vs control, the change in fare per mile and fees collected to date; effect dots with p10–p90 ranges per metric and mode; weekly series; fee revenue by month and mode; results with and without borderline zones; a limits note linking `/methods#congestion-method`
 - [ ] Drivers: tiles for pay per hour with a passenger, driver share of fare, trips per hour worked (marked TLC-reported) and active drivers; driver-share trend; the pay-rise event study with the 2024 reference
 - [ ] The event study shows fare per mile with driver pay per mile on one shared $/mile axis; pay per minute goes in its own panel (no dual axes)
+- [ ] D28: time charts on the drivers page draw all events from `events.json` (three since D28: 1 Mar 2025 per-minute inflation step, 1 Aug 2025 "New driver minimum-pay rule"); never write "5% rise" in page text
 
 ## Page rules (all page lanes)
 

@@ -30,6 +30,7 @@
 
 - [x] D24: in `agg_zone_hour`, `wav_match` counts trips with `wav_request AND wav_match`, and `shared_match` counts `shared_request AND shared_match`
 - [x] D25: new table `agg_vendor_month` (month × mode × vendor_id: `rows`, over all rows), with the same month-scoped rewrite; schema in `AGG_SCHEMAS`
+- [ ] D29: `agg_zone_hour` gains `wav_trips` (BIGINT, last column): valid rows with `wav_match`, requested or not; NULL for cabs. `wav_req` and `wav_match` unchanged
 
 ## Tests (expected values worked out by hand)
 

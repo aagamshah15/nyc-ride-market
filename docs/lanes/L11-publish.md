@@ -21,6 +21,8 @@
 - [x] `findings.py`: one builder per question (Q1–Q15), plus page titles and chart subtitles. Numbers formatted per `contracts/README.md`. Language: "estimated effect"; "per hour with a passenger"; taxi tips "card-only"
 - [x] Changes vs a year earlier compare the latest month with the same month of the previous year
 - [x] Remove stale files the contract no longer lists
+- [ ] D28: `events.json` has three events in date order (`congestion_pricing_start`, `driver_pay_inflation_step`, `driver_pay_rise` labelled "New driver minimum-pay rule"); Q6 text uses the rule's name and `pay_event` net of 2024, never "5%"
+- [ ] D29: company `wav` rows and Q11 come from `wav_service` (completed WAV-requested trips, share of trips in a WAV); `compare` key `wav_share`; say unfulfilled requests aren't in TLC's records
 
 ## Tests
 
