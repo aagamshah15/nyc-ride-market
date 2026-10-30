@@ -27,9 +27,11 @@
 -- shared_match        BIGINT    valid rows with shared_request AND shared_match; ride-hail only (D24)
 -- wav_req             BIGINT    valid rows with wav_request; ride-hail only
 -- wav_match           BIGINT    valid rows with wav_request AND wav_match; ride-hail only (D24)
+-- wav_trips           BIGINT    valid rows with wav_match, requested or not; ride-hail only (D29)
 --
 -- A match counts only on a trip that asked for it (D24): TLC sets wav_match_flag on any trip that
 -- ran in an accessible vehicle, requested or not, so the raw flag alone overstates matches.
+-- wav_trips keeps that raw flag: the trips that ran in an accessible vehicle (D29, wav_service).
 --
 -- Ride-hail is uber, lyft and other_hv. "Ride-hail only" columns are NULL for cabs and "cabs only"
 -- columns NULL for ride-hail; otherwise a sum over no qualifying rows is 0. Money and miles are
@@ -73,7 +75,8 @@ g AS (
         count(*) FILTER (WHERE is_valid AND shared_request)        AS shared_req,
         count(*) FILTER (WHERE is_valid AND shared_request AND shared_match) AS shared_match,
         count(*) FILTER (WHERE is_valid AND wav_request)           AS wav_req,
-        count(*) FILTER (WHERE is_valid AND wav_request AND wav_match) AS wav_match
+        count(*) FILTER (WHERE is_valid AND wav_request AND wav_match) AS wav_match,
+        count(*) FILTER (WHERE is_valid AND wav_match)             AS wav_trips
     FROM t
     GROUP BY month, mode, hv, pu_zone, hour_of_week
 )
@@ -99,5 +102,6 @@ SELECT
     (CASE WHEN hv THEN shared_req END)::BIGINT                     AS shared_req,
     (CASE WHEN hv THEN shared_match END)::BIGINT                   AS shared_match,
     (CASE WHEN hv THEN wav_req END)::BIGINT                        AS wav_req,
-    (CASE WHEN hv THEN wav_match END)::BIGINT                      AS wav_match
+    (CASE WHEN hv THEN wav_match END)::BIGINT                      AS wav_match,
+    (CASE WHEN hv THEN wav_trips END)::BIGINT                      AS wav_trips
 FROM g;

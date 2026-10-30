@@ -59,6 +59,7 @@ AGG_SCHEMAS = {
         ("card_trips", I64), ("card_tips", F64), ("card_fare_base", F64),
         ("wait_s_sum", I64), ("wait_n", I64), ("cbd_fee", F64),
         ("shared_req", I64), ("shared_match", I64), ("wav_req", I64), ("wav_match", I64),
+        ("wav_trips", I64),                                       # D29
     ]),
     "agg_zone_month_dist": pa.schema([   # pu_zone = 0: city-wide, incl. ride_hail / all (D10, D16)
         ("month", D), ("mode", S), ("pu_zone", I16), ("n", I64),
@@ -207,6 +208,7 @@ def _agg_defaults(name: str, mode: str) -> dict:
             "cbd_fee": 147.0 if hv else 73.5,
             "shared_req": 2 if hv else None, "shared_match": 1 if hv else None,
             "wav_req": 1 if hv else None, "wav_match": 1 if hv else None,
+            "wav_trips": 9 if hv else None,
         }
     if name == "agg_zone_month_dist":
         return {"month": month, "mode": mode, "pu_zone": 161, "n": 3_000,

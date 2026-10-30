@@ -164,10 +164,10 @@ SPEC_CLEAN_COLUMNS = {   # SPEC §4, §4.1, §4.2 (+ D9 wide-list flags, D25 ven
     "vendor_id",                                               # D25
 }
 
-SPEC_AGG_COLUMNS = {     # SPEC §5 (+ D7–D10, D15, D25)
+SPEC_AGG_COLUMNS = {     # SPEC §5 (+ D7–D10, D15, D25, D29)
     "agg_zone_hour": "month mode pu_zone hour_of_week trips_all trips_valid miles duration_s fare_base "
                      "rider_total_ex_tip driver_pay tips card_trips card_tips card_fare_base wait_s_sum "
-                     "wait_n cbd_fee shared_req shared_match wav_req wav_match",
+                     "wait_n cbd_fee shared_req shared_match wav_req wav_match wav_trips",
     "agg_zone_month_dist": "month mode pu_zone n fpm_p10 fpm_p50 fpm_p90 fpmin_p50 wait_p50 wait_p90",
     "agg_od_month": "month mode pu_zone do_zone trips_valid miles duration_s fare_base driver_pay "
                     "rider_total_ex_tip",

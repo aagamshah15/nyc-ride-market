@@ -80,13 +80,14 @@ def test_zone_hour_sums():
     assert uber["wait_n"] == 2
     assert uber["cbd_fee"] == pytest.approx(4.5)                 # 3 × 1.50
     assert (uber["shared_req"], uber["shared_match"], uber["wav_req"], uber["wav_match"]) == (1, 1, 1, 0)
+    assert uber["wav_trips"] == 0                                # no trip ran in an accessible vehicle
     assert (uber["card_trips"], uber["card_tips"], uber["card_fare_base"]) == (None, None, None)
 
     # E is alone in zone 264 with no valid row: counted in trips_all, every sum 0
     unknown = one("agg_zone_hour", mode="uber", pu_zone=264)
     assert (unknown["trips_all"], unknown["trips_valid"]) == (1, 0)
     assert (unknown["miles"], unknown["fare_base"], unknown["driver_pay"]) == (0.0, 0.0, 0.0)
-    assert (unknown["wait_s_sum"], unknown["wait_n"], unknown["shared_req"]) == (0, 0, 0)
+    assert (unknown["wait_s_sum"], unknown["wait_n"], unknown["shared_req"], unknown["wav_trips"]) == (0, 0, 0, 0)
 
     yellow = one("agg_zone_hour", mode="yellow")
     # F and G valid, H invalid
@@ -100,7 +101,8 @@ def test_zone_hour_sums():
     assert yellow["card_tips"] == pytest.approx(3.0)
     assert yellow["card_fare_base"] == pytest.approx(18.5)
     assert yellow["cbd_fee"] == pytest.approx(1.5)               # 2 × 0.75
-    for column in ("driver_pay", "wait_s_sum", "wait_n", "shared_req", "shared_match", "wav_req", "wav_match"):
+    for column in ("driver_pay", "wait_s_sum", "wait_n", "shared_req", "shared_match", "wav_req", "wav_match",
+                   "wav_trips"):
         assert yellow[column] is None, column
 
     # every row of the month is in exactly one group (tie-out)
@@ -121,6 +123,8 @@ def test_matches_count_only_requested_trips():
     # WAV: requests A B; match A only. C ran in an accessible vehicle unasked, so it isn't a match
     # (D24); the raw flag would give 2 matches (A, C). G is invalid.
     assert (row["wav_req"], row["wav_match"]) == (2, 1)
+    # trips in an accessible vehicle, asked or not (D29): A and C; not B (no WAV), not invalid G
+    assert row["wav_trips"] == 2
     # shared: requests E F; match E only (the raw flag would give D, E)
     assert (row["shared_req"], row["shared_match"]) == (2, 1)
 

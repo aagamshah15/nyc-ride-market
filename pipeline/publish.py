@@ -26,7 +26,7 @@ from pathlib import Path
 
 import yaml
 
-from pipeline import common, findings, metrics, validate, zones
+from pipeline import common, findings, metrics, studies, validate, zones
 
 CONTRACTS_SITE = common.REPO_ROOT / "contracts" / "site"
 PAGES_PATH = CONTRACTS_SITE / "pages.yaml"
@@ -50,9 +50,16 @@ VOLATILITY_MIN_TRIPS = 5_000
 TILE_DIGITS = {"count": 1, "share": 4, "usd": 2, "usd_per_mile": 3, "usd_per_minute": 3,   # contracts §2
                "usd_per_hour": 2, "seconds": 0, "trips_per_hour": 3, "ratio": 3, "effect": 4}
 NYC_BOROUGHS = ("Bronx", "Brooklyn", "Manhattan", "Queens", "Staten Island")   # for sentences naming one
+# Pickup-share sentences leave these airports out. TLC ride-hail doesn't pick up at Newark, so its few
+# pickup records (122 in Aug 2026, nearly all yellow cabs) say nothing about who wins there. Drop-offs,
+# the data rows and the tiles keep them.
+NO_PICKUP_SHARES = ("EWR",)
+OUTSIDE_NYC = 265                        # "Outside of NYC": every out-of-city place in one zone (D26)
 TLC_CLASSES = {"FHV - High Volume": "ride_hail", "Yellow": "yellow", "Green": "green"}
-EVENT_LABELS = {"congestion_pricing_start": "Congestion pricing starts",
-                "driver_pay_rise": "Driver minimum pay rises 5%"}
+EVENT_LABELS = {"congestion_pricing_start": "Congestion pricing starts",            # D28; listed by date
+                "driver_pay_inflation_step": "Per-minute minimum pay +3.9% (inflation)",
+                "driver_pay_rise": "New driver minimum-pay rule"}
+PAY_RULE_MEASURES = ("pay_per_min", "pay_per_mile", "fare_per_mile")   # pay_event columns
 DOWNLOADS = {"share_monthly.json": "Monthly trips per day and share by mode",
              "zones/index.json": "Zone summary, one row per taxi zone",
              "congestion.json": "Congestion-pricing estimates, weekly series and fees",
@@ -284,8 +291,9 @@ class Site:
     # --- files ---------------------------------------------------------------
 
     def events(self) -> dict:
-        return {**self.env(), "events": [{"id": key, "date": str(self.periods[key]), "label": label}
-                                         for key, label in EVENT_LABELS.items()]}
+        keys = sorted(EVENT_LABELS, key=lambda key: str(self.periods[key]))
+        return {**self.env(), "events": [{"id": key, "date": str(self.periods[key]), "label": EVENT_LABELS[key]}
+                                         for key in keys]}
 
     def tiles(self) -> dict:
         return {**self.env(), "tiles": self.tile_registry}
@@ -325,7 +333,7 @@ class Site:
         fpm = {(r["month"], r["mode"]): r for r in self.out.rows("fare_dist") if r["pu_zone"] == 0}
         ds = {(r["month"], r["mode"]): r for r in self.out.rows("driver_share")}
         tips = {(r["month"], r["mode"]): r for r in self.out.rows("tip_rate") if r["pu_borough"] == "all"}
-        wav = [r for r in self.out.rows("wav_match_rate") if r["mode"] in APPS]
+        wav = [r for r in self.out.rows("wav_service") if r["mode"] in APPS]
         shared = [r for r in self.out.rows("shared_match_rate") if r["pu_zone"] == 0 and r["mode"] in APPS]
         waits = {(r["month"], r["mode"]): r for r in self.out.rows("wait_time") if r["pu_zone"] == 0}
         rates = {(r["month"], r["mode"]): r for r in self.out.rows("fare_rates")}
@@ -352,7 +360,7 @@ class Site:
             "driver_share": ("share", lambda c: _r(ds.get((m, c), {}).get("driver_share"), 4)),
             "tip_rate": ("share", lambda c: _r(tips.get((m, c), {}).get("tip_rate"), 4)),
             "wait_p50": ("seconds", lambda c: _r(waits.get((m, c), {}).get("wait_p50"), 0)),
-            "wav_match_rate": ("share", lambda c: _r(wav_now.get(c, {}).get("match_rate"), 4)),
+            "wav_share": ("share", lambda c: _r(wav_now.get(c, {}).get("wav_share"), 4)),
             "shared_match_rate": ("share", lambda c: _r(shared_now.get(c, {}).get("match_rate"), 4)),
         }
         compare = [{"metric": metric, "unit": unit, **per_company(value)}
@@ -379,8 +387,9 @@ class Site:
                                                   p90=dist_now.get("fpm_p90"), month=m, prior=p),
             "tip_rate": findings.company_tip_rate(mode=mode, tip_rate=tiles["tip_rate"], change=yoy["tip_rate"],
                                                   card_only=cab, month=m),
-            "wav": findings.company_wav(mode=mode, rates={a: wav_now.get(a, {}).get("match_rate") for a in APPS},
-                                        month=m),
+            "wav": findings.company_wav(
+                mode=mode, service={a: (wav_now.get(a, {}).get("wav_requests"), wav_now.get(a, {}).get("wav_share"))
+                                    for a in APPS}, month=m),
             "shared": findings.company_shared(mode=mode,
                                               requests={a: shared_now.get(a, {}).get("requests") for a in APPS},
                                               matched_share=shared_now.get(mode, {}).get("match_rate"), month=m),
@@ -405,7 +414,8 @@ class Site:
                           "card_only": r["card_only"]}
                          for (_, md), r in sorted(tips.items(), key=lambda kv: (kv[0][0], _mode_rank(kv[0][1])))
                          if md in COMPANIES],
-            "wav": [self._match_row(r) for r in wav],
+            "wav": [{"month": r["month"], "mode": r["mode"], "trips": r["trips"], "wav_requests": r["wav_requests"],
+                     "wav_trips": r["wav_trips"], "wav_share": _r(r["wav_share"], 4)} for r in wav],
             "shared": [self._match_row(r) for r in shared],
             "compare": compare,
             "lyft_vs_uber": lyft_vs_uber,
@@ -481,12 +491,17 @@ class Site:
                        for r in sorted(profile[z], key=lambda r: (_mode_rank(r["mode"]), r["hour_of_week"]))
                        if (r["mode_share_in_zone"] or 0) >= HEATMAP_MIN_SHARE]
             dests = destinations[z]
+            # name a mapped zone; "Outside of NYC" gets its own clause when it would have ranked first
+            mapped = [d for d in dests if d["do_zone"] in ZONE_IDS]
+            top = mapped[0] if mapped else None
+            out = next((d for d in dests if d["do_zone"] == OUTSIDE_NYC), None)
+            left_city = out["share"] if out and (top is None or dests.index(out) < dests.index(top)) else None
             wait, wait_prior = info["wait"], info["wait_prior"]
             tiles, yoy = self._tiles(
                 {"trips_per_day": info["trips_per_day"], "rh_share": info["rh_share"],
                  "wait_p50": None if thin else wait.get("wait_p50"),
                  "wait_p90": None if thin else wait.get("wait_p90"),
-                 "top_destination": dests[0]["name"] if dests else None},
+                 "top_destination": top["name"] if top else None},
                 {"trips_per_day": info["prior_trips_per_day"], "wait_p50": wait_prior.get("wait_p50"),
                  "wait_p90": wait_prior.get("wait_p90")})
             yoy["rh_share"] = _r(info["rh_change"], 4)     # zone_share_change's own change
@@ -503,8 +518,8 @@ class Site:
                                                                window=window, month=m),
                     "waits": findings.zone_waits(mode=info["app"], wait_p50=tiles["wait_p50"], thin=thin, month=m),
                     "top_destinations": findings.zone_top_destinations(
-                        name=dests[0]["name"] if dests else None, dest_share=dests[0]["share"] if dests else None,
-                        month=m)},
+                        name=top["name"] if top else None, dest_share=top["share"] if top else None,
+                        left_city_share=left_city, month=m)},
                 "tiles": tiles, "yoy": yoy,
                 "share_trend": share_trend[z],
                 "hour_heatmap": heatmap,
@@ -523,23 +538,29 @@ class Site:
         latest = sorted((r for r in share_rows if r["month"] == m), key=key)
         airports = sorted({r["airport"] for r in latest}, key=_airport_rank)
 
-        def totals(month: str) -> tuple[dict, int]:
+        def totals(month: str, rows: list[dict]) -> tuple[dict, int]:
             by_mode: dict[str, int] = defaultdict(int)
-            for r in share_rows:
+            for r in rows:
                 if r["month"] == month:
                     by_mode[r["mode"]] += r["trips"]
             return by_mode, sum(by_mode.values())
+
+        def yellow_share(month: str, rows: list[dict]) -> float | None:
+            by_mode, total = totals(month, rows)
+            return by_mode["yellow"] / total if total else None
 
         def fare_mean(month: str) -> float | None:
             rows = self.out.rows("airport_fares", to_month=month)
             trips = sum(r["trips"] for r in rows if r["fare_mean"] is not None)
             return sum(r["fare_mean"] * r["trips"] for r in rows if r["fare_mean"] is not None) / trips if trips else None
 
-        by_mode_now, total_now = totals(m)
-        by_mode_prior, total_prior = totals(p)
-        yellow_now = by_mode_now["yellow"] / total_now if total_now else None
-        yellow_prior = by_mode_prior["yellow"] / total_prior if total_prior else None
+        # sentences count trips to every airport and pickups everywhere but NO_PICKUP_SHARES
+        counted = [r for r in share_rows if not (r["direction"] == "from" and r["airport"] in NO_PICKUP_SHARES)]
+        by_mode_now, total_now = totals(m, counted)
         top = _argmax(dict(by_mode_now))
+        both_ways = sorted({r["airport"] for r in counted if r["month"] == m and r["direction"] == "from"},
+                           key=_airport_rank)
+        dropoff_only = [a for a in airports if a not in both_ways]
 
         by_hour = self.out.rows("airport_by_hour")
         window = self.out.params("airport_by_hour").get("window")
@@ -553,9 +574,9 @@ class Site:
             return sum(rows) if rows else None
 
         tiles, yoy = self._tiles(
-            {"trips_per_day": trips_per_day(m), "yellow_share": yellow_now,
+            {"trips_per_day": trips_per_day(m), "yellow_share": yellow_share(m, share_rows),
              "fare_to_manhattan_mean": fare_mean(m), "busiest_hour": busiest},
-            {"trips_per_day": trips_per_day(p), "yellow_share": yellow_prior,
+            {"trips_per_day": trips_per_day(p), "yellow_share": yellow_share(p, share_rows),
              "fare_to_manhattan_mean": fare_mean(p) if self.has_prior else None})
 
         trend: dict[tuple, dict[str, int]] = defaultdict(lambda: defaultdict(int))
@@ -568,7 +589,7 @@ class Site:
                             for md, n in sorted(counts.items(), key=lambda kv: _mode_rank(kv[0]))]
 
         leaders = []
-        for airport in airports:
+        for airport in both_ways:
             pickups = {r["mode"]: r["share"] for r in latest if r["airport"] == airport and r["direction"] == "from"}
             if (leader := _argmax(pickups)) is not None:
                 leaders.append((airport, leader, pickups[leader]))
@@ -589,16 +610,16 @@ class Site:
         dearest = max(focus_rows, key=lambda r: r["fare_mean"]) if focus_rows else None
 
         self.airport_facts = {"top": top, "top_share": by_mode_now[top] / total_now if top else None,
-                              "airports": airports, "fare_mean": tiles["fare_to_manhattan_mean"],
-                              "busiest_hour": busiest}
+                              "airports": both_ways, "dropoff_only": dropoff_only,
+                              "fare_mean": tiles["fare_to_manhattan_mean"], "busiest_hour": busiest}
         return {
             **self.env(),
             "title": findings.airports_title(mode=top, top_share=self.airport_facts["top_share"],
-                                             airports=airports, month=m),
+                                             airports=both_ways, dropoff_only=dropoff_only, month=m),
             "subtitles": {
                 "split": findings.airports_split(leaders=leaders, month=m),
-                "share_trend": findings.airports_share_trend(yellow_change=_pts(yellow_now, yellow_prior),
-                                                             month=m, prior=p),
+                "share_trend": findings.airports_share_trend(
+                    yellow_change=_pts(yellow_share(m, counted), yellow_share(p, counted)), month=m, prior=p),
                 "by_hour": findings.airports_by_hour(hour=busiest, trips_per_day=hourly.get(busiest),
                                                      window=window, month=m),
                 "fares": findings.airports_fares(
@@ -631,8 +652,8 @@ class Site:
             by_mode[r["mode"]] += r["cbd_fee"] or 0.0
         top_fee_mode = _argmax(dict(by_mode))
 
-        company_effects = {c: effect.get(("trips", c, "core"), {}).get("median") for c in COMPANIES}
-        lowest, highest = _argmin(company_effects), _argmax(company_effects)
+        mode_effects = {md: effect.get(("trips", md, "core"), {}).get("median") for md in ("ride_hail", "yellow", "green")}
+        green_share = self.mode_share(self.month, "green")
 
         trips = [r for r in self.out.rows("cp_weekly_trips") if r["zone_list"] == "core"]
         years = sorted({r["iso_year"] for r in trips})
@@ -658,16 +679,14 @@ class Site:
 
         tiles, yoy = self._tiles({"trips_effect": trips_all.get("median"), "fpm_effect": fpm_rh.get("median"),
                                   "fees_to_date": total_fees if fees else None}, {})
-        self.congestion_facts = {"trips_all": trips_all, "company_effects": company_effects,
+        self.congestion_facts = {"trips_all": trips_all, "mode_effects": mode_effects, "green_share": green_share,
                                  "fpm_rh": fpm_rh.get("median"),
                                  "ds_rh": effect.get(("driver_share", "ride_hail", "core"), {}).get("median")}
         return {
             **self.env(),
             "title": findings.congestion_title(trips_effect=tiles["trips_effect"]),
             "subtitles": {
-                "effects": findings.congestion_effects(
-                    lowest=(lowest, company_effects[lowest]) if lowest else None,
-                    highest=(highest, company_effects[highest]) if highest else None),
+                "effects": findings.congestion_effects(by_mode=mode_effects, green_share=green_share),
                 "weekly_effect": findings.congestion_weekly_effect(p10=trips_all.get("p10"), p90=trips_all.get("p90")),
                 "weekly_trips": findings.congestion_weekly_trips(
                     treated_change=growth.get("treated"), control_change=growth.get("control"),
@@ -718,13 +737,7 @@ class Site:
         tiles, yoy = self._tiles(tiles_for(m, tlc_now), tiles_for(p, tlc_prior))
 
         event = self.out.rows("pay_event")
-        rh_event = {(r["year"], r["week_offset"]): r for r in event if r["mode"] == "ride_hail"}
-        years = sorted({y for y, _ in rh_event})
-
-        def week(year, offset):
-            r = rh_event.get((year, offset))
-            return (r["week_start"], r["pay_per_min"]) if r else None
-
+        rule = self.pay_rule()
         tph_by_class = {TLC_CLASSES[r["license_class"]]: r["trips_per_hour_worked"]
                         for r in hours if r["month"] == tlc_month}
         self.driver_facts = {"tlc_month": tlc_month, "tlc_now": tlc_now}
@@ -739,9 +752,8 @@ class Site:
                 "pay_per_hour_trend": findings.drivers_pay_per_hour(pay_per_hour=tiles["pay_per_hour"],
                                                                     change=yoy["pay_per_hour"], month=m),
                 "event_study": findings.drivers_event_study(
-                    before=week(years[-1], -1) if years else None, after=week(years[-1], 1) if years else None,
-                    reference_before=week(years[0], -1) if len(years) > 1 else None,
-                    reference_after=week(years[0], 1) if len(years) > 1 else None),
+                    pay_per_min=rule["net"].get("pay_per_min"), pay_per_mile=rule["net"].get("pay_per_mile"),
+                    weeks=rule["weeks"], base_year=rule["base_year"]),
                 "hours": findings.drivers_hours(tph={k: tph_by_class.get(k) for k in TLC_CLASSES.values()},
                                                 tlc_month=tlc_month) if tlc_month else None},
             "tiles": tiles, "yoy": yoy,
@@ -839,6 +851,23 @@ class Site:
             "downloads": [{"file": f, "description": d, "bytes": sizes[f]} for f, d in DOWNLOADS.items()],
         }
 
+    def pay_rule(self) -> dict:
+        """Ride-hail changes across the new minimum-pay rule (D28): the median week after against the
+        median week before, net of the same weeks of the reference year, as L10's report computes
+        them (``studies.before_after``; the transition week left out, D12)."""
+        event = self.out.rows("pay_event")
+        years = sorted({r["year"] for r in event})
+        net = {}
+        if len(years) >= 2:
+            base, year = years[0], years[-1]
+            for measure in PAY_RULE_MEASURES:
+                before, after = studies.before_after(event, "ride_hail", measure, year)
+                ref_before, ref_after = studies.before_after(event, "ride_hail", measure, base)
+                change, ref_change = _rel(after, before), _rel(ref_after, ref_before)
+                net[measure] = None if change is None or ref_change is None else (1 + change) / (1 + ref_change) - 1
+        return {"net": net, "weeks": max((r["week_offset"] for r in event), default=None),
+                "base_year": years[0] if len(years) >= 2 else None}
+
     # --- Q1–Q15 ----------------------------------------------------------------
 
     def findings(self) -> list[dict | None]:
@@ -847,16 +876,13 @@ class Site:
         counts = self.zone_counts()
         rh_share, rh_prior = self.mode_share(m, "ride_hail"), self.mode_share(p, "ride_hail")
         ds = {(r["month"], r["mode"]): r["driver_share"] for r in self.out.rows("driver_share")}
-        rise = str(self.periods["driver_pay_rise"])[:7] + "-01"
-        before = _shift(rise, -1)
-        pph = {(r["month"], r["mode"]): r["pay_per_hour"] for r in self.out.rows("pay_per_hour")}
-        fpm = {(r["month"], r["mode"]): r["fare_per_mile"] for r in self.out.rows("fare_rates")}
+        rule = self.pay_rule()
         dist = {(r["month"], r["mode"]): r["fpm_p50"] for r in self.out.rows("fare_dist") if r["pu_zone"] == 0}
         waits = {(r["mode"]): r["wait_p50"] for r in self.out.rows("wait_time") if r["month"] == m and r["pu_zone"] == 0}
         zone_waits = [r for r in self.out.rows("wait_time")
                       if r["month"] == m and r["pu_zone"] in ZONE_IDS and r["wait_p50"] is not None]
         longest = max(zone_waits, key=lambda r: r["wait_p50"], default=None)
-        wav = {r["mode"]: r["match_rate"] for r in self.out.rows("wav_match_rate") if r["month"] == m}
+        wav = {r["mode"]: r for r in self.out.rows("wav_service") if r["month"] == m}
         shared = [r for r in self.out.rows("shared_match_rate") if r["mode"] in APPS]
         city = [r for r in shared if r["pu_zone"] == 0]
         requests_now = sum(r["requests"] or 0 for r in city if r["month"] == m)
@@ -885,25 +911,27 @@ class Site:
             findings.q1(rh_share=rh_share, change=_pts(rh_share, rh_prior), zones_up=counts["rh_up"],
                         zones_total=counts["rh_compared"], month=m),
             findings.q2(all_modes=(trips_all.get("median"), trips_all.get("p10"), trips_all.get("p90")),
-                        by_company=cp["company_effects"]),
+                        by_mode=cp["mode_effects"], green_share=cp["green_share"]),
             findings.q3(fpm_effect=cp["fpm_rh"], driver_share_effect=cp["ds_rh"]),
             findings.q4(zones_now=counts["lyft_ahead"], zones_prior=counts["lyft_ahead_prior"], month=m),
             findings.q5(driver_share=ds.get((m, "ride_hail")),
                         change=_pts(ds.get((m, "ride_hail")), ds.get((p, "ride_hail"))),
                         by_company={a: ds.get((m, a)) for a in APPS}, month=m),
-            findings.q6(pay_after=pph.get((rise, "ride_hail")), pay_before=pph.get((before, "ride_hail")),
-                        fpm_change=_rel(fpm.get((rise, "ride_hail")), fpm.get((before, "ride_hail"))),
-                        rise_month=rise, before_month=before),
+            findings.q6(pay_per_min=rule["net"].get("pay_per_min"), pay_per_mile=rule["net"].get("pay_per_mile"),
+                        fare_per_mile=rule["net"].get("fare_per_mile"), weeks=rule["weeks"],
+                        base_year=rule["base_year"], rule_month=str(self.periods["driver_pay_rise"])),
             findings.q7(fpm_median=dist.get((m, "all")), zone_name=self.zone_name(widest["pu_zone"]) if widest else None,
                         mode=widest["mode"] if widest else None, volatility=widest["volatility"] if widest else None,
                         month=m),
             findings.q8(waits={a: waits.get(a) for a in APPS},
                         longest=(self.zone_name(longest["pu_zone"]), longest["mode"], longest["wait_p50"])
                         if longest else None, month=m),
-            findings.q9(mode=ap["top"], top_share=ap["top_share"], airports=ap["airports"], fare_mean=ap["fare_mean"],
+            findings.q9(mode=ap["top"], top_share=ap["top_share"], airports=ap["airports"],
+                        dropoff_only=ap["dropoff_only"], fare_mean=ap["fare_mean"],
                         busiest_hour=ap["busiest_hour"], month=m),
             findings.q10(zones_now=counts["yellow_leads"], zones_prior=counts["yellow_leads_prior"], month=m),
-            findings.q11(rates={a: wav.get(a) for a in APPS}, month=m),
+            findings.q11(service={a: (wav.get(a, {}).get("wav_requests"), wav.get(a, {}).get("wav_share"))
+                                  for a in APPS}, month=m),
             findings.q12(requests=requests_now if city else None, change=_rel(requests_now, requests_prior),
                          matched_share=matched_now / requests_now if requests_now else None,
                          top_zone=self.zone_name(top_shared) if top_shared else None, month=m),

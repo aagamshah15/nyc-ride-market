@@ -109,15 +109,35 @@ def test_q4_lyft_against_uber():
         "value": 23, "unit": "count", "page": "/companies/lyft", "featured": False}
 
 
-def test_q2_congestion_effect():
-    # all modes: median −0.06, p10 −0.0826, p90 −0.0402; the largest company effect by size is
-    # yellow's −0.071 (Uber −0.0584, Lyft −0.03, green +0.01).
+def test_q2_congestion_effect_by_mode():
+    # all modes: median −0.06, p10 −0.0826, p90 −0.0402; by mode ride-hail −0.0813 and yellow −0.0777;
+    # green, 0.17% of NYC trips, comes apart with its share.
     result = findings.q2(all_modes=(-0.06, -0.0826, -0.0402),
-                         by_company={"uber": -0.0584, "lyft": -0.03, "yellow": -0.071, "green": 0.01})
+                         by_mode={"ride_hail": -0.0813, "yellow": -0.0777, "green": 0.0411}, green_share=0.0017)
     assert result["text"] == ("Congestion pricing had an estimated effect of −6.0% on trips touching the zone "
-                              "(weekly range −8.3% to −4.0%); among companies it was largest for yellow cabs, "
-                              "at −7.1%")
+                              "(weekly range −8.3% to −4.0%); by mode, ride-hail apps −8.1% and yellow cabs −7.8%, "
+                              "while green cabs, 0.2% of NYC trips, came out at +4.1%")
     assert (result["value"], result["unit"], result["featured"]) == (-0.06, "effect", True)
+    assert findings.congestion_effects(by_mode={"ride_hail": -0.0813, "yellow": -0.0777, "green": 0.0411},
+                                       green_share=0.0017) == (
+        "By mode, the estimated effect on trips touching the zone was −8.1% for ride-hail apps and −7.8% for "
+        "yellow cabs; green cabs, 0.2% of NYC trips, came out at +4.1%")
+
+
+def test_destination_sentences():
+    assert findings.zone_top_destinations(name="Park Slope", dest_share=0.041, left_city_share=0.071,
+                                          month=AUG26) == (
+        "Park Slope was the top destination from here in Aug 2026, with 4.1% of trips; 7.1% of trips left the city")
+    assert findings.zone_top_destinations(name=None, dest_share=None, left_city_share=0.25, month=AUG26) == \
+        "No destination in the city had enough trips from here in Aug 2026 to list; 25% of trips left the city"
+    assert findings.zone_top_destinations(name=None, dest_share=None, left_city_share=None, month=AUG26) == \
+        "No destination had enough trips from here in Aug 2026 to list"
+
+
+def test_airports_named_by_direction():
+    assert findings.airports_title(mode="uber", top_share=0.63, airports=["JFK", "LGA"], dropoff_only=["EWR"],
+                                   month=AUG26) == \
+        "Uber carried 63% of trips to and from JFK and LaGuardia and to Newark in Aug 2026"
 
 
 def test_q14_fee_money():
@@ -129,13 +149,34 @@ def test_q14_fee_money():
     assert result["value"] == 10_627_132.13
 
 
-def test_q6_pay_rise():
-    # $44.73 against $42.60 is +5.0%; fare per mile unchanged reads "held steady".
-    result = findings.q6(pay_after=44.73, pay_before=42.60, fpm_change=0.0, rise_month="2025-08-01",
-                         before_month="2025-07-01")
-    assert result["text"] == ("Ride-hail drivers earned $44.73 per hour with a passenger in Aug 2025, the month "
-                              "the minimum-pay rise began, +5.0% on Jul 2025; fare per mile held steady over "
-                              "the same months")
+def test_q6_new_pay_rule():
+    # Net of the same weeks of 2024: pay per minute −0.9%, pay per mile −1.2%, base fare per mile −2.2%.
+    result = findings.q6(pay_per_min=-0.0091, pay_per_mile=-0.0121, fare_per_mile=-0.0218, weeks=12,
+                         base_year=2024, rule_month="2025-08-01")
+    assert result["text"] == ("Over the 12 weeks after the new minimum-pay rule of Aug 2025, which lowered the "
+                              "per-mile floor and raised the per-minute floor, ride-hail driver pay per minute with "
+                              "a passenger fell 0.9% and pay per mile fell 1.2% against the 12 weeks before, net of "
+                              "the same weeks of 2024; base fare per mile fell 2.2%")
+    assert (result["value"], result["unit"]) == (-0.0091, "effect")
+    assert findings.drivers_event_study(pay_per_min=-0.0091, pay_per_mile=-0.0121, weeks=12, base_year=2024) == (
+        "Net of the same weeks of 2024, ride-hail driver pay per minute with a passenger fell 0.9% and pay per mile "
+        "fell 1.2% in the 12 weeks after the new minimum-pay rule, against the 12 weeks before")
+
+
+def test_q11_accessible_service():
+    # D29: completed WAV-requested trips and the share of trips in a WAV; no match rate.
+    service = {"uber": (39_879, 0.0937), "lyft": (16_612, 0.0851)}
+    result = findings.q11(service=service, month=AUG26)
+    assert result["text"] == ("Uber completed 39,900 trips that requested a wheelchair-accessible vehicle in Aug 2026 "
+                              "and Lyft 16,600, and 9.4% of Uber's trips and 8.5% of Lyft's trips ran in one; "
+                              "requests that went unfilled aren't in TLC's records")
+    assert (result["value"], result["unit"]) == (39_879, "count")
+    assert findings.company_wav(mode="uber", service=service, month=AUG26) == (
+        "Uber completed 39,900 trips that requested a wheelchair-accessible vehicle in Aug 2026, and 9.4% of all its "
+        "trips ran in one; requests that went unfilled aren't in TLC's records")
+    assert findings.company_wav(mode="yellow", service=service, month=AUG26) == (
+        "Wheelchair-accessible service isn't reported for yellow cabs; in Aug 2026, 9.4% of Uber trips and 8.5% of "
+        "Lyft trips ran in a wheelchair-accessible vehicle; requests that went unfilled aren't in TLC's records")
 
 
 def test_thin_and_empty_zone_titles():
@@ -164,7 +205,7 @@ def test_pay_per_hour_is_with_a_passenger():
 
 def test_congestion_results_are_estimated_effects():
     sentences = [findings.congestion_title(trips_effect=-0.06),
-                 findings.congestion_effects(lowest=("uber", -0.09), highest=("green", 0.01)),
+                 findings.congestion_effects(by_mode={"ride_hail": -0.08, "yellow": -0.07}, green_share=None),
                  findings.congestion_weekly_effect(p10=-0.08, p90=-0.04),
                  findings.q3(fpm_effect=0.025, driver_share_effect=-0.004)["text"]]
     for text in sentences:

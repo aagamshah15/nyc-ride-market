@@ -14,7 +14,7 @@ import pyarrow.parquet as pq
 import pytest
 
 from pipeline import aggregate, common
-from tests.factories import agg_table, clean_trips, write_agg, write_clean
+from tests.factories import AGG_SCHEMAS, agg_table, clean_trips, write_agg, write_clean
 
 MAR, APR = date(2025, 3, 1), date(2025, 4, 1)
 
@@ -142,14 +142,29 @@ def test_clean_rows_for_another_month_stop_the_run():
     assert not common.agg_dir().exists()
 
 
-def test_changed_table_layout_stops_the_run():
-    stale = agg_table("agg_zone_hour").drop_columns(["wav_match"])   # an older layout
-    path = write_agg("agg_zone_hour", stale)
+def test_older_layout_is_set_aside_and_the_table_restarts(capsys):
+    # agg_zone_hour as written before D29 (no wav_trips), holding January, February and March
+    old = agg_table("agg_zone_hour", [{"month": date(2025, m, 1)} for m in (1, 2, 3)]).drop_columns(["wav_trips"])
+    path = write_agg("agg_zone_hour", old)
     before = path.read_bytes()
     write_clean(MARCH)
-    with pytest.raises(aggregate.AggregateError, match="agg_zone_hour: .* back-fill"):
-        aggregate.aggregate_month("2025-03")
-    assert path.read_bytes() == before
+    aggregate.aggregate_month("2025-03")
+
+    # the table restarts in the current layout with March alone; the old file is kept, outside data/agg/
+    assert pq.read_schema(path).equals(AGG_SCHEMAS["agg_zone_hour"])
+    assert {r["month"] for r in pq.read_table(path).to_pylist()} == {MAR}
+    assert aggregate.stale_path("agg_zone_hour").read_bytes() == before
+    assert aggregate.stale_path("agg_zone_hour").parent != common.agg_dir()
+    warning = capsys.readouterr().err
+    assert "agg_zone_hour: the file was written without wav_trips" in warning
+    assert "aggregate its other 2 months again (2025-01 to 2025-02)" in warning
+
+    # other tables were new, so nothing else was set aside; the next month merges as usual
+    assert [p.name for p in aggregate.stale_path("x").parent.iterdir()] == ["agg_zone_hour.parquet"]
+    write_clean(APRIL)
+    aggregate.aggregate_month("2025-04")
+    assert {r["month"] for r in pq.read_table(path).to_pylist()} == {MAR, APR}
+    assert "older layout" not in capsys.readouterr().err
 
 
 def test_clean_files_missing_a_column_stop_the_run_before_any_write():
