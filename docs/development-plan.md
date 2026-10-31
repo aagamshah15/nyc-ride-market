@@ -44,12 +44,12 @@ The integrator keeps the Status column current.
 | [L09](lanes/L09-metrics.md) | Metrics library | `sql/metrics/` (all but L10's), `pipeline/metrics.py` | 2 | L01 approved | Q1, Q4–Q15 | built on fixtures, merged 24 Oct; real run at G2 |
 | [L10](lanes/L10-policy-studies.md) | Policy studies | `sql/metrics/cp_*.sql`, `pay_event.sql`, `pipeline/studies.py` | 3 | L09 runner exists | Q2, Q3, Q6 | done: both studies written; D28 wording merged 30 Oct (`7046078`); G4 passed |
 | [L11](lanes/L11-publish.md) | Publish and findings | `pipeline/publish.py`, `pipeline/findings.py`, `site/src/data/` | 3 | L09 runner exists | all | done: D28/D29 and the G4 fixes merged (`c228b61`); real `site/src/data/` committed at G4 |
-| [L12](lanes/L12-pages-home-methods.md) | Pages: Home + Methods | `index.md`, `methods.md` | 4 | L05 done | home | running in the cloud since 27 Oct; reports by draft PR from `lane/L12-…` |
-| [L13](lanes/L13-pages-companies.md) | Pages: Companies | `companies/[company].md` | 4 | L05 done | Q4, Q5, Q11–Q13 | running in the cloud since 27 Oct; reports by draft PR from `lane/L13-…` |
-| [L14](lanes/L14-pages-zones.md) | Pages: Zones | `zones/[zone].md`, `zones/index.md` | 4 | L05 done | Q1, Q8, Q10 | running in the cloud since 27 Oct; reports by draft PR from `lane/L14-…` |
-| [L15](lanes/L15-pages-congestion-drivers.md) | Pages: Congestion + Drivers | `congestion-pricing.md`, `drivers.md` | 4 | L05 done | Q2, Q3, Q5, Q6, Q14, Q15 | running in the cloud since 27 Oct; reports by draft PR from `lane/L15-…` |
-| [L16](lanes/L16-pages-airports-prices.md) | Pages: Airports + Prices | `airports.md`, `prices.md` | 4 | L05 done | Q7, Q9 | running in the cloud since 27 Oct; reports by draft PR from `lane/L16-…` |
-| [L17](lanes/L17-refresh-deploy.md) | Refresh and deploy | `.github/workflows/refresh.yml`, release scripts | 4 | L11 writes real data; GitHub repo exists | — | not started |
+| [L12](lanes/L12-pages-home-methods.md) | Pages: Home + Methods | `index.md`, `methods.md` | 4 | L05 done | home | restarted in the cloud 30 Oct on real data; reports by draft PR |
+| [L13](lanes/L13-pages-companies.md) | Pages: Companies | `companies/[company].md` | 4 | L05 done | Q4, Q5, Q11–Q13 | done: merged 30 Oct (`8b21fb7`); four company pages on real data |
+| [L14](lanes/L14-pages-zones.md) | Pages: Zones | `zones/[zone].md`, `zones/index.md` | 4 | L05 done | Q1, Q8, Q10 | done: merged 30 Oct (`66de92b`); zones index + 263 zone pages, build 7 s |
+| [L15](lanes/L15-pages-congestion-drivers.md) | Pages: Congestion + Drivers | `congestion-pricing.md`, `drivers.md` | 4 | L05 done | Q2, Q3, Q5, Q6, Q14, Q15 | restarted in the cloud 30 Oct on real data; reports by draft PR |
+| [L16](lanes/L16-pages-airports-prices.md) | Pages: Airports + Prices | `airports.md`, `prices.md` | 4 | L05 done | Q7, Q9 | restarted in the cloud 30 Oct on real data; reports by draft PR |
+| [L17](lanes/L17-refresh-deploy.md) | Refresh and deploy | `.github/workflows/refresh.yml`, release scripts | 4 | L11 writes real data; GitHub repo exists | — | running in the cloud since 30 Oct (build and test only; nothing runs or deploys before G6) |
 | [L18](lanes/L18-launch-review.md) | Launch review | `reports/launch_review.md` | 5 | G5 | all | not started |
 
 ---
@@ -124,6 +124,11 @@ All gate checks run in the integrator space. G1, G3, G4, G5 and G6 are SPEC §11
 
 ### Gate log
 
+- **Pages, 30 Oct 2026.** L13 (companies) and L14 (zones index + 263 zone pages) merged after green test-merges; the site builds 268 routes in 7 s. Shared fixes the lanes reported, made by the integrator:
+  - `/zones/` nav path (`acbf13f`);
+  - event labels wrap to fit at 375 px, `/zones` links get the slash, and the inputs stylesheet loads on every page (`f6d20fa`);
+  - the Q4 zone rows carry `thin` (`01bad4d`).
+  - L12, L15, L16 and L17 restarted as cloud sessions; no branch or PR from them yet.
 - **G4, 30 Oct 2026: passed** (signed off by the user, with fixes). [docs/g4-review.md](g4-review.md) checks Q1–Q15 against the aggregates directly and against L10's reports:
   - 13 findings confirmed as published;
   - Q10 counted junk Newark pickups (zone 1), fixed to 6 zones, down from 9;
