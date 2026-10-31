@@ -44,12 +44,12 @@ The integrator keeps the Status column current.
 | [L09](lanes/L09-metrics.md) | Metrics library | `sql/metrics/` (all but L10's), `pipeline/metrics.py` | 2 | L01 approved | Q1, Q4–Q15 | built on fixtures, merged 24 Oct; real run at G2 |
 | [L10](lanes/L10-policy-studies.md) | Policy studies | `sql/metrics/cp_*.sql`, `pay_event.sql`, `pipeline/studies.py` | 3 | L09 runner exists | Q2, Q3, Q6 | done: both studies written; D28 wording merged 30 Oct (`7046078`); G4 passed |
 | [L11](lanes/L11-publish.md) | Publish and findings | `pipeline/publish.py`, `pipeline/findings.py`, `site/src/data/` | 3 | L09 runner exists | all | done: D28/D29 and the G4 fixes merged (`c228b61`); real `site/src/data/` committed at G4 |
-| [L12](lanes/L12-pages-home-methods.md) | Pages: Home + Methods | `index.md`, `methods.md` | 4 | L05 done | home | restarted in the cloud 30 Oct on real data; reports by draft PR |
+| [L12](lanes/L12-pages-home-methods.md) | Pages: Home + Methods | `index.md`, `methods.md` | 4 | L05 done | home | done: merged 31 Oct (`1f40ab7`); home + methods (all ten methods anchors) |
 | [L13](lanes/L13-pages-companies.md) | Pages: Companies | `companies/[company].md` | 4 | L05 done | Q4, Q5, Q11–Q13 | done: merged 30 Oct (`8b21fb7`); four company pages on real data |
 | [L14](lanes/L14-pages-zones.md) | Pages: Zones | `zones/[zone].md`, `zones/index.md` | 4 | L05 done | Q1, Q8, Q10 | done: merged 30 Oct (`66de92b`); zones index + 263 zone pages, build 7 s |
-| [L15](lanes/L15-pages-congestion-drivers.md) | Pages: Congestion + Drivers | `congestion-pricing.md`, `drivers.md` | 4 | L05 done | Q2, Q3, Q5, Q6, Q14, Q15 | restarted in the cloud 30 Oct on real data; reports by draft PR |
-| [L16](lanes/L16-pages-airports-prices.md) | Pages: Airports + Prices | `airports.md`, `prices.md` | 4 | L05 done | Q7, Q9 | restarted in the cloud 30 Oct on real data; reports by draft PR |
-| [L17](lanes/L17-refresh-deploy.md) | Refresh and deploy | `.github/workflows/refresh.yml`, release scripts | 4 | L11 writes real data; GitHub repo exists | — | running in the cloud since 30 Oct (build and test only; nothing runs or deploys before G6) |
+| [L15](lanes/L15-pages-congestion-drivers.md) | Pages: Congestion + Drivers | `congestion-pricing.md`, `drivers.md` | 4 | L05 done | Q2, Q3, Q5, Q6, Q14, Q15 | done: merged 31 Oct (`cbdccb1`); congestion pricing + drivers; fee chart events added by the integrator (`120bdb1`) |
+| [L16](lanes/L16-pages-airports-prices.md) | Pages: Airports + Prices | `airports.md`, `prices.md` | 4 | L05 done | Q7, Q9 | done: merged 31 Oct (`8e98fe5`); airports + prices |
+| [L17](lanes/L17-refresh-deploy.md) | Refresh and deploy | `.github/workflows/refresh.yml`, release scripts | 4 | L11 writes real data; GitHub repo exists | — | not started: the cloud attempts never pushed, and the local start was blocked by the auto-mode check; held until the pages were merged (user, 31 Oct) |
 | [L18](lanes/L18-launch-review.md) | Launch review | `reports/launch_review.md` | 5 | G5 | all | not started |
 
 ---
@@ -124,6 +124,13 @@ All gate checks run in the integrator space. G1, G3, G4, G5 and G6 are SPEC §11
 
 ### Gate log
 
+- **G5, 31 Oct 2026: passed** (integrator check, SPEC §11 phase 4). L12, L15 and L16 merged (`1f40ab7`, `cbdccb1`, `8e98fe5`) after a green test-merge, joining L13 and L14.
+  - **Every route builds:** home, congestion pricing, 4 company pages, the zones index, 263 zone pages, airports, drivers, prices and methods. That's 275 pages in 16 s, with 274 links validated, and zones 264 and 265 have no pages.
+  - **Data budgets pass:** `tests/test_site_budget.py` (14) runs on the real data, every zone file is under 50 KB, and the largest route is congestion pricing at about 783 KB of 1.5 MB.
+  - **Palette and dark mode:** no colour outside `palette.js` in any page or component; dark tokens are in `palette.js` and `style.css`. Each page lane checked light, dark and 375 px in a browser.
+  - **Integrator fixes along the way:** `pages.yaml` now lists the files `/methods` reads (`4df08c8`), and the fee chart draws the events (`120bdb1`).
+  - **Left for L18 / polish (no rule broken):** charts instead of tables for core-vs-wide effects and fare per minute need two new subtitles from L11 (`effects_wide`, `fpmin_by_mode`).
+  - **Next:** L18 launch review and L17 refresh workflow, then G6 (the deploy waits for the user).
 - **Pages, 30 Oct 2026.** L13 (companies) and L14 (zones index + 263 zone pages) merged after green test-merges; the site builds 268 routes in 7 s. Shared fixes the lanes reported, made by the integrator:
   - `/zones/` nav path (`acbf13f`);
   - event labels wrap to fit at 375 px, `/zones` links get the slash, and the inputs stylesheet loads on every page (`f6d20fa`);
