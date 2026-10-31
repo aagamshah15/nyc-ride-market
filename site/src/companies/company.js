@@ -65,7 +65,6 @@ export function countTiles(rows, field, what) {
 export function gapScatter(rows, {subtitle, asOf, width = 640, dark = palette.isDark()} = {}) {
   if (!subtitle || !asOf) throw new Error("gapScatter: the subtitle and asOf options are required");
   const data = rows.filter((d) => d.gap != null && d.gap_change != null);
-  const flagged = data.some((d) => "thin" in d);
   const counted = (d) => d.thin !== true;
   const leader = (d) => (d.gap > 0 ? "lyft" : "uber");
   const leads = {uber: "Uber has the bigger share", lyft: "Lyft has the bigger share"};
@@ -105,9 +104,9 @@ export function gapScatter(rows, {subtitle, asOf, width = 640, dark = palette.is
     ]
   });
 
-  const note = flagged
-    ? "Hollow dots are zones with too few trips in the month to count."
-    : "The count in the finding leaves out zones with too few trips in the month; the chart draws every zone.";
+  const note = data.some((d) => !counted(d))
+    ? html`<p class="nrm-note" style="margin: 0.5rem 0 0">Hollow dots are zones with too few trips in the month to count.</p>`
+    : null;
   const table = tableView([...data].sort((a, b) => b.gap - a.gap), [
     {key: "name", label: "Zone", format: "text"},
     {key: "lyft_share", label: "Lyft share of pickups", format: "share"},
@@ -120,7 +119,7 @@ export function gapScatter(rows, {subtitle, asOf, width = 640, dark = palette.is
     ${plot.legend("color", LEGEND)}
     ${plot}
     <div class="nrm-axis-label">Lyft's share of the zone's pickups minus Uber's (pts)</div>
-    <p class="nrm-note" style="margin: 0.5rem 0 0">${note}</p>
+    ${note}
     <figcaption>${sourceCaption(asOf)}</figcaption>
   </figure>${table}</div>`;
 }
