@@ -4,12 +4,9 @@ and findings checked against values worked out by hand, on factory aggregates (L
 import importlib.util
 import json
 import re
-from collections import defaultdict
 from datetime import date
 from pathlib import Path
 
-import pyarrow as pa
-import pyarrow.parquet as pq
 import pytest
 import yaml
 from contract_check import assert_matches_contract
@@ -36,13 +33,14 @@ AUG24, JUL25, AUG25, AUG26 = date(2024, 8, 1), date(2025, 7, 1), date(2025, 8, 1
 
 # Pickups (trips_all = trips_valid) by zone and mode, one hour-of-week cell each. Aug 2026 against
 # the same three earlier months (Aug 2024, Jul 2025, Aug 2025). Zone 2 is thin in Aug 2026 (50 < 100)
-# but not a year earlier (100); 264 is the unknown zone and gets no page.
+# but not a year earlier (100); 264 is the unknown zone and gets no page. Zone 1 (Newark Airport) has
+# yellow pickup records that aren't TLC trips: they'd make it a yellow-led zone if it were counted.
 TRIPS_NOW = {161: {"uber": 500, "lyft": 200, "yellow": 300}, 236: {"uber": 300, "lyft": 400, "yellow": 100},
              132: {"uber": 200, "lyft": 100, "yellow": 500}, 7: {"uber": 300, "lyft": 100, "green": 200},
-             2: {"uber": 30, "yellow": 20}, 264: {"uber": 100}}
+             2: {"uber": 30, "yellow": 20}, 264: {"uber": 100}, 1: {"yellow": 150}}
 TRIPS_BEFORE = {161: {"uber": 450, "lyft": 250, "yellow": 300}, 236: {"uber": 400, "lyft": 300, "yellow": 100},
                 132: {"uber": 300, "lyft": 100, "yellow": 400}, 7: {"uber": 200, "lyft": 100, "green": 300},
-                2: {"uber": 30, "yellow": 70}, 264: {"uber": 100}}
+                2: {"uber": 30, "yellow": 70}, 264: {"uber": 100}, 1: {"yellow": 150}}
 BUSY_ZONE = 230   # every mode in every hour of the week: the zone-file size worst case
 
 NAMED_ZONES = {1: ("EWR", "Newark Airport", "EWR"), 2: ("Queens", "Jamaica Bay", "Boro Zone"),
@@ -121,6 +119,8 @@ def od_rows() -> list[dict]:
             {"month": month, "mode": "lyft", "pu_zone": 236, "do_zone": 161, "trips_valid": 25},
             {"month": month, "mode": "uber", "pu_zone": 161, "do_zone": 265, "trips_valid": 60},   # Outside of NYC
             {"month": month, "mode": "uber", "pu_zone": 236, "do_zone": 265, "trips_valid": 20},
+            {"month": month, "mode": "uber", "pu_zone": 138, "do_zone": 161, "trips_valid": 30,   # LaGuardia
+             "rider_total_ex_tip": 2_100.0},
         ]
     return rows
 
@@ -208,38 +208,6 @@ def example(rel: str):
     return json.loads((SITE_CONTRACTS / mock.example_name(rel)).read_text())
 
 
-WAV_SQL = metrics.METRICS_DIR / "wav_service.sql"
-
-
-def stub_wav_service() -> pa.Table:
-    """L09's wav_service (D29) until its SQL is on this branch: the contract's sums over agg_zone_hour,
-    month × mode for Uber and Lyft."""
-    sums = defaultdict(lambda: [0, 0, 0])
-    for r in pq.read_table(common.agg_path("agg_zone_hour")).to_pylist():
-        if r["mode"] in ("uber", "lyft"):
-            cell = sums[(r["month"], r["mode"])]
-            cell[0] += r["trips_valid"]
-            cell[1] += r["wav_req"] or 0
-            cell[2] += r["wav_trips"] or 0
-    rows = [{"month": month, "mode": mode, "trips": trips, "wav_requests": requests, "wav_trips": wav,
-             "wav_share": wav / trips if trips else None}
-            for (month, mode), (trips, requests, wav) in sorted(sums.items())]
-    return pa.Table.from_pylist(rows, schema=metrics.contract_schema("wav_service"))
-
-
-def with_wav_stub(run):
-    def patched(name, **params):
-        if name == "wav_service" and not WAV_SQL.exists():
-            return stub_wav_service()
-        return run(name, **params)
-    return patched
-
-
-@pytest.fixture(autouse=True)
-def wav_service(monkeypatch):
-    monkeypatch.setattr(metrics, "run", with_wav_stub(metrics.run))
-
-
 def load_all(out: Path) -> dict[str, object]:
     return {path.relative_to(out).as_posix(): json.loads(path.read_text())
             for path in sorted(out.rglob("*")) if path.is_file()}
@@ -254,7 +222,7 @@ def site(tmp_path_factory):
     calls = []
     with pytest.MonkeyPatch.context() as mp:
         mp.setenv("NYC_DATA_DIR", str(data))
-        run = with_wav_stub(metrics.run)
+        run = metrics.run
         mp.setattr(metrics, "run", lambda name, **params: calls.append(name) or run(name, **params))
         write_fixture(data)
         publish.main(["--dev", "--out", str(out)])
@@ -316,7 +284,7 @@ def test_zone_map_is_copied(site, tmp_path):
 def test_metrics_run_through_the_runner(site):
     """Every value comes from metrics.run, L10's five metrics and L09's wav_service included."""
     assert L10_METRICS | {"wav_service"} <= set(site["calls"])
-    assert set(site["calls"]) <= set(metrics.available()) | {"wav_service"}   # stubbed until L09's SQL lands
+    assert set(site["calls"]) <= set(metrics.available())
 
 
 def test_downloads_list_the_published_sizes(site):
@@ -335,10 +303,10 @@ def test_every_question_has_a_finding(site):
 
 
 HAND_WORKED = {
-    # Pickups in Aug 2026: 3,350, of which ride-hail 2,230 → 66.6% ("67%"). Aug 2025: 2,230 of 3,400 →
-    # 65.6%, so +0.98 pts ("+1.0 pts"). Zones with 100+ trips both years: 7, 132, 161, 236; ride-hail
-    # share rose only in zone 7 (300 of 600 → 400 of 600).
-    "Q1": "Ride-hail apps carried 67% of NYC trips in Aug 2026 (+1.0 pts on a year earlier), and their share of "
+    # Pickups in Aug 2026: 3,500, of which ride-hail 2,230 → 63.7% ("64%"). Aug 2025: 2,230 of 3,550 →
+    # 62.8%, so +0.90 pts ("+0.9 pts"). Zones with 100+ TLC trips both years: 7, 132, 161, 236 (zone 1
+    # left out: its pickups aren't TLC trips); ride-hail share rose only in zone 7 (300 → 400 of 600).
+    "Q1": "Ride-hail apps carried 64% of NYC trips in Aug 2026 (+0.9 pts on a year earlier), and their share of "
           "pickups rose in 1 of 4 zones",
     # All modes, core list. Weekly treated growth ÷ control growth − 1: W10 (900 + 980) ÷ 2,000 − 1 =
     # −0.06, W11 −0.11, W12 −0.01. Median −0.06; p10 −0.11 + 0.2 × 0.05 = −0.10; p90 −0.06 + 0.8 × 0.05
@@ -367,10 +335,10 @@ HAND_WORKED = {
     "Q8": "Uber riders waited a median 4.0 min from request to pickup in Aug 2026, Lyft riders 4.5 min; the "
           "longest median wait was 10.0 min, for Lyft riders in Upper East Side North",
     # Airport trips in Aug 2026 without Newark's 10 pickups: Uber 60 + 50 + 30 + 20 = 160 of 220 (73%).
-    # To Manhattan from JFK: rider totals 3,200 + 1,400 over 40 + 20 trips = $76.67. Hour 15 has 160
-    # trips, hour 7 has 70.
+    # To Manhattan, each airport apart: JFK rider totals 3,200 + 1,400 over 40 + 20 trips = $76.67;
+    # LaGuardia 2,100 over 30 = $70.00. Hour 15 has 160 trips, hour 7 has 70.
     "Q9": "Uber carried 73% of trips to and from JFK and LaGuardia and to Newark in Aug 2026; the mean fare to "
-          "Manhattan was $76.67 before tip, and trips peaked at 3 pm",
+          "Manhattan before tip was $76.67 from JFK and $70.00 from LaGuardia, and trips peaked at 3 pm",
     # wav_service, Aug 2026. Uber: 6 rows with 1 WAV request and 9 WAV trips each, 1,430 valid trips →
     # 54 ÷ 1,430 = 3.8%. Lyft: 4 rows, 800 valid trips → 36 ÷ 800 = 4.5%.
     "Q11": "Uber completed 6 trips that requested a wheelchair-accessible vehicle in Aug 2026 and Lyft 4, and 3.8% "
@@ -394,14 +362,18 @@ def test_findings_worked_by_hand(site, question):
 
 def test_home_tiles_worked_by_hand(site):
     home = site["files"]["home.json"]
-    # 3,350 trips ÷ 31 days = 108.06 a day; 3,400 ÷ 31 a year earlier → 3,350 ÷ 3,400 − 1 = −1.47%.
+    # 3,500 trips ÷ 31 days = 112.90 a day; 3,550 ÷ 31 a year earlier → 3,500 ÷ 3,550 − 1 = −1.41%.
     # Driver share is 1,391.60 ÷ 1,813 in Aug 2026 and 1,461.18 ÷ 1,813 in Aug 2025, so the platform
     # keeps 0.2324 against 0.1941.
-    assert home["tiles"] == {"trips_per_day": 108.1, "rh_share": 0.6657, "platform_share": 0.2324,
+    assert home["tiles"] == {"trips_per_day": 112.9, "rh_share": 0.6371, "platform_share": 0.2324,
                              "cbd_fees_last_month": 2925.0}
-    assert home["yoy"] == {"trips_per_day": -0.0147, "rh_share": 0.0098, "platform_share": 0.0384,
+    assert home["yoy"] == {"trips_per_day": -0.0141, "rh_share": 0.009, "platform_share": 0.0384,
                            "cbd_fees_last_month": 0.17}
-    assert home["title"] == "Ride-hail apps carried 67% of NYC trips in Aug 2026"
+    assert home["title"] == "Ride-hail apps carried 64% of NYC trips in Aug 2026"
+    # Same month at both ends, Aug 2024 → Aug 2026. Green: 300 of 3,550 → 200 of 3,500, −2.74 pts, more
+    # than yellow +1.84, Lyft +1.73 or Uber −0.83. Aug 2025 equals Aug 2024, so no dip or peak clause.
+    assert home["subtitles"]["share_trend"] == \
+        "Green cabs' share fell 2.7 pts between Aug 2024 and Aug 2026, the biggest shift of any company"
 
 
 def test_zone_counts(site):
@@ -444,6 +416,24 @@ def test_destinations_rank_mapped_zones(site):
     ues = site["files"]["zones/236.json"]                       # 25 to Midtown Center, 20 out of the city
     assert ues["subtitles"]["top_destinations"] == (
         "Midtown Center was the top destination from here in Aug 2026, with 3.1% of trips")
+
+
+def test_newark_zone_isnt_counted_or_described_as_tlc_pickups(site):
+    """Zone 1's pickup records aren't TLC trips: no zone count includes it, the index marks it thin so
+    maps grey it, and its page talks about drop-offs. Its data rows stay (D26)."""
+    index = site["files"]["zones/index.json"]
+    newark = next(row for row in index["rows"] if row["zone"] == 1)
+    assert newark["thin"] is True and newark["top_mode"] == "yellow"
+    assert index["tiles"]["zones_yellow_leads"] == 1        # zone 132 only; 2 if Newark counted
+    page = site["files"]["zones/1.json"]
+    assert page["flags"]["thin"] is True and page["flags"]["airport"] == "EWR"
+    # drop-offs at Newark: 20 Uber trips ÷ 31 days = 0.6 a day
+    assert page["title"] == "TLC vehicles dropped off 0.6 trips a day at Newark Airport in Aug 2026; pickups there " \
+                            "aren't TLC trips"
+    assert page["subtitles"] == {chart: f"Pickups at Newark Airport aren't TLC trips, so {text}"
+                                 for chart, text in findings.NOT_TLC_PICKUPS.items()}
+    assert set(page["tiles"].values()) == {None} and set(page["yoy"].values()) == {None}
+    assert page["share_trend"] and page["hour_heatmap"]
 
 
 def test_newark_pickups_stay_out_of_share_sentences(site):

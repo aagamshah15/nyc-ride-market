@@ -179,6 +179,35 @@ def test_q11_accessible_service():
         "Lyft trips ran in a wheelchair-accessible vehicle; requests that went unfilled aren't in TLC's records")
 
 
+def test_share_trend_over_the_same_month():
+    assert findings.home_share_trend(mode="uber", change=-0.0169, first_month="2024-08-01", month=AUG26,
+                                     turn=("dipped", "2025-08-01", 0.592)) == (
+        "Uber's share fell 1.7 pts between Aug 2024 and Aug 2026, the biggest shift of any company; it dipped to "
+        "59% in Aug 2025")
+    assert findings.home_share_trend(mode="uber", change=None, first_month=None, month=AUG26) is None
+
+
+def test_q9_names_each_airport_fare():
+    result = findings.q9(mode="uber", top_share=0.6333, airports=["JFK", "LGA"], dropoff_only=["EWR"],
+                         fares=[("JFK", 106.38), ("LGA", 75.52)], busiest_hour=14, month=AUG26)
+    assert result["text"] == ("Uber carried 63% of trips to and from JFK and LaGuardia and to Newark in Aug 2026; "
+                              "the mean fare to Manhattan before tip was $106 from JFK and $75.52 from LaGuardia, "
+                              "and trips peaked at 2 pm")
+
+
+def test_borough_sentence_names_its_measure():
+    assert findings.prices_by_borough(borough="Manhattan", fare_per_mile=6.41, window=3, month=AUG26) == (
+        "Manhattan had the highest overall fare per mile (total fares ÷ total miles), $6.41/mile across all modes, "
+        "over the 3 months to Aug 2026")
+
+
+def test_newark_page_sentences():
+    assert findings.zone_not_tlc_title(name="Newark Airport", dropoffs_per_day=4982.3, month=AUG26) == \
+        "TLC vehicles dropped off 4,980 trips a day at Newark Airport in Aug 2026; pickups there aren't TLC trips"
+    assert findings.zone_not_tlc(name="Newark Airport", chart="waits") == \
+        "Pickups at Newark Airport aren't TLC trips, so there are no waits to report"
+
+
 def test_thin_and_empty_zone_titles():
     assert findings.zone_title(name="Jamaica Bay", rh_share=0.6, trips=50, thin=True, month=AUG26) == \
         "Jamaica Bay had 50 pickups in Aug 2026, too few to profile"
