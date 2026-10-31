@@ -124,6 +124,11 @@ All gate checks run in the integrator space. G1, G3, G4, G5 and G6 are SPEC §11
 
 ### Gate log
 
+- **D28 and D29 merged and re-run on the real data, 30 Oct 2026.** L07 (`wav_trips`, `1eb6554`), L09 (`wav_service`, `c815dda`) and L11 (findings fixes `dbbb831`, D28/D29 `148660d`) were test-merged onto `integrator/d28-d29` (484 passed, site built) and merged into `main` as `22c5ddf`; L10's D28 wording went in as `7046078`.
+  - `pipeline.aggregate` re-ran all 32 months from the clean files in 149 s. `make validate` passes as at G3 (all five checks), and `pipeline.metrics --all` exits 0.
+  - `pipeline.publish` wrote 278 files with `validated: true`; every file passes its contract and every route its budget. Not committed: `site/src/data/` waits for the G4 review.
+  - Q11 on real data: in Aug 2026 Uber completed 43,600 WAV-requested trips and Lyft 24,400; 12.0% of Uber's trips and 6.4% of Lyft's ran in a WAV.
+  - Q6 on real data, net of 2024 across W31: pay per minute with a passenger −0.9%, pay per mile −1.2%, base fare per mile −2.2%.
 - **L10 and L11 merged, 27 Oct 2026.** The test-merge of both onto `main` passed `make test` (473 passed, site built); merged as `daa0739` and `84824ca`, CI green.
   - L11's real publish (278 files, `validated: true`) passes every contract once the zone-map check accepts MultiPolygons: 12 real zones are MultiPolygons. The checker now checks a geometry down to its type, and the mock splits zone 2 (`bc1ef2c`).
   - **D28 and D29 accepted by the user, 27 Oct** (`56afd38`): 1 Aug 2025 is a new minimum-pay rule (per-mile floor down, per-minute floor up) with TLC's 1 Mar 2025 CPI-W step as a second event; Q11 reports completed WAV-requested trips and the share of trips in a WAV. Contracts on `integrator/d28-d29` (`ccf8df7`); L07 (`wav_trips`), L09 (`wav_service`), L10 (wording) and L11 (events, Q6, Q11) are implementing; then real `make aggregate` for 32 months and a re-publish.
