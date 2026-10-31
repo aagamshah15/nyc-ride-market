@@ -42,8 +42,8 @@ The integrator keeps the Status column current.
 | [L07](lanes/L07-aggregate.md) | Aggregate | `pipeline/aggregate.py`, `sql/agg/` | 2 | L01 approved | — | built on fixtures, merged 24 Oct (D23 included); real run at G2 |
 | [L08](lanes/L08-validate.md) | Validation gate | `pipeline/validate.py`, `sql/validate/` | 2 | L01 approved | — | built on fixtures, merged 24 Oct; real run at G2 |
 | [L09](lanes/L09-metrics.md) | Metrics library | `sql/metrics/` (all but L10's), `pipeline/metrics.py` | 2 | L01 approved | Q1, Q4–Q15 | built on fixtures, merged 24 Oct; real run at G2 |
-| [L10](lanes/L10-policy-studies.md) | Policy studies | `sql/metrics/cp_*.sql`, `pay_event.sql`, `pipeline/studies.py` | 3 | L09 runner exists | Q2, Q3, Q6 | done: write-ups from the G3 aggregates merged 27 Oct (`daa0739`); pay-rise narrative being sharpened with the TLC rule's terms |
-| [L11](lanes/L11-publish.md) | Publish and findings | `pipeline/publish.py`, `pipeline/findings.py`, `site/src/data/` | 3 | L09 runner exists | all | done: merged 27 Oct (`84824ca`); a real validated publish writes 278 files within budget |
+| [L10](lanes/L10-policy-studies.md) | Policy studies | `sql/metrics/cp_*.sql`, `pay_event.sql`, `pipeline/studies.py` | 3 | L09 runner exists | Q2, Q3, Q6 | done: both studies written; D28 wording merged 30 Oct (`7046078`); G4 passed |
+| [L11](lanes/L11-publish.md) | Publish and findings | `pipeline/publish.py`, `pipeline/findings.py`, `site/src/data/` | 3 | L09 runner exists | all | done: D28/D29 and the G4 fixes merged (`c228b61`); real `site/src/data/` committed at G4 |
 | [L12](lanes/L12-pages-home-methods.md) | Pages: Home + Methods | `index.md`, `methods.md` | 4 | L05 done | home | running in the cloud since 27 Oct; reports by draft PR from `lane/L12-…` |
 | [L13](lanes/L13-pages-companies.md) | Pages: Companies | `companies/[company].md` | 4 | L05 done | Q4, Q5, Q11–Q13 | running in the cloud since 27 Oct; reports by draft PR from `lane/L13-…` |
 | [L14](lanes/L14-pages-zones.md) | Pages: Zones | `zones/[zone].md`, `zones/index.md` | 4 | L05 done | Q1, Q8, Q10 | running in the cloud since 27 Oct; reports by draft PR from `lane/L14-…` |
@@ -124,6 +124,13 @@ All gate checks run in the integrator space. G1, G3, G4, G5 and G6 are SPEC §11
 
 ### Gate log
 
+- **G4, 30 Oct 2026: passed** (signed off by the user, with fixes). [docs/g4-review.md](g4-review.md) checks Q1–Q15 against the aggregates directly and against L10's reports:
+  - 13 findings confirmed as published;
+  - Q10 counted junk Newark pickups (zone 1), fixed to 6 zones, down from 9;
+  - Q9, the home share trend and the prices borough line got wording fixes.
+  - L11 made the fixes (`7589a93`, merged as `c228b61`). The re-publish wrote 278 files with `validated: true`; every contract and budget passes, `make test` passes (490), and the site builds.
+  - **The real `site/src/data/` is committed to `main` from this point.** CI now builds the site with real data, not mocks. The site is not deployed until G6.
+  - **SPEC §11 phase 3 is done:** both studies are written (`reports/congestion_pricing.md`, `reports/pay_rise.md`), and every question has a checked finding.
 - **D28 and D29 merged and re-run on the real data, 30 Oct 2026.** L07 (`wav_trips`, `1eb6554`), L09 (`wav_service`, `c815dda`) and L11 (findings fixes `dbbb831`, D28/D29 `148660d`) were test-merged onto `integrator/d28-d29` (484 passed, site built) and merged into `main` as `22c5ddf`; L10's D28 wording went in as `7046078`.
   - `pipeline.aggregate` re-ran all 32 months from the clean files in 149 s. `make validate` passes as at G3 (all five checks), and `pipeline.metrics --all` exits 0.
   - `pipeline.publish` wrote 278 files with `validated: true`; every file passes its contract and every route its budget. Not committed: `site/src/data/` waits for the G4 review.
