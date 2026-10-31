@@ -238,12 +238,16 @@ def home_title(*, rh_share, month):
     return f"Ride-hail apps carried {share(rh_share)} of NYC trips in {month_label(month)}"
 
 
-def home_share_trend(*, mode, change, first_month, month):
-    """The company whose share moved most since the first month in the data."""
+def home_share_trend(*, mode, change, first_month, month, turn=None):
+    """The company whose share moved most between the same month of two years (no season mixed in).
+    ``turn``: (verb, month, share) when a year between went beyond both ends, e.g. ("dipped", …)."""
     if _missing(mode, change):
         return None
-    return (f"{possessive(cap(noun(mode)))} share {moved(change)} between {month_label(first_month)} "
+    text = (f"{possessive(cap(noun(mode)))} share {moved(change)} between {month_label(first_month)} "
             f"and {month_label(month)}, the biggest shift of any company")
+    if turn and not _missing(*turn):
+        text += f"; it {turn[0]} to {share(turn[2])} in {month_label(turn[1])}"
+    return text
 
 
 # --- companies ---------------------------------------------------------------
@@ -407,6 +411,25 @@ def zone_waits(*, mode, wait_p50, thin, month):
         return f"Too few ride-hail trips here in {month_label(month)} to report waits"
     return (f"{noun(mode)} riders here waited a median {seconds(wait_p50)} from request to pickup in "
             f"{month_label(month)}")
+
+
+# Pickup charts on a zone whose pickups aren't TLC trips (Newark Airport): what each chart can't show.
+NOT_TLC_PICKUPS = {"share_trend": "these shares don't show who serves the airport",
+                   "hour_heatmap": "these hours don't show when TLC vehicles serve it",
+                   "waits": "there are no waits to report",
+                   "top_destinations": "these destinations don't describe trips from the airport"}
+
+
+def zone_not_tlc_title(*, name, dropoffs_per_day, month):
+    """Title for a zone whose pickup records aren't TLC trips: what TLC vehicles do there is drop off."""
+    if _missing(dropoffs_per_day):
+        return f"Pickups at {name} aren't TLC trips"
+    return (f"TLC vehicles dropped off {count(dropoffs_per_day)} trips a day at {name} in {month_label(month)}; "
+            f"pickups there aren't TLC trips")
+
+
+def zone_not_tlc(*, name, chart):
+    return f"Pickups at {name} aren't TLC trips, so {NOT_TLC_PICKUPS[chart]}"
 
 
 def zone_top_destinations(*, name, dest_share, left_city_share, month):
@@ -615,8 +638,8 @@ def prices_by_hour(*, cheapest, dearest, window, month):
 def prices_by_borough(*, borough, fare_per_mile, window, month):
     if _missing(borough, fare_per_mile):
         return None
-    return (f"{borough} had the highest fare per mile, {usd_per_mile(fare_per_mile)} across all modes, over "
-            f"the {count(window)} months to {month_label(month)}")
+    return (f"{borough} had the highest overall fare per mile (total fares ÷ total miles), "
+            f"{usd_per_mile(fare_per_mile)} across all modes, over the {count(window)} months to {month_label(month)}")
 
 
 def prices_volatility(*, zone_name, mode, volatility, month):
@@ -718,11 +741,14 @@ def q8(*, waits, longest, month):
     return finding("Q8", text, first_wait, "seconds")
 
 
-def q9(*, mode, top_share, airports, dropoff_only, fare_mean, busiest_hour, month):
+def q9(*, mode, top_share, airports, dropoff_only, fares, busiest_hour, month):
+    """``fares``: [(airport, mean fare to Manhattan)], each airport on its own (a blend would hide the gap)."""
     text = airports_title(mode=mode, top_share=top_share, airports=airports, dropoff_only=dropoff_only, month=month)
     if text:
-        if not _missing(fare_mean):
-            text += f"; the mean fare to Manhattan was {usd(fare_mean)} before tip"
+        known = [(a, f) for a, f in fares if not _missing(f)]
+        if known:
+            text += ("; the mean fare to Manhattan before tip was "
+                     + join_and([f"{usd(f)} from {AIRPORT_NAMES.get(a, a)}" for a, f in known]))
         if not _missing(busiest_hour):
             text += f", and trips peaked at {hour_of_day(busiest_hour)}"
     return finding("Q9", text, top_share, "share")
