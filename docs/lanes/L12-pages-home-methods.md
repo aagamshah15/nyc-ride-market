@@ -41,6 +41,7 @@ _Only this lane writes here. Newest first._
 
 | Date | State | Note |
 |---|---|---|
+| 31 Oct 2026 | done, main merged | Merged `main` at 6a523c4 (L13's Q4 fix only; no conflicts, nothing these pages use). `make test` green again: 490 passed, 13 skipped, 14 of 14 budget tests, 274 links. Rechecked both pages in the browser: desktop, and 375 px dark. No console errors. |
 | 31 Oct 2026 | done | `index.md` and `methods.md` built on the real data (as of 2026-08). `make test` green; checked in a browser at desktop and 375 px, light and dark, no console errors. Also builds and renders on mock data (scratch copy). |
 
 **Blocked:** none. One request for the integrator (Follow-ups, first item): `/methods` reads two files that `pages.yaml` doesn't list.
