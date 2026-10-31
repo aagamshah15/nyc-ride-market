@@ -43,10 +43,11 @@ _Only this lane writes here. Newest first._
 
 | Date | State | Note |
 |---|---|---|
+| 30 Oct 2026 | done | Main merged (thin flag on `by_zone` in 01bad4d). The Q4 chart now matches its subtitle: only zone 207 is filled and named, the thin zones draw hollow, and the interim note is gone. `make test` green |
 | 30 Oct 2026 | done | `companies/[company].md` and its page-only helpers in `companies/company.js`, built on the real data (as of 2026-08) and on mock data in a scratch copy; `make test` green. One Blocked request for the integrator (thin flag on `by_zone`). Hand-off below |
 | 30 Oct 2026 | started | Brief, SPEC §9, contracts, D24/D29 and the L05 kit read; real company files checked |
 
-**Blocked:** none for this lane's work. One request for the integrator (L11's files and the companies contract):
+**Blocked:** none. The request below was resolved by the integrator in 01bad4d (`by_zone` rows carry `thin`).
 
 1. **`lyft_vs_uber.by_zone` rows carry no thin flag.** `zones_lyft_ahead` (and the Q4 subtitle) count only zones with enough trips (`zone_counts()` in `publish.py`: not `thin`, i.e. at least `THIN_TRIPS` trips in the month and not a no-pickup zone), but `by_zone` lists every zone with no way to tell which ones were counted. On the real data three zones have Lyft ahead (Rikers Island +53.9 pts, Saint Michaels Cemetery/Woodside +52.6 pts, Governor's Island +33.3 pts) while the finding says one, so the Q4 chart can't match its subtitle. Suggest `publish.py` add `thin: true|false` to each `by_zone` row (the same rule as the count), with the mock generator and `companies.example.json` regenerated. The page already handles it: rows with `thin: true` draw hollow and unlabelled and the chart note changes to "Hollow dots are zones with too few trips in the month to count." Until then the chart draws every zone and its note says the count leaves out zones with too few trips. If you name the field differently, `counted()` in `site/src/companies/company.js` is the one line to change.
 
@@ -61,7 +62,7 @@ _Only this lane writes here. Newest first._
   - Mock data: `make_mock_site_data.py --out` into a scratch copy of `site/`, built and opened: all four routes, mock banner, no runtime errors, three not-reported states on the cab pages.
   - Real data in the browser (`observable preview`): all four pages at 1280 px and 375 px, light and dark; no console errors; no page-level horizontal scroll at 375 px (the compare table scrolls in its own box, as designed); Q4 tooltip and table view work.
 - Known limits:
-  - The Q4 chart draws thin zones as ordinary dots until the Blocked request lands, and their extreme changes (Governor's Island −66.7 pts) stretch its y axis.
+  - Thin zones still draw in the Q4 chart (hollow), so their extreme changes (Governor's Island −66.7 pts) stretch its y axis.
   - The WAV and shared count tiles show the latest month only, with no change line: the file carries no year-earlier change for them and the page computes none.
   - With the real data the Lyft line on the shared chart starts in Jun 2025 (no Lyft shared requests before), and Lyft's match rate rests on a few thousand requests a month.
 - Follow-ups:
