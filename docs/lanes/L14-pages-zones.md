@@ -52,6 +52,12 @@ _Only this lane writes here. Newest first._
 
 1. **Resolved by the integrator in acbf13f.** **The `/zones` nav entry broke the build.** `observablehq.config.js` listed `{name: "Zones", path: "/zones", source: "zones/index.md"}`. In Framework 1.13.4, `"/zones"` resolves to `src/zones.md`: see `normalizePath` in `config.js` and `findPage` in `loader.js`. So once `zones/index.md` existed, the build failed with `Not found: /zones`. The fix is `path: "/zones/"`, which Framework normalises to `/zones/index`. The integrator made that change on main, and this branch has merged it.
 2. **The pinned Inputs ships without its stylesheet.** `page.js` exports Inputs from `npm:@observablehq/inputs@0.12.0`. Framework adds `inputs.css` only when a page imports the bare specifier `npm:@observablehq/inputs` (`getImplicitStylesheets` in `libraries.js`). Tables and inputs from `page.js` therefore render unstyled: `Inputs.table` loses its scroll box and spills over the caption and footer. The zones table works around this with a plain table and L05's `.nrm-table-scroll`. Other page lanes (L12, L13, L15, L16) will hit the same problem. A fix for L05: have `page.js` also load `observablehq:stdlib/inputs.css`, or add an import that Framework recognises.
+3. **Finding links to `/zones` (no slash) 404 in the preview.** Three findings in `home.json` have `"page": "/zones"`, and `page.js` `siteUrl()` turns that into `<root>/zones`. Checked 30 Oct on this branch, with acbf13f merged:
+   - **Framework preview** (`make site-dev`, Framework 1.13.4): `GET /zones` returns `404` with the plain-text body `Not found: /zones`. `/zones/` returns 200 (the index), and `/zones/index` returns `302` to `/zones/`.
+   - **Built site:** `dist/` has `zones/index.html` and no `zones.html`. Served by a plain static server (`python3 -m http.server`), `GET /zones` returns `301` to `/zones/`, which returns 200.
+   - **GitHub Pages:** not tested here, since there's no deploy. Its documented behaviour is the same directory-to-slash redirect, so the link should work once deployed (under the `/nyc-ride-market/` base too). Only the preview breaks.
+   - **Link check:** Framework's build doesn't catch these, because the links are built from JSON at runtime. Its link check covers only static links in the markdown.
+   - L14 changed neither `page.js` nor the data; the fix is for the shared code.
 
 **Hand-off**
 - Built:
