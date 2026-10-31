@@ -12,7 +12,7 @@ Who wins the airport trip at JFK, LaGuardia and Newark, at what fare and when; a
 
 ## Starts when
 
-- L05 is done. Build on `make site-mock` data; switch to real data once L11 publishes
+- L05 is done, and G4 passed (30 Oct 2026). The **real, validated site data (as of 2026-08) is committed in `site/src/data/`** (`d6841ef`). Build against it; don't run `make site-mock` (it refuses to overwrite real data) and never commit changes under `site/src/data/`. If a page needs data the files don't carry, add a Blocked note for the integrator (L11 owns the files).
 
 ## Tasks
 

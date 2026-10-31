@@ -12,7 +12,8 @@
 
 ## Starts when
 
-- L05 is done. Build on `make site-mock` data; switch to real data once L11 publishes
+- L05 is done, and G4 passed (30 Oct 2026). The **real, validated site data (as of 2026-08) is committed in `site/src/data/`** (`d6841ef`). Build against it; don't run `make site-mock` (it refuses to overwrite real data) and never commit changes under `site/src/data/`. If a page needs data the files don't carry, add a Blocked note for the integrator (L11 owns the files).
+- Zone 1 (Newark Airport) is marked `thin` in both years since G4: TLC vehicles don't pick up at Newark, so its page leads with drop-offs and its pickup tiles are null. Grey it out on the maps like other thin zones. 12 zones are MultiPolygons (`contracts/README.md`), so map code must handle both geometry types
 
 ## Tasks
 
