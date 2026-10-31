@@ -40,6 +40,7 @@ _Only this lane writes here. Newest first._
 
 | Date | State | Note |
 |---|---|---|
+| 31 Oct 2026 | done, synced | Merged `main` at `6a523c4` (merge `437609c`). The merge only brought L13's `company.js` and brief, nothing these pages use. `make test` still passes (490 passed, 13 skipped, site build renders both routes), and both pages re-checked in the browser with no console errors |
 | 31 Oct 2026 | done | `airports.md` and `prices.md` built on the real data (as of 2026-08). `make test` passes: 490 passed, 13 skipped, and the site build renders both routes. The mock data also builds and renders, checked in a scratch copy. Both pages checked in the browser at 1280 px and 375 px, light and dark, with no console errors |
 
 **Blocked:** nothing stops the pages. One data ask for L11: `prices.json` has no finding subtitle for fare per minute, so the page can't give it a chart of its own. For now it shows the median fare per minute by mode as tiles, and overall fare per minute by borough and mode in a table. If a chart is wanted, `publish.py` would add something like `subtitles.fpmin_by_mode`, and the page would draw it with `fareRange` or `lineChart`.
