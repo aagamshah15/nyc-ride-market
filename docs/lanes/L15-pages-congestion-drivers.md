@@ -42,6 +42,7 @@ _Only this lane writes here. Newest first._
 
 | Date | State | Note |
 |---|---|---|
+| 31 Oct 2026 | main merged | Merged main at `6a523c4` (two L13 commits; no shared-file changes). Re-ran `make test`: 490 passed, 13 skipped. Re-checked both built pages at 1280 px (light) and 375 px (dark): every chart renders, no console errors, no horizontal scroll. Blocked notes unchanged |
 | 31 Oct 2026 | ready for hand-off | Both pages built on the real data (as of 2026-08) and on mock data; `make test` green. Two Blocked notes for the integrator (fee chart events, sensitivity subtitle) |
 | | not started | |
 
