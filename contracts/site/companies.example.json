@@ -180,7 +180,8 @@
         "lyft_share": 0.1379,
         "uber_share": 0.4166,
         "gap": -0.2787,
-        "gap_change": 0.0176
+        "gap_change": 0.0176,
+        "thin": false
       },
       {
         "zone": 2,
@@ -188,7 +189,8 @@
         "lyft_share": 0.2266,
         "uber_share": 0.5857,
         "gap": -0.3591,
-        "gap_change": 0.0179
+        "gap_change": 0.0179,
+        "thin": false
       },
       {
         "zone": 3,
@@ -196,7 +198,8 @@
         "lyft_share": 0.2255,
         "uber_share": 0.5883,
         "gap": -0.3628,
-        "gap_change": 0.0079
+        "gap_change": 0.0079,
+        "thin": false
       }
     ]
   }

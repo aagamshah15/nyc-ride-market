@@ -383,6 +383,8 @@ def test_zone_counts(site):
     assert [row["zone"] for row in index["rows"]] == list(range(1, 264))
     uber, yellow = site["files"]["companies/uber.json"], site["files"]["companies/yellow.json"]
     assert (uber["lyft_vs_uber"]["zones_lyft_ahead"], uber["lyft_vs_uber"]["zones_lyft_ahead_prior_year"]) == (1, 0)
+    rows = uber["lyft_vs_uber"]["by_zone"]
+    assert sum(r["gap"] > 0 and not r["thin"] for r in rows) == uber["lyft_vs_uber"]["zones_lyft_ahead"]
     assert yellow["lyft_vs_uber"] is None
     assert yellow["not_reported"] == ["driver_share", "wav", "shared"] and uber["not_reported"] == []
     assert yellow["tiles"]["driver_share"] is None

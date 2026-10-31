@@ -389,7 +389,7 @@ class Site:
             counts = self.zone_counts()
             by_zone = [{"zone": z, "name": self.zone_name(z), "lyft_share": _r(row["lyft_share"], 4),
                         "uber_share": _r(row["uber_share"], 4), "gap": _r(row["gap"], 4),
-                        "gap_change": _r(row["gap_change"], 4)}
+                        "gap_change": _r(row["gap_change"], 4), "thin": info["thin"]}
                        for z, info in self.zone_info().items() if (row := info["lvu"])]
             lyft_vs_uber = {"zones_lyft_ahead": counts["lyft_ahead"],
                             "zones_lyft_ahead_prior_year": counts["lyft_ahead_prior"], "by_zone": by_zone}

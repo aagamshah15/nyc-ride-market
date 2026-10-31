@@ -115,7 +115,7 @@ Language (CLAUDE.md): congestion results are "estimated effects"; pay per hour i
 - A missing value is JSON `null`. Never `0`, never an omitted key.
 - An empty list means "no rows" (for example no shared-ride data for a mode).
 - Company files list unavailable metrics in `not_reported` (for taxis: `driver_share`, `wav`, `shared`); pages show "not reported for this mode".
-- Zone files set `flags.thin = true` when the zone has fewer than 100 valid trips in the latest month; pages show "too few trips" instead of percentiles.
+- Zone files set `flags.thin = true` when the zone has fewer than 100 valid trips in the latest month; pages show "too few trips" instead of percentiles. The companies `lyft_vs_uber.by_zone` rows carry the same `thin` flag, and `zones_lyft_ahead` counts only zones that aren't thin, so a chart can match its subtitle.
 - A `yoy` value is `null` when the year-earlier value is missing or zero.
 - Percentiles are `null` below n = 100 (SPEC §5); waits are `null` for taxis (no request time).
 

@@ -324,8 +324,8 @@ class MockSite:
                 gap_prior = lyft - uber + self.rng.uniform(-0.02, 0.01)
                 by_zone.append({"zone": z, "name": info["name"], "lyft_share": _r(lyft, 4),
                                 "uber_share": _r(uber, 4), "gap": _r(lyft - uber, 4),
-                                "gap_change": _r((lyft - uber) - gap_prior, 4)})
-            ahead = sum(1 for row in by_zone if row["gap"] > 0)
+                                "gap_change": _r((lyft - uber) - gap_prior, 4), "thin": info["thin"]})
+            ahead = sum(1 for row in by_zone if row["gap"] > 0 and not row["thin"])
             lyft_vs_uber = {"zones_lyft_ahead": ahead, "zones_lyft_ahead_prior_year": max(0, ahead - 4),
                             "by_zone": by_zone}
 
