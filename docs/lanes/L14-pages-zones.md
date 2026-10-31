@@ -44,12 +44,13 @@ _Only this lane writes here. Newest first._
 
 | Date | State | Note |
 |---|---|---|
-| 30 Oct 2026 | done, blocked on config | `zones/index.md` and `zones/[zone].md` built against the real data (as of 2026-08). `make test` green (490 passed, 13 skipped; 263 links validated), but only with a one-character fix to `observablehq.config.js` that this lane can't commit (Blocked 1). Hand-off below |
+| 30 Oct 2026 | done | Merged main (acbf13f fixes the `/zones/` nav path, Blocked 1). `make test` green on this branch with no local changes: 490 passed, 13 skipped; 263 links validated |
+| 30 Oct 2026 | built | `zones/index.md` and `zones/[zone].md` built against the real data (as of 2026-08). The build needed a one-character config fix outside L14's files (Blocked 1). Hand-off below |
 | 30 Oct 2026 | started | Read SPEC §9, contracts, components, G4 review; profiled every zone file (7 thin, all non-thin files complete) |
 
 **Blocked** (for the integrator; all are shared files outside L14's Owns):
 
-1. **The `/zones` nav entry breaks the build.** `observablehq.config.js` lists `{name: "Zones", path: "/zones", source: "zones/index.md"}`. In Framework 1.13.4, `"/zones"` resolves to `src/zones.md`: see `normalizePath` in `config.js` and `findPage` in `loader.js`. So once `zones/index.md` exists, the build fails with `Not found: /zones`. The fix is `path: "/zones/"`, which Framework normalises to `/zones/index`. With that one change applied locally (and not committed), the build and `make test` pass. The integrator was asked on 30 Oct.
+1. **Resolved by the integrator in acbf13f.** **The `/zones` nav entry broke the build.** `observablehq.config.js` listed `{name: "Zones", path: "/zones", source: "zones/index.md"}`. In Framework 1.13.4, `"/zones"` resolves to `src/zones.md`: see `normalizePath` in `config.js` and `findPage` in `loader.js`. So once `zones/index.md` existed, the build failed with `Not found: /zones`. The fix is `path: "/zones/"`, which Framework normalises to `/zones/index`. The integrator made that change on main, and this branch has merged it.
 2. **The pinned Inputs ships without its stylesheet.** `page.js` exports Inputs from `npm:@observablehq/inputs@0.12.0`. Framework adds `inputs.css` only when a page imports the bare specifier `npm:@observablehq/inputs` (`getImplicitStylesheets` in `libraries.js`). Tables and inputs from `page.js` therefore render unstyled: `Inputs.table` loses its scroll box and spills over the caption and footer. The zones table works around this with a plain table and L05's `.nrm-table-scroll`. Other page lanes (L12, L13, L15, L16) will hit the same problem. A fix for L05: have `page.js` also load `observablehq:stdlib/inputs.css`, or add an import that Framework recognises.
 
 **Hand-off**
@@ -70,7 +71,7 @@ _Only this lane writes here. Newest first._
   - **Thin zones** (`flags.thin`: zones 1, 2, 103, 104, 105, 110 and 199) show the title, the tiles (null tiles read "Too few trips") and one `tooFewTrips` state in place of the four charts. This follows the titles L11 generates for them ("too few to profile", "No pickups were recorded", Newark's drop-off title). Defensive empty states cover a non-thin zone with an empty section, though none has one in the 2026-08 data.
   - Zones 264 and 265 get no pages; the build has none.
 - Checked:
-  - `make test`: 490 passed, 13 skipped (smoke-test stubs, as on main); the site build validated 263 links.
+  - `make test` on this branch after merging main: 490 passed, 13 skipped (smoke-test stubs, as on main); the site build validated 263 links.
   - Build: `npm run build` takes about 6.2 s for all 265 pages (home, the zones index and 263 zone pages).
   - Output: `dist` is 13.1 MB in total. Each zone page is 13 kB of HTML plus 97–136 kB of files, of which about 94 kB is the shared stylesheet with the inlined Inter font, so the zone data itself is at most about 42 KB. The index is 18 kB of HTML plus 549 kB of files: `zones/index.json` 64 KB and `taxi_zones.geojson` 388 KB. All pages share 662 kB of cached JS.
   - Data files: the largest zone file is 39,681 bytes (zone 132), under 50 KB, and every route is within its 1.5 MB budget (`test_site_data_within_budget`).
