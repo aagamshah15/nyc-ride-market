@@ -128,7 +128,7 @@ display(sensitivityTable(data.effects));
 
 ```js
 display(monthlyColumns(data.fees, {y: "cbd_fee", unit: "usd", yLabel: "Congestion fees charged ($ per month)",
-  subtitle: data.subtitles.fees, asOf, width, dark}));
+  events: events.events, subtitle: data.subtitles.fees, asOf, width, dark}));
 ```
 
 ## Where pickups moved

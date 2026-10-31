@@ -47,7 +47,7 @@ _Only this lane writes here. Newest first._
 | | not started | |
 
 **Blocked:**
-- **L05 · `monthlyColumns` has no `events` option.** The fee chart (`congestion.json` `fees`, by month and mode) is a time chart but can't draw the `events.json` rules, so the congestion page misses "every time chart draws every event" on that one chart. Ask: give `monthlyColumns` an `events` option that works like `lineChart`'s. The page will then pass `events: events.events`. Every other time chart on both pages draws all three events.
+- **Resolved by the integrator (31 Oct): `monthlyColumns` takes `events`, and the fee chart passes them.** ~~L05 · `monthlyColumns` has no `events` option.~~ The fee chart (`congestion.json` `fees`, by month and mode) is a time chart but can't draw the `events.json` rules, so the congestion page misses "every time chart draws every event" on that one chart. Ask: give `monthlyColumns` an `events` option that works like `lineChart`'s. The page will then pass `events: events.events`. Every other time chart on both pages draws all three events.
 - **L11 · No subtitle for the core-vs-wide comparison.** `congestion.json` has a finding subtitle for `effects` (core list) but none for the borderline-zone result. So the page shows "with and without borderline zones" as a table (core and wide medians and ranges, by measure and mode), not a chart, since every chart needs a finding from JSON. Ask: `publish.py` adds `subtitles.effects_wide` (for example, the yellow-cab estimate's move between the lists). The page can then draw it as a second `effectDots` chart.
 
 **Hand-off**

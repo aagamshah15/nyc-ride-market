@@ -513,9 +513,10 @@ export function barChart(rows, options = {}) {
  *   x        month field (default "month");  y: required value field
  *   unit     its tile unit;  yLabel: required, with units
  *   z        series field (default "mode"; null for one series in the accent colour)
+ *   events   events.json `events` for dated rules, as in lineChart
  */
 export function monthlyColumns(rows, options = {}) {
-  const {x = "month", y, unit, yLabel, dark = palette.isDark(), width = 640} = options;
+  const {x = "month", y, unit, yLabel, events, dark = palette.isDark(), width = 640} = options;
   const z = options.z === undefined ? "mode" : options.z;
   required("monthlyColumns", options, ["y", "unit", "yLabel"]);
   const V = drawn(unit);
@@ -523,12 +524,15 @@ export function monthlyColumns(rows, options = {}) {
   const keys = z ? ordered(data.map((d) => d[z])) : [];
   const color = z ? seriesColor(keys, {dark}) : undefined;
   const xDomain = extent(data.map((d) => +d.__x)).map((t) => new Date(t));
+  const dated = eventMarks(events, xDomain, dark, width - 56 - 16);
   const plot = Plot.plot({
     ...plotOptions({width, height: options.height ?? (width < 480 ? 240 : 300), marginTop: 16, marginLeft: 56, marginRight: 16}),
     x: {type: "utc", label: null, ticks: timeTicks(xDomain, width), tickFormat: format.axis("month")},
-    y: {label: yLabel, labelArrow: "none", grid: true, tickFormat: format.axis(unit)},
+    y: {label: yLabel, labelArrow: "none", grid: true, tickFormat: format.axis(unit),
+      ...(dated.marks.length > 1 ? {insetTop: dated.inset} : null)},
     color,
     marks: [
+      ...dated.marks,
       Plot.rectY(data, {x: "__x", interval: "month", y: "__y", fill: z ?? palette.color("accent", dark), order: keys.length ? keys : undefined,
         insetLeft: 1, insetRight: 1, tip: true,
         title: (d) => `${z ? `${format.modeName(d[z])} · ` : ""}${format.month(d[x])}\n${format.value(unit, d[y])}`}),
