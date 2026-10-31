@@ -20,7 +20,7 @@ const NAV = [
     source: "companies/[company].md",
     pages: Object.entries(COMPANIES).map(([company, name]) => ({name, path: `/companies/${company}`}))
   },
-  {name: "Zones", path: "/zones", source: "zones/index.md"},
+  {name: "Zones", path: "/zones/", source: "zones/index.md"},
   {name: "Airports", path: "/airports", source: "airports.md"},
   {name: "Drivers", path: "/drivers", source: "drivers.md"},
   {name: "Prices", path: "/prices", source: "prices.md"},
