@@ -54,5 +54,5 @@ routes:
     methods: cleaning
   /methods:
     source: methods.md
-    files: [quality.json]
+    files: [quality.json, congestion.json, events.json]   # the download links fetch only on click
     methods: null
