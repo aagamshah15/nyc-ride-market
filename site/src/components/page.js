@@ -22,8 +22,12 @@ export {Inputs, html};
 const ROOT = new URL("../../", import.meta.url);
 
 /** An absolute URL for a site path such as "methods#tips" or "zones/132". */
+// Routes whose page is an index file (zones/index.md): Framework's preview serves them only with the
+// trailing slash, so findings that link to "/zones" get it added here.
+const INDEX_ROUTES = new Set(["/zones"]);
+
 export function siteUrl(path) {
-  return new URL(path.replace(/^\//, ""), ROOT).href;
+  return new URL((INDEX_ROUTES.has(path) ? `${path}/` : path).replace(/^\//, ""), ROOT).href;
 }
 
 /** A notice while a page shows mock or unvalidated data; nothing for validated real data. */

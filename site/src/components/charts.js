@@ -127,18 +127,28 @@ function timeTicks([x0, x1], width) {
   return step >= 12 ? `${step / 12} year${step > 12 ? "s" : ""}` : `${step} month${step > 1 ? "s" : ""}`;
 }
 
-/** Dated rules with labels (events.json rows or {date, label}), labels stacked at the top. */
-function eventMarks(events, [x0, x1], dark) {
+/**
+ * Dated rules with labels (events.json rows or {date, label}), labels stacked at the top. A label
+ * wraps to the room beside its rule (Plot's lineWidth is in ems, about two characters each), so it
+ * stays inside narrow charts. Returns the marks and the inset the stacked labels need.
+ */
+function eventMarks(events, [x0, x1], dark, innerWidth) {
   const visible = (events ?? [])
     .map((e) => ({...e, date: format.utcDate(e.date)}))
     .filter((e) => e.date >= x0 && e.date <= x1);
-  return [
-    Plot.ruleX(visible, {x: "date", stroke: palette.color("muted", dark), strokeWidth: 1.5}),
-    ...visible.map((e, i) => Plot.text([e], {
-      x: "date", text: "label", frameAnchor: "top", dy: 6 + i * 15, dx: (e.date - x0) / (x1 - x0) > 0.55 ? -5 : 5,
-      textAnchor: (e.date - x0) / (x1 - x0) > 0.55 ? "end" : "start", fill: "currentColor", fontSize: 11, ...HALO
-    }))
-  ];
+  const marks = [Plot.ruleX(visible, {x: "date", stroke: palette.color("muted", dark), strokeWidth: 1.5})];
+  let top = 6;
+  for (const e of visible) {
+    const at = (e.date - x0) / (x1 - x0);
+    const right = at <= 0.55;
+    const ems = Math.max(6, ((right ? 1 - at : at) * innerWidth - 8) / 11);
+    marks.push(Plot.text([e], {
+      x: "date", text: "label", frameAnchor: "top", lineAnchor: "top", dy: top, dx: right ? 5 : -5,
+      textAnchor: right ? "start" : "end", lineWidth: ems, fill: "currentColor", fontSize: 11, ...HALO
+    }));
+    top += 11 * Math.ceil(String(e.label).length / (2 * ems)) + 4;
+  }
+  return {marks, inset: top + 2};
 }
 
 /** Labelled vertical rules at numeric x positions ({x, label}), e.g. a transition week. */
@@ -183,20 +193,21 @@ export function lineChart(rows, options = {}) {
   const tipTitle = (d) => `${z ? `${seriesLabel(d[z])} · ` : ""}${xText(d[x])}\n${format.value(yUnit, d[y])}`;
   const labelled = endLabels && z && keys.length > 1 && width >= 480;
   const longest = Math.max(0, ...keys.map((k) => String(seriesLabel(k)).length));
-  const nEvents = (events?.length ?? 0) + (rules?.length ?? 0);
+  const marginRight = labelled ? 18 + longest * 7 : 16, marginLeft = options.marginLeft ?? 48;
+  const dated = temporal ? eventMarks(events, xDomain.map((t) => new Date(t)), dark, width - marginLeft - marginRight) : null;
+  const insetTop = dated ? (dated.marks.length > 1 ? dated.inset : 0) : (rules?.length ? 8 + rules.length * 15 : 0);
 
   const base = {
-    ...plotOptions({width, height: options.height ?? (width < 480 ? 260 : 320), marginTop: 24,
-      marginRight: labelled ? 18 + longest * 7 : 16, marginLeft: options.marginLeft ?? 48}),
+    ...plotOptions({width, height: options.height ?? (width < 480 ? 260 : 320), marginTop: 24, marginRight, marginLeft}),
     x: temporal
       ? {type: "utc", label: options.xLabel ?? null, labelArrow: "none", ticks: timeTicks(xDomain.map((t) => new Date(t)), width), tickFormat: format.axis("month")}
       : {label: options.xLabel, labelArrow: "none", tickFormat: xType === "hour" ? format.hourOfDay : format.axis("number"), ticks: xType === "hour" ? [0, 6, 12, 18] : undefined},
     y: {label: yLabel, labelArrow: "none", grid: true, zero, nice: true, tickFormat: format.axis(yUnit),
-      ...(nEvents ? {insetTop: 8 + nEvents * 15} : null)},
+      ...(insetTop ? {insetTop} : null)},
     color: color ?? undefined
   };
   const marks = [
-    ...(temporal ? eventMarks(events, xDomain.map((t) => new Date(t)), dark) : ruleMarks(rules, dark)),
+    ...(dated ? dated.marks : ruleMarks(rules, dark)),
     Plot.lineY(data, {x: "__x", y: "__y", z, stroke, strokeWidth: 2, strokeLinejoin: "round", strokeLinecap: "round"}),
     Plot.ruleX(data, Plot.pointerX({x: "__x", stroke: palette.color("muted", dark)})),
     Plot.dot(data, Plot.pointerX({x: "__x", y: "__y", fill: stroke, r: 4, stroke: SURFACE, strokeWidth: 2})),

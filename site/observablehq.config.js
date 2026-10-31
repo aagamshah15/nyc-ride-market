@@ -31,7 +31,9 @@ export default {
   title: "NYC Ride Market",
   root: "src",
   style: "style.css",
-  globalStylesheets: [],   // Inter is self-hosted (style.css); no Google Fonts request
+  // Inter is self-hosted (style.css), so no Google Fonts request. page.js pins Inputs by version, which
+  // hides it from Framework's implicit-stylesheet check, so its stylesheet is loaded for every page here.
+  globalStylesheets: ["observablehq:stdlib/inputs.css"],
   pages: NAV.filter(({source}) => exists(source)).map(({source, ...page}) => page),
   dynamicPaths: [
     ...(exists("companies/[company].md") ? Object.keys(COMPANIES).map((c) => `/companies/${c}`) : []),
