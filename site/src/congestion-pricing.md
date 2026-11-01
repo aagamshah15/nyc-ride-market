@@ -18,6 +18,8 @@ const data = FileAttachment("data/congestion.json").json();
 const geo = FileAttachment("data/taxi_zones.geojson").json();
 const tiles = FileAttachment("data/tiles.json").json();
 const events = FileAttachment("data/events.json").json();
+// The published congestion-zone list, for the map's outline of the core zones.
+const quality = FileAttachment("data/quality.json").json();
 ```
 
 ```js
@@ -37,13 +39,15 @@ const byMetricAndMode = (a, b) =>
 const core = data.effects.filter((d) => d.zone_list === "core").sort(byMetricAndMode);
 
 // The headline weekly series: trips touching the zone, all modes, core list. Weeks left out of the
-// summary (holiday weeks that fall differently in the two years) are left off the line too.
+// summary (holiday weeks that fall differently in the two years) are left off the line too, which
+// breaks there rather than joining across them.
 const weekly = data.weekly_effect.filter((d) => d.metric === "trips" && d.mode === "all" && d.zone_list === "core");
 const excludedWeeks = [...new Set(weekly.filter((d) => d.excluded).map((d) => d.week_start))];
 const excludedReasons = [...new Set(data.excluded_weeks.map((d) => d.reason))];
 
 const [firstYear, lastYear] = [Math.min(...data.weekly_trips.map((d) => d.iso_year)), Math.max(...data.weekly_trips.map((d) => d.iso_year))];
 const GROUP_LABELS = {treated: "Touching the zone", control: "Elsewhere"};
+const coreZones = (quality.cbd_zones ?? []).filter((z) => !z.borderline).map((z) => z.zone);
 ```
 
 ```js
@@ -55,7 +59,8 @@ Every result on this page is an estimated effect. It compares the year-on-year c
 ## Estimated effects by mode
 
 ```js
-display(effectDots(core, {fyLabels: METRIC_LABELS, subtitle: data.subtitles.effects, asOf, width, dark}));
+// All modes takes the one palette colour no row here uses: the text colour would match Uber's.
+display(effectDots(core, {fyLabels: METRIC_LABELS, colors: {all: "other_hv"}, subtitle: data.subtitles.effects, asOf, width, dark}));
 ```
 
 <p class="nrm-note">Base fare excludes the congestion fee itself, which riders pay on top. Driver share is reported for the ride-hail apps only.</p>
@@ -63,8 +68,8 @@ display(effectDots(core, {fyLabels: METRIC_LABELS, subtitle: data.subtitles.effe
 ## Week by week
 
 ```js
-display(lineChart(weekly.filter((d) => !d.excluded), {
-  x: "week_start", xType: "week", y: "effect", yUnit: "effect", z: null,
+display(lineChart(weekly.map((d) => (d.excluded ? {...d, effect: null} : d)), {
+  x: "week_start", xType: "week", y: "effect", yUnit: "effect", z: null, gaps: true,
   yLabel: "Estimated effect on trips touching the zone (%)",
   events: events.events, subtitle: data.subtitles.weekly_effect, asOf, width, dark
 }));
@@ -136,10 +141,10 @@ display(monthlyColumns(data.fees, {y: "cbd_fee", unit: "usd", yLabel: "Congestio
 ```js
 display(choropleth(geo, data.zone_change, {value: "change", unit: "effect", kind: "diverging",
   legendLabel: `Change in pickups per day, ${lastYear} on ${firstYear} (%)`, href: (zone) => siteUrl(`zones/${zone}`),
-  subtitle: data.subtitles.zone_change, asOf, width: Math.min(width, 640), dark}));
+  outline: {zones: coreZones, label: "Congestion zone (core list)"}, subtitle: data.subtitles.zone_change, asOf, width: Math.min(width, 640), dark}));
 ```
 
-<p class="nrm-note">This map has no comparison group, so it shows where pickups moved, not an estimated effect. Click a zone to open its page.</p>
+<p class="nrm-note">This map has no comparison group, so it shows where pickups moved, not an estimated effect. The outline marks the taxi zones on the congestion zone's core list. Click a zone to open its page.</p>
 
 ## Limits
 

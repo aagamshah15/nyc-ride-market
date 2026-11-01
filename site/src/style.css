@@ -159,6 +159,49 @@ table,
   margin-top: 0.75rem;
 }
 
+/* Policy dates: each rule's numbered badge, named in this key above the plot. */
+.nrm-events {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem 1.25rem;
+  list-style: none;
+  margin: 0 0 0.5rem;
+  padding: 0;
+  font: 12px/1.35 var(--sans-serif);
+  max-width: none;
+}
+
+.nrm-events li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.35rem;
+  margin: 0;
+}
+
+.nrm-event-badge {
+  flex: none;
+  margin-top: -0.05rem;
+}
+
+/* Map extras beside the colour legend: the no-data hatch and any outlined set of zones. */
+.nrm-map-key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.25rem;
+  margin: 0.25rem 0 0.5rem;
+  font: 12px/1.35 var(--sans-serif);
+}
+
+.nrm-map-key span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.nrm-zoom {
+  margin-top: 0.75rem;
+}
+
 .nrm-facet-label {
   color: var(--theme-foreground);
   font-size: 13px;
