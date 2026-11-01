@@ -36,12 +36,22 @@ _Only this lane writes here. Newest first._
 
 | Date | State | Note |
 |---|---|---|
-| | not started | |
+| 1 Nov 2026 | review done | `reports/launch_review.md` on `main` at `83f2488`: 0 blockers, 10 should-fix, 17 nits. The integrator routes the fixes; re-check when they land |
 
 **Blocked:** none
 
 **Hand-off**
-- Built:
+- Built: `reports/launch_review.md`, with 27 numbered findings (route, evidence, owner, severity), a summary table and the checklist. Results: 7 items pass, 3 fail (subtitle vs chart, dark mode, zone spot-check).
 - Checked:
+  - **Built site:** real 2026-08 data, served from `site/dist`.
+  - **Light mode at 1280 px:** all 10 top-level routes.
+  - **Dark mode:** 6 routes and zones.
+  - **375 px:** 8 routes plus zone 132.
+  - **Ten zone pages:** 1, 27, 43, 105, 132, 138, 161, 199, 207, 237, plus a script over all 263 zone files.
+  - **Scripted checks:** prose digits, colour literals, banned words, anchors, `validated` and `MOCK`, budget and contract tests (61 passed).
+  - **Colour blindness:** Machado (2009) simulation, numeric (CIEDE2000) and as an in-page SVG filter.
 - Known limits:
-- Follow-ups:
+  - The built-in browser pane was often hidden, so pages rendered only when a screenshot forced a frame.
+  - Dark mode wasn't screenshotted on `/drivers`, `/methods` or the company pages; they share components already checked in dark.
+  - Only the Uber company page was checked at 375 px; the other three share its template.
+- Follow-ups: the fixes routed by owner (L05: findings 1, 5, 7, 8, 17; L11: 15 findings; L12, L13, L14, L15, L16: see the report's summary). Finding 7 touches D20's colours and finding 10 touches `contracts/site/tiles.yaml`, so both go through the integrator.
