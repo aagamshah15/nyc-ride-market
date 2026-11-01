@@ -1,0 +1,331 @@
+# Monthly refresh (SPEC §10, D6): notice a new TLC month, process, validate, publish and deploy it.
+# Lane L17 · docs/lanes/L17-refresh-deploy.md
+#
+#   check    restore the newest data-YYYY-MM Release, take the month after the latest in it,
+#            and HEAD that month's three trip files; stop quietly if any isn't posted
+#   refresh  make month → make validate → make publish → make test → deploy guard → commit
+#            site/src/data/ (on main)
+#   deploy   GitHub Pages (main only: the github-pages environment refuses other branches)
+#   release  upload the new aggregates as Release data-YYYY-MM. Last, so a month counts as done
+#            only once it is live; if anything earlier fails, the next run redoes the month
+#
+# A validation failure opens an issue with reports/validation.md and stops: nothing is committed,
+# deployed or uploaded. On a branch other than main the run stops after the deploy guard.
+# redeploy_only skips make month and rebuilds the site from the newest Release: for a month
+# processed locally (SPEC §10's fallback, reports/runner_check.md) or a site change on main.
+
+name: refresh
+
+on:
+  workflow_dispatch:
+    inputs:
+      month:
+        description: "Month to process, YYYY-MM. Empty: the month after the latest in the aggregates"
+        type: string
+        default: ""
+      drill_validation_failure:
+        description: "Drill: treat validation as failed (opens an issue, deploys nothing)"
+        type: boolean
+        default: false
+      redeploy_only:
+        description: "Skip make month: validate, publish and deploy the newest Release's aggregates"
+        type: boolean
+        default: false
+  # SPEC §10's weekly check, Mondays 14:00 UTC. Off until G6: the user uncomments these lines
+  # once a manual run has completed end to end and the failure drill has opened its issue.
+  # schedule:
+  #   - cron: "0 14 * * 1"
+
+# The repo's default token is read-only (D14), so each job asks for what it needs:
+# contents: write (commit, Release), pages: write and id-token: write (Pages), issues: write.
+permissions:
+  contents: read
+
+concurrency:
+  group: refresh
+  cancel-in-progress: false
+
+env:
+  GH_REPO: ${{ github.repository }}
+
+defaults:
+  run:
+    shell: bash   # -eo pipefail
+
+jobs:
+  check:
+    name: Check for a new TLC month
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    outputs:
+      tag: ${{ steps.restore.outputs.tag }}
+      month: ${{ steps.month.outputs.month }}
+      posted: ${{ steps.head.outputs.posted }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --quiet -e .
+
+      - name: Restore aggregates from the newest data Release (SPEC §10 step 2)
+        id: restore
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="$(python -m pipeline.release download --dir "$RUNNER_TEMP")"
+          python -m pipeline.release unpack --archive "$RUNNER_TEMP/aggregates.tar.zst"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Next expected month
+        id: month
+        env:
+          MONTH_INPUT: ${{ inputs.month }}
+          REDEPLOY_ONLY: ${{ inputs.redeploy_only }}
+        run: |
+          if [ "$REDEPLOY_ONLY" = "true" ]; then
+            month="$(python -m pipeline.release latest-month)"
+          elif [ -n "$MONTH_INPUT" ]; then
+            month="$(python -m pipeline.common months "$MONTH_INPUT" "$MONTH_INPUT")"   # rejects anything but YYYY-MM
+          else
+            month="$(python -m pipeline.release next-month)"
+          fi
+          echo "Aggregates run through $(python -m pipeline.release latest-month); checking $month"
+          echo "month=$month" >> "$GITHUB_OUTPUT"
+
+      - name: HEAD the month's three trip files (SPEC §10 step 1)
+        id: head
+        env:
+          MONTH: ${{ steps.month.outputs.month }}
+          REDEPLOY_ONLY: ${{ inputs.redeploy_only }}
+        run: |
+          if [ "$REDEPLOY_ONLY" = "true" ]; then
+            echo "posted=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::redeploy_only: rebuilding the site from the aggregates through $MONTH"
+            exit 0
+          fi
+          set +e
+          python -m pipeline.ingest --check "$MONTH"
+          code=$?
+          set -e
+          case "$code" in
+            0) echo "posted=true" >> "$GITHUB_OUTPUT" ;;
+            1) echo "posted=false" >> "$GITHUB_OUTPUT"
+               echo "::notice::$MONTH isn't posted for all three datasets yet; nothing to do" ;;
+            *) exit "$code" ;;   # 4: the check itself failed (network, server)
+          esac
+
+  refresh:
+    name: Process, validate and publish ${{ needs.check.outputs.month }}
+    needs: check
+    if: needs.check.outputs.posted == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    permissions:
+      contents: write   # push the site data commit
+      issues: write     # open an issue when validation fails
+    outputs:
+      sha: ${{ steps.commit.outputs.sha }}
+    env:
+      MONTH: ${{ needs.check.outputs.month }}
+      TAG: ${{ needs.check.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+      - run: make setup PYTHON=python
+
+      - name: Restore aggregates (SPEC §10 step 2)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python -m pipeline.release download --tag "$TAG" --dir "$RUNNER_TEMP" > /dev/null
+          python -m pipeline.release unpack --archive "$RUNNER_TEMP/aggregates.tar.zst"
+          rm "$RUNNER_TEMP/aggregates.tar.zst"
+
+      - name: Lookup files, indicators and zone map
+        run: |
+          make ref
+          make zones
+
+      # Disk is sampled every 5 s and GNU time records wall time and peak memory, for
+      # reports/runner_check.md (SPEC §10: check the runner's disk and time limit).
+      - name: make month (SPEC §10 step 3)
+        if: inputs.redeploy_only != true
+        run: |
+          df -BM --output=size,used,avail "$GITHUB_WORKSPACE" > "$RUNNER_TEMP/disk-before.txt"
+          ( while true; do df -BM --output=avail "$GITHUB_WORKSPACE" | tail -n 1; sleep 5; done ) \
+            > "$RUNNER_TEMP/disk-avail.txt" &
+          sampler=$!
+          trap 'kill "$sampler"' EXIT
+          if [ -x /usr/bin/time ]; then
+            /usr/bin/time -v -o "$RUNNER_TEMP/month-time.txt" make month MONTH="$MONTH"
+          else
+            make month MONTH="$MONTH"
+          fi
+
+      - name: Runner measurements
+        if: always()
+        run: |
+          {
+            echo "### Runner check: make month $MONTH"
+            echo '```'
+            echo "cores: $(nproc)"
+            free -h
+            echo
+            echo "disk before make month:"
+            cat "$RUNNER_TEMP/disk-before.txt" 2>/dev/null || true
+            echo "least free during make month: $(sort -n "$RUNNER_TEMP/disk-avail.txt" 2>/dev/null | head -n 1)"
+            echo
+            grep -E "Elapsed|Maximum resident" "$RUNNER_TEMP/month-time.txt" 2>/dev/null || echo "no GNU time output"
+            echo
+            du -sh data/* 2>/dev/null || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: make validate (SPEC §10 step 4)
+        id: validate
+        env:
+          DRILL: ${{ inputs.drill_validation_failure }}
+        run: |
+          make validate
+          if [ "$DRILL" = "true" ]; then
+            echo "::error::Drill: validation passed but is treated as failed"
+            exit 1
+          fi
+
+      - name: Open an issue with reports/validation.md
+        if: failure() && steps.validate.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DRILL: ${{ inputs.drill_validation_failure }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          title="Refresh $MONTH: validation failed"
+          if [ "$DRILL" = "true" ]; then title="[drill] $title"; fi
+          body="$RUNNER_TEMP/issue.md"
+          {
+            echo "The refresh of **$MONTH** stopped at \`make validate\`. Nothing was committed, deployed or uploaded."
+            echo
+            if [ "$DRILL" = "true" ]; then
+              echo "_Drill: the run was started with \`drill_validation_failure\`, so validation was treated as failed whatever it found._"
+              echo
+            fi
+            echo "Run: $RUN_URL"
+            echo
+            echo "---"
+            echo
+            if [ -f reports/validation.md ]; then
+              head -c 60000 reports/validation.md
+            else
+              echo "\`reports/validation.md\` wasn't written; see the run log."
+            fi
+          } > "$body"
+          number="$(gh issue list --state open --limit 100 --json number,title \
+            | TITLE="$title" python -c 'import json, os, sys; print(next((str(i["number"]) for i in json.load(sys.stdin) if i["title"] == os.environ["TITLE"]), ""))')"
+          if [ -n "$number" ]; then
+            gh issue comment "$number" --body-file "$body"
+          else
+            gh issue create --title "$title" --body-file "$body"
+          fi
+
+      - name: Keep the validation report
+        if: failure() && steps.validate.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: validation-report
+          path: reports/validation.md
+          if-no-files-found: ignore
+
+      - name: make publish and make test (SPEC §10 step 5)
+        run: |
+          make publish
+          make test
+
+      - name: Deploy guard
+        run: python scripts/deploy_guard.py --month "$(python -m pipeline.release latest-month)"
+
+      - name: Commit site/src/data/
+        id: commit
+        if: github.ref == 'refs/heads/main'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add site/src/data reports/validation.md
+          if git diff --cached --quiet; then
+            echo "site/src/data/ is unchanged"
+          else
+            git commit -m "Refresh site data through $(python -m pipeline.release latest-month)" \
+                       -m "refresh workflow run $GITHUB_RUN_ID, month $MONTH"
+            git pull --rebase origin main
+            git push origin HEAD:main
+          fi
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Upload the site for Pages
+        if: github.ref == 'refs/heads/main'
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: site/dist
+
+      - name: Pack the new aggregates
+        if: github.ref == 'refs/heads/main'
+        run: python -m pipeline.release pack --archive "$RUNNER_TEMP/aggregates.tar.zst"
+
+      - name: Keep the aggregates for the release job
+        if: github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: aggregates
+          path: ${{ runner.temp }}/aggregates.tar.zst
+          retention-days: 7
+          compression-level: 0
+          if-no-files-found: error
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: refresh
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
+
+  release:
+    name: Upload the aggregates as a Release asset
+    needs: [refresh, deploy]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write   # create the Release and its tag
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --quiet -e .
+      - uses: actions/download-artifact@v4
+        with:
+          name: aggregates
+          path: ${{ runner.temp }}
+      - name: Upload aggregates.tar.zst
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET: ${{ needs.refresh.outputs.sha }}
+        run: python -m pipeline.release upload --archive "$RUNNER_TEMP/aggregates.tar.zst" --target "$TARGET"
