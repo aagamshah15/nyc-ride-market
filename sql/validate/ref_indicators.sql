@@ -4,14 +4,16 @@
 --         (pipeline/validate.py checks the header first). Empty cells arrive as NULL.
 -- Output  one row per Year/Month × License Class, column names unchanged:
 --   month                                   DATE, first day of "Year/Month"
---   "Year/Month"                            text as published, e.g. 2026-08
+--   "Year/Month"                            text as published: 2026-08, or 2026-08-01 since NYC Open
+--                                           Data switched the column to full dates (Nov 2026)
 --   "License Class"                         text, e.g. FHV - High Volume, Yellow, Green
 --   numeric columns                         DOUBLE, values unchanged
 --   "Percent of Trips Paid with Credit Card" DOUBLE, a whole-number percent (79 = 79%), NULL for FHV classes
 -- A value that doesn't parse fails the load; nothing is coerced to NULL.
 
 SELECT
-    CAST(strptime("Year/Month", '%Y-%m') AS DATE)           AS month,
+    CAST(coalesce(try_strptime("Year/Month", '%Y-%m-%d'),
+                  strptime("Year/Month", '%Y-%m')) AS DATE)  AS month,
     "Year/Month",
     "License Class",
     CAST("Trips Per Day" AS DOUBLE)                         AS "Trips Per Day",

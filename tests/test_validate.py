@@ -711,6 +711,19 @@ def test_ref_indicators_keeps_names_and_values():
     assert green["Trips Per Day Shared"] is None
 
 
+def test_ref_indicators_reads_full_dates_and_rejects_other_months():
+    """NYC Open Data now publishes Year/Month as 2026-08-01; both forms load, anything else fails."""
+    write_indicators(lines=[
+        "2026-09-01,Green,1486,39626,525,509,307,18,3.9,18,3.8,17.3,,",
+        "2026-08,Yellow,115307,3456554,12958,9995,7948,24,8.6,21,7.5,19,,",
+    ])
+    rows = pq.read_table(validate.load_ref_indicators()).to_pylist()
+    assert [(r["month"], r["Year/Month"]) for r in rows] == [(date(2026, 8, 1), "2026-08"), (date(2026, 9, 1), "2026-09-01")]
+    write_indicators(lines=["Sep 2026,Green,1486,39626,525,509,307,18,3.9,18,3.8,17.3,,"])
+    with pytest.raises(Exception, match="Sep 2026"):
+        validate.load_ref_indicators()
+
+
 def test_ref_indicators_rejects_another_header():
     write_indicators(header=REAL_HEADER.replace("Year/Month", "Month/Year"))
     with pytest.raises(ValueError, match=r"missing \['Year/Month'\], unexpected \['Month/Year'\]"):
