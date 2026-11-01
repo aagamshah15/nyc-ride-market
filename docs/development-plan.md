@@ -49,7 +49,7 @@ The integrator keeps the Status column current.
 | [L14](lanes/L14-pages-zones.md) | Pages: Zones | `zones/[zone].md`, `zones/index.md` | 4 | L05 done | Q1, Q8, Q10 | done: merged 30 Oct (`66de92b`); zones index + 263 zone pages, build 7 s |
 | [L15](lanes/L15-pages-congestion-drivers.md) | Pages: Congestion + Drivers | `congestion-pricing.md`, `drivers.md` | 4 | L05 done | Q2, Q3, Q5, Q6, Q14, Q15 | done: merged 31 Oct (`cbdccb1`); congestion pricing + drivers; fee chart events added by the integrator (`120bdb1`) |
 | [L16](lanes/L16-pages-airports-prices.md) | Pages: Airports + Prices | `airports.md`, `prices.md` | 4 | L05 done | Q7, Q9 | done: merged 31 Oct (`8e98fe5`); airports + prices |
-| [L17](lanes/L17-refresh-deploy.md) | Refresh and deploy | `.github/workflows/refresh.yml`, release scripts | 4 | L11 writes real data; GitHub repo exists | — | built, merged 1 Nov (`838fc6e`): `workflow_dispatch` only, schedule commented out; nothing has run on GitHub. G6 steps are the user's (lane hand-off) |
+| [L17](lanes/L17-refresh-deploy.md) | Refresh and deploy | `.github/workflows/refresh.yml`, release scripts | 4 | L11 writes real data; GitHub repo exists | — | done: first end-to-end run passed 1 Nov; site live; weekly schedule on (Mondays 14:00 UTC) |
 | [L18](lanes/L18-launch-review.md) | Launch review | `reports/launch_review.md` | 5 | G5 | all | done 1 Nov: 0 blockers, 10 should-fix, 17 nits; 26 fixed (`930faec`, `e5da94b`), #18 open for the user |
 
 ---
@@ -124,6 +124,14 @@ All gate checks run in the integrator space. G1, G3, G4, G5 and G6 are SPEC §11
 
 ### Gate log
 
+- **G6, 1 Nov 2026: passed. v1 is live at https://aagamshah15.github.io/nyc-ride-market/** (the user said "Yes, launch"; SPEC §11 phase 5).
+  - **Refresh workflow ran once end to end:** [run 41362907480](https://github.com/aagamshah15/nyc-ride-market/actions/runs/41362907480) on `main`, `month: 2026-08`, all four jobs green. `github-actions[bot]` committed `cc76515`, Pages deployed, Release `data-2026-08` was refreshed, about 5 minutes in all (`reports/runner_check.md`). Two first-run fixes on the way:
+    - `.venv/bin` on PATH in the refresh job (`472bb5a`);
+    - NYC Open Data switched the indicators' `Year/Month` to full dates (`7d874bb`). With the fresh file, green's tie-out is within ±2% in every month.
+  - **Failure path:** the real failure (issue #1) and the [drill](https://github.com/aagamshah15/nyc-ride-market/actions/runs/41363445673) (issue #2) both opened an issue with the report and deployed, committed and uploaded nothing. Both issues are closed.
+  - **L18 review closed:** 26 of 27 findings fixed; #18 (static `<title>` on dynamic routes) accepted with the launch.
+  - **Methods page complete** and **phone layout checked** (L18, 375 px).
+  - **Weekly schedule enabled:** Mondays 14:00 UTC. It checks for the next TLC month and stops quietly until it's posted.
 - **Toward G6, 1 Nov 2026.** L17 (refresh workflow) and the L18 launch review merged (`838fc6e`). Two fix sessions and integrator follow-ups closed 26 of L18's 27 findings (`930faec`, `e5da94b`). #18 (static `<title>` on dynamic routes, which Framework 1.13.4 can't set) waits for the user to accept it. The real data was re-published; `make test` passes (546).
   - **G6 status:**
     - methods page complete: ✅

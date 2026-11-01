@@ -31,10 +31,10 @@ on:
         description: "Skip make month: validate, publish and deploy the newest Release's aggregates"
         type: boolean
         default: false
-  # SPEC §10's weekly check, Mondays 14:00 UTC. Off until G6: the user uncomments these lines
-  # once a manual run has completed end to end and the failure drill has opened its issue.
-  # schedule:
-  #   - cron: "0 14 * * 1"
+  # SPEC §10's weekly check, Mondays 14:00 UTC. Enabled at G6 (1 Nov 2026) after a manual run
+  # completed end to end and the failure drill opened its issue.
+  schedule:
+    - cron: "0 14 * * 1"
 
 # The repo's default token is read-only (D14), so each job asks for what it needs:
 # contents: write (commit, Release), pages: write and id-token: write (Pages), issues: write.

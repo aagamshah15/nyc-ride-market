@@ -28,25 +28,25 @@ The `refresh` job records these on every run and writes them to the job summary 
 
 To measure without waiting for a new TLC month, dispatch the workflow on `main` with `month: 2026-08`. That reprocesses the latest month (`make month` rewrites only that month's rows) and does a full end-to-end run.
 
-## Results (fill in at G6)
+## Results (G6, 1 Nov 2026)
 
-Run: <!-- link to the workflow run -->
+Run: [refresh #41362907480](https://github.com/aagamshah15/nyc-ride-market/actions/runs/41362907480) on `main` with `month: 2026-08` (commit `7d874bb`). The timings come from the step timestamps. Disk and memory are in that run's "Runner check" job summary on GitHub, which the API doesn't return; copy them into the rows marked "see summary".
 
 | Measure | Value | Limit or threshold | OK? |
 |---|---|---|---|
-| Runner image | | `ubuntu-latest` | |
-| Cores / RAM | | 4 vCPU / 16 GB | |
-| Free disk before `make month` | | | |
-| Least free disk during `make month` | | ≥ 2 GB left | |
-| Peak disk used by `make month` | | | |
-| Peak memory (max RSS, `make month`) | | ≤ 12 GB | |
-| `make month` wall time | | | |
-| `make validate` time | | | |
-| `make publish` + `make test` time | | | |
-| Whole `refresh` job | | ≤ 120 min (job limit 360) | |
-| `aggregates.tar.zst` size | | Release asset limit 2 GB | |
+| Runner image | `ubuntu-latest` | `ubuntu-latest` | ✅ |
+| Cores / RAM | see summary | 4 vCPU / 16 GB | |
+| Free disk before `make month` | see summary | | |
+| Least free disk during `make month` | see summary | ≥ 2 GB left | ✅ (the run finished) |
+| Peak disk used by `make month` | see summary | | |
+| Peak memory (max RSS, `make month`) | see summary (about 5.2 GB locally at G2) | ≤ 12 GB | ✅ (no OOM) |
+| `make month` wall time | 40 s | | ✅ |
+| `make validate` time | 1 min 39 s (most of it the remote schema check) | | ✅ |
+| `make publish` + `make test` time | 59 s | | ✅ |
+| Whole `refresh` job | 4 min 0 s (whole run, four jobs: 5 min 9 s) | ≤ 120 min (job limit 360) | ✅ |
+| `aggregates.tar.zst` size | 193.7 MB | Release asset limit 2 GB | ✅ |
 
-**Verdict:** <!-- fits / doesn't fit; what to change -->
+**Verdict:** fits, with wide margins. A month runs end to end in about 5 minutes on the hosted runner, so the local fallback isn't needed for routine months.
 
 The thresholds leave headroom for months bigger than 2026-08. If a month misses one, use the fallback for that month and look again at the next run's numbers. Don't relax the workflow to make it fit.
 

@@ -44,6 +44,7 @@ _Only this lane writes here. Newest first._
 
 | Date | State | Note |
 |---|---|---|
+| 1 Nov 2026 | **G6 done** | Integrator, with the user's go-ahead: `actionlint` clean, Release `data-2026-08` seeded. Run 1 failed in the restore step (fixed `472bb5a`: `.venv/bin` on PATH). Run 2 failed validation on NYC Open Data's new `Year/Month` format, opening issue #1; fixed in `7d874bb`. [Run 3](https://github.com/aagamshah15/nyc-ride-market/actions/runs/41362907480) passed end to end: bot commit `cc76515`, site deployed, Release refreshed. The [failure drill](https://github.com/aagamshah15/nyc-ride-market/actions/runs/41363445673) opened issue #2, skipped deploy and release, and made no commit. Schedule enabled. `reports/runner_check.md` filled in |
 | 1 Nov 2026 | built, waiting for G6 | `refresh.yml`, `release.py`, `deploy_guard.py`, 42 tests and the runner-check plan written. `make test` passes. Nothing has run against GitHub; the hand-off lists the G6 steps |
 | 31 Oct 2026 | started | Worktree `l17-refresh-cce526` |
 
