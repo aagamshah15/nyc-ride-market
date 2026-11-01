@@ -2,6 +2,10 @@
   "as_of_month": "MOCK",
   "generated_at": "2026-10-24T00:00:00Z",
   "validated": false,
+  "subtitles": {
+    "valid_share": "MOCK subtitle for valid_share",
+    "tie_out": "MOCK subtitle for tie_out"
+  },
   "quality": [
     {
       "month": "2024-01-01",
@@ -46,17 +50,20 @@
       {
         "id": "tie_out",
         "status": "pass",
-        "summary": "MOCK summary for tie_out"
+        "summary": "MOCK summary for tie_out",
+        "text": "MOCK public text for tie_out"
       },
       {
         "id": "quality_drift",
         "status": "pass",
-        "summary": "MOCK summary for quality_drift"
+        "summary": "MOCK summary for quality_drift",
+        "text": "MOCK public text for quality_drift"
       },
       {
         "id": "cbd_list",
         "status": "pass",
-        "summary": "MOCK summary for cbd_list"
+        "summary": "MOCK summary for cbd_list",
+        "text": "MOCK public text for cbd_list"
       }
     ],
     "tie_out": [
