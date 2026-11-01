@@ -141,7 +141,11 @@ jobs:
           node-version: "24"
           cache: npm
           cache-dependency-path: site/package-lock.json
-      - run: make setup PYTHON=python
+      # make setup installs into .venv; later steps call `python -m pipeline.…` directly, so put the
+      # venv first on PATH for the rest of the job (the first run failed: no duckdb outside it).
+      - run: |
+          make setup PYTHON=python
+          echo "$GITHUB_WORKSPACE/.venv/bin" >> "$GITHUB_PATH"
 
       - name: Restore aggregates (SPEC §10 step 2)
         env:
