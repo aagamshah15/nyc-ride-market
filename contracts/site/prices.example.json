@@ -7,7 +7,8 @@
     "fpm_by_mode": "MOCK subtitle for fpm_by_mode",
     "fpm_by_hour": "MOCK subtitle for fpm_by_hour",
     "fpm_by_borough": "MOCK subtitle for fpm_by_borough",
-    "volatility_by_zone": "MOCK subtitle for volatility_by_zone"
+    "volatility_by_zone": "MOCK subtitle for volatility_by_zone",
+    "volatility_by_zone_lyft": "MOCK subtitle for volatility_by_zone_lyft"
   },
   "tiles": {
     "fpm_median": 3.348,

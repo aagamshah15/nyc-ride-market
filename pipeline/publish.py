@@ -18,6 +18,7 @@ import calendar
 import json
 import math
 import shutil
+import statistics
 import sys
 from collections import defaultdict
 from datetime import date, datetime, timezone
@@ -52,9 +53,13 @@ TILE_DIGITS = {"count": 1, "share": 4, "usd": 2, "usd_per_mile": 3, "usd_per_min
 NYC_BOROUGHS = ("Bronx", "Brooklyn", "Manhattan", "Queens", "Staten Island")   # for sentences naming one
 # Airports whose pickup records aren't TLC trips: TLC vehicles don't pick up at Newark, and its few
 # records (480 in zone 1 in Aug 2026, 478 yellow, 88% ending at Newark) are an artifact. Pickup-share
-# sentences, zone counts and maps leave its zone out (marked thin in the zone index, so maps grey it);
-# drop-offs and the data rows keep it.
+# sentences, zone counts and maps leave its zone out (marked thin in the zone index, so maps grey it),
+# and so do the per-zone rows built from its pickups: the index nulls its figures, zone_change and
+# volatility_by_zone drop it, and its zone file has no pickup series. Drop-offs keep it.
 NO_PICKUP_SHARES = ("EWR",)
+NO_PICKUP_FIGURES = ("trips_per_day", "rh_share", "yellow_share", "wait_p50", "share_change_yoy",   # zones/index.json
+                     "yellow_share_change_yoy", "top_mode")
+NO_PICKUP_SERIES = ("share_trend", "hour_heatmap", "top_destinations")    # emptied in that zone's file
 OUTSIDE_NYC = 265                        # "Outside of NYC": every out-of-city place in one zone (D26)
 TLC_CLASSES = {"FHV - High Volume": "ride_hail", "Yellow": "yellow", "Green": "green"}
 EVENT_LABELS = {"congestion_pricing_start": "Congestion pricing starts",            # D28; listed by date
@@ -455,6 +460,9 @@ class Site:
                  "yellow_share_change_yoy": _r(info["yellow_change"], 4),
                  "top_mode": info["top_mode"], "cbd": z in self.cbd_core, "thin": info["thin"]}
                 for z, info in zs.items()]
+        for row in rows:     # pickup records that aren't TLC trips: no figure reads them
+            if row["zone"] in self.no_pickup_zones:
+                row.update({key: None for key in NO_PICKUP_FIGURES})
         busiest = max((r for r in rows if r["zone"] not in self.no_pickup_zones), key=lambda r: r["trips_per_day"] or 0)
         tiles, yoy = self._tiles({"zones_yellow_leads": counts["yellow_leads"],
                                   "zones_lyft_beats_uber": counts["lyft_ahead"], "zones_rh_share_up": counts["rh_up"]},
@@ -475,7 +483,7 @@ class Site:
                 "tiles": tiles, "yoy": yoy, "rows": rows}
 
     def zone_files(self) -> dict[str, dict]:
-        m, p = self.month, self.prior
+        m = self.month
         share_trend = defaultdict(list)
         for r in self.out.rows("trip_share"):
             if r["mode"] in COMPANIES:
@@ -504,13 +512,12 @@ class Site:
         files = {}
         for z, info in self.zone_info().items():
             name, thin = self.zone_name(z), info["thin"]
-            hours: dict[int, float] = defaultdict(float)
-            for r in profile[z]:
-                hours[r["hour_of_week"]] += r["trips_per_week"] or 0.0
-            peak = _argmax(dict(hours))
             heatmap = [{"hour_of_week": r["hour_of_week"], "mode": r["mode"], "trips": _r(r["trips_per_week"], 1)}
                        for r in sorted(profile[z], key=lambda r: (_mode_rank(r["mode"]), r["hour_of_week"]))
                        if (r["mode_share_in_zone"] or 0) >= HEATMAP_MIN_SHARE]
+            # the single largest cell the per-mode grids draw (the first in mode order on a tie)
+            peak = max((r for r in heatmap if r["trips"] is not None), key=lambda r: r["trips"], default=None)
+            latest_share = {r["mode"]: r["share"] for r in share_trend[z] if r["month"] == m}
             dests = destinations[z]
             # name a mapped zone; "Outside of NYC" gets its own clause when it would have ranked first
             mapped = [d for d in dests if d["do_zone"] in ZONE_IDS]
@@ -526,11 +533,16 @@ class Site:
                 {"trips_per_day": info["prior_trips_per_day"], "wait_p50": wait_prior.get("wait_p50"),
                  "wait_p90": wait_prior.get("wait_p90")})
             yoy["rh_share"] = _r(info["rh_change"], 4)     # zone_share_change's own change
-            title = findings.zone_title(name=name, rh_share=info["rh_share"], trips=info["trips"], thin=thin, month=m)
+            if thin:     # as /zones blanks thin rows: no share or change from a handful of trips
+                tiles["rh_share"] = yoy["rh_share"] = yoy["trips_per_day"] = None
+            title = findings.zone_title(name=name, rh_share=info["rh_share"], trips=info["trips"], thin=thin, month=m,
+                                        airport=z in self.airports)
             subtitles = {
-                "share_trend": findings.zone_share_trend(rh_share=info["rh_share"], change=info["rh_change"],
-                                                         month=m, prior=p),
-                "hour_heatmap": findings.zone_hour_heatmap(peak_hour=peak, peak_trips=hours.get(peak),
+                "share_trend": findings.zone_share_trend(apps=[(a, latest_share.get(a)) for a in APPS],
+                                                         rh_share=info["rh_share"], change=info["rh_change"], month=m),
+                "hour_heatmap": findings.zone_hour_heatmap(mode=peak["mode"] if peak else None,
+                                                           peak_hour=peak["hour_of_week"] if peak else None,
+                                                           peak_trips=peak["trips"] if peak else None,
                                                            window=window, month=m),
                 "waits": findings.zone_waits(mode=info["app"], wait_p50=tiles["wait_p50"], thin=thin, month=m),
                 "top_destinations": findings.zone_top_destinations(
@@ -542,7 +554,7 @@ class Site:
                 subtitles = {chart: findings.zone_not_tlc(name=name, chart=chart) for chart in subtitles}
                 tiles = {key: None for key in tiles}
                 yoy = {key: None for key in yoy}
-            files[f"zones/{z}.json"] = {
+            zone_file = {
                 **self.env(), "zone": z, "name": name, "borough": self.lookup[z]["Borough"],
                 "flags": {"cbd": z in self.cbd_core, "cbd_borderline": z in self.cbd_borderline,
                           "airport": self.airports.get(z), "thin": thin},
@@ -552,6 +564,9 @@ class Site:
                 "waits": {"monthly": [] if thin else monthly_waits[z], "by_hour": [] if thin else hourly_waits[z]},
                 "top_destinations": dests,
             }
+            if info["no_pickups"]:
+                zone_file.update({key: [] for key in NO_PICKUP_SERIES})
+            files[f"zones/{z}.json"] = zone_file
         return files
 
     def airports_page(self) -> dict:
@@ -575,8 +590,8 @@ class Site:
             by_mode, total = totals(month, rows)
             return by_mode["yellow"] / total if total else None
 
-        def fare_mean(month: str) -> float | None:
-            rows = self.out.rows("airport_fares", to_month=month)
+        def fare_mean(month: str) -> float | None:     # trips from the airports with TLC pickups, together
+            rows = [r for r in self.out.rows("airport_fares", to_month=month) if r["airport"] not in NO_PICKUP_SHARES]
             trips = sum(r["trips"] for r in rows if r["fare_mean"] is not None)
             return sum(r["fare_mean"] * r["trips"] for r in rows if r["fare_mean"] is not None) / trips if trips else None
 
@@ -626,14 +641,19 @@ class Site:
                       "fare_base_mean": _r(r["fare_base_mean"], 2), "fare_per_mile": _r(r["fare_per_mile"], 3),
                       "trips_per_day": _r(r["trips"] / _days(m), 1)} for r in fares]
         fares_by_airport: dict[str, list] = defaultdict(list)
-        for r in fares:
-            fares_by_airport[r["airport"]].append(r)
-        focus = _argmax({a: sum(r["trips"] for r in rows) for a, rows in fares_by_airport.items()})
-        focus_rows = [r for r in fares_by_airport.get(focus, []) if r["fare_mean"] is not None]
-        focus_trips = sum(r["trips"] for r in focus_rows)
-        focus_mean = sum(r["fare_mean"] * r["trips"] for r in focus_rows) / focus_trips if focus_trips else None
-        cheapest = min(focus_rows, key=lambda r: r["fare_mean"]) if focus_rows else None
-        dearest = max(focus_rows, key=lambda r: r["fare_mean"]) if focus_rows else None
+        for r in fares:      # trips from an airport are pickups there
+            if r["airport"] not in NO_PICKUP_SHARES:
+                fares_by_airport[r["airport"]].append(r)
+        fare_ranges = []     # each airport's panel: its cheapest and dearest bars
+        for airport in sorted(fares_by_airport, key=_airport_rank):
+            bars = [r for r in fares_out if r["airport"] == airport and r["fare_mean"] is not None]
+            if bars:
+                low, high = min(bars, key=lambda r: r["fare_mean"]), max(bars, key=lambda r: r["fare_mean"])
+                fare_ranges.append((airport, (low["mode"], low["fare_mean"]), (high["mode"], high["fare_mean"])))
+
+        # yellow cabs' share of each airport's trips, as the trend chart draws it
+        yellow_at = {(r["month"], r["airport"]): r["share"] for r in share_trend if r["mode"] == "yellow"}
+        yellow_changes = [(a, _pts(yellow_at.get((m, a)), yellow_at.get((p, a)))) for a in both_ways]
 
         def mean_fare(rows: list[dict]) -> float | None:     # rider total ÷ trips, a ratio of sums
             rows = [r for r in rows if r["fare_mean"] is not None]
@@ -651,14 +671,10 @@ class Site:
                                              airports=both_ways, dropoff_only=dropoff_only, month=m),
             "subtitles": {
                 "split": findings.airports_split(leaders=leaders, month=m),
-                "share_trend": findings.airports_share_trend(
-                    yellow_change=_pts(yellow_share(m, counted), yellow_share(p, counted)), month=m, prior=p),
+                "share_trend": findings.airports_share_trend(changes=yellow_changes, month=m, prior=p),
                 "by_hour": findings.airports_by_hour(hour=busiest, trips_per_day=hourly.get(busiest),
                                                      window=window, month=m),
-                "fares": findings.airports_fares(
-                    airport=focus, fare_mean=focus_mean,
-                    cheapest=(cheapest["mode"], cheapest["fare_mean"]) if cheapest else None,
-                    dearest=(dearest["mode"], dearest["fare_mean"]) if dearest else None, month=m)},
+                "fares": findings.airports_fares(ranges=fare_ranges, month=m)},
             "tiles": tiles, "yoy": yoy,
             "split": [{"airport": r["airport"], "direction": r["direction"], "mode": r["mode"],
                        "trips_per_day": _r(r["trips_per_day"], 1), "share": _r(r["share"], 4)} for r in latest],
@@ -704,8 +720,8 @@ class Site:
                                      sum(series[(group, base, w)] for w in weeks))
 
         start_year = int(start[:4])
-        change = [r for r in self.out.rows("cp_zone_change") if r["pu_zone"] in ZONE_IDS]
-        measured = [r for r in change if r["change"] is not None and r["pu_zone"] in self.pickup_zones]
+        change = [r for r in self.out.rows("cp_zone_change") if r["pu_zone"] in self.pickup_zones]
+        measured = [r for r in change if r["change"] is not None]
         in_zone = [r for r in measured if r["pu_zone"] in self.cbd_core]
         excluded = sorted({(r["iso_year"], r["iso_week"], r["exclusion_reason"]) for r in weekly if r["excluded"]},
                           key=lambda t: (t[0], t[1], t[2] or ""))
@@ -826,10 +842,18 @@ class Site:
             {"fpm_median": dist_at.get((p, "all"), {}).get("fpm_p50"),
              "volatility": vol_at.get((p, 0, "all"), {}).get("volatility")})
 
-        zone_vol = [r for r in vol if r["month"] == m and r["pu_zone"] in ZONE_IDS and r["mode"] in COMPANIES]
-        widest = max((r for r in zone_vol if r["volatility"] is not None and r["n"] >= VOLATILITY_MIN_TRIPS
-                      and r["pu_zone"] in self.pickup_zones),
-                     key=lambda r: r["volatility"], default=None)
+        zone_vol = [r for r in vol if r["month"] == m and r["pu_zone"] in self.pickup_zones and r["mode"] in COMPANIES]
+
+        def widest_cell(modes: tuple) -> dict | None:
+            return max((r for r in zone_vol if r["mode"] in modes and r["volatility"] is not None
+                        and r["n"] >= VOLATILITY_MIN_TRIPS), key=lambda r: r["volatility"], default=None)
+
+        def volatility_sentence(cell: dict | None) -> str | None:
+            return findings.prices_volatility(zone_name=self.zone_name(cell["pu_zone"]) if cell else None,
+                                              mode=cell["mode"] if cell else None,
+                                              volatility=cell["volatility"] if cell else None, month=m)
+
+        widest = widest_cell(COMPANIES)
         company_fpm = {c: dist_at.get((m, c), {}).get("fpm_p50") for c in COMPANIES}
         low_mode, high_mode = _argmin(company_fpm), _argmax(company_fpm)
         borough_fpm = {r["pu_borough"]: r["fare_per_mile"] for r in by_borough
@@ -850,10 +874,9 @@ class Site:
                 "fpm_by_borough": findings.prices_by_borough(borough=top_borough,
                                                              fare_per_mile=borough_fpm.get(top_borough),
                                                              window=window, month=m),
-                "volatility_by_zone": findings.prices_volatility(
-                    zone_name=self.zone_name(widest["pu_zone"]) if widest else None,
-                    mode=widest["mode"] if widest else None, volatility=widest["volatility"] if widest else None,
-                    month=m)},
+                # the zone map draws one app at a time: Uber first, then Lyft
+                "volatility_by_zone": volatility_sentence(widest_cell(("uber",))),
+                "volatility_by_zone_lyft": volatility_sentence(widest_cell(("lyft",)))},
             "tiles": tiles, "yoy": yoy,
             "fpm_by_mode": [{"month": r["month"], "mode": r["mode"], "fpm_p10": _r(r["fpm_p10"], 3),
                              "fpm_p50": _r(r["fpm_p50"], 3), "fpm_p90": _r(r["fpm_p90"], 3),
@@ -870,20 +893,107 @@ class Site:
         }
 
     def quality(self, sizes: dict[str, int]) -> dict:
-        validation = None
+        rows = self.out.rows("quality_month")
+        validation, tie_out = None, None
         if self.summary is not None:
             validation = {key: self.summary.get(key) for key in ("status", "checks", "tie_out", "cbd", "fees")}
+            validation["checks"] = [{**c, "text": self._check_text(c)} for c in self.summary.get("checks") or []]
+            gated, cabs = self._tie_out_parts()
+            tie_out = findings.quality_tie_out(**gated, cab_gaps=[(mode, gap) for mode, _, _, gap in cabs],
+                                               tolerance_pct=validate.TIE_OUT_TOLERANCE_PCT) if gated else None
+        known = [r for r in rows if r["valid_share"] is not None]
+        lowest = min(known, key=lambda r: r["valid_share"], default=None)
+        below = sum(r["valid_rows"] * 100 < validate.MIN_VALID_PCT * r["rows"] for r in known)   # as the gate compares
         return {
             **self.env(),
+            "subtitles": {
+                "valid_share": findings.quality_valid_share(
+                    lowest=(lowest["mode"], lowest["month"], lowest["valid_share"]) if lowest else None,
+                    below=below, total=len(known), floor_pct=validate.MIN_VALID_PCT),
+                "tie_out": tie_out},
             "quality": [{"month": r["month"], "mode": r["mode"], "rows": r["rows"], "valid_rows": r["valid_rows"],
                          "valid_share": _r(r["valid_share"], 4), "f_time": r["f_time"], "f_miles": r["f_miles"],
                          "f_fare": r["f_fare"], "f_zone": r["f_zone"], "f_wait": r["f_wait"]}
-                        for r in self.out.rows("quality_month")],
+                        for r in rows],
             "validation": validation,
             "cbd_zones": [{"zone": r["LocationID"], "name": self.zone_name(r["LocationID"]),
                            "borderline": r["borderline"], "note": r["note"]} for r in self.cbd_rows],
             "downloads": [{"file": f, "description": d, "bytes": sizes[f]} for f, d in DOWNLOADS.items()],
         }
+
+    # --- the validation gate in public words ---------------------------------
+
+    def _months_checked(self) -> list[str]:
+        return [f"{month}-01" for month in (self.summary or {}).get("months_checked") or []]
+
+    def _tie_out_parts(self) -> tuple[dict | None, list[tuple]]:
+        """The gate's tie-out rows: (the gated ride-hail counts, [(cab mode, months off, months
+        checked, the diff furthest from zero)]). Statuses are the gate's own."""
+        rows = (self.summary or {}).get("tie_out") or []
+        if not rows:
+            return None, []
+        by_class: dict[str, list[dict]] = defaultdict(list)
+        for r in rows:
+            by_class[r["license_class"]].append(r)
+        ride_hail = sorted(by_class.get(validate.GATED_LICENSE_CLASS, []), key=lambda r: r["month"])
+        gated = {"within": sum(r["status"] == "pass" for r in ride_hail),
+                 "checked": sum(r["status"] in ("pass", "fail") for r in ride_hail),
+                 "exceptions": [(r["month"], r["diff"]) for r in ride_hail if r["status"] == "excepted"],
+                 "skipped": [r["month"] for r in ride_hail if r["status"] == "skipped"]}
+        cabs = []
+        for license_class, mode in TLC_CLASSES.items():
+            checked = [r for r in by_class.get(license_class, []) if r["status"] in ("pass", "fail")]
+            if license_class != validate.GATED_LICENSE_CLASS and checked:
+                gap = max((r["diff"] for r in checked if r["diff"] is not None), key=abs, default=None)
+                cabs.append((mode, sum(r["status"] == "fail" for r in checked), len(checked), gap))
+        return gated, cabs
+
+    def _quality_drift(self) -> list[tuple[str, list[str]]]:
+        """Months more than DRIFT_POINTS below the mode's median valid share over the months the
+        gate checked: its rule (sql/validate/quality.sql) on the quality_month metric."""
+        checked = set(self._months_checked())
+        shares: dict[str, list[tuple[str, float]]] = defaultdict(list)
+        for r in self.out.rows("quality_month"):
+            if r["month"] in checked and r["valid_share"] is not None:
+                shares[r["mode"]].append((r["month"], r["valid_share"]))
+        drift = []
+        for mode in sorted(shares, key=_mode_rank):
+            median = statistics.median(v for _, v in shares[mode])
+            months = [month for month, v in shares[mode] if round((median - v) * 100, 6) > validate.DRIFT_POINTS]
+            if months:
+                drift.append((mode, months))
+        return sorted(drift, key=lambda t: -len(t[1]))
+
+    def _check_text(self, check: dict) -> str:
+        """One public sentence per validation check, from the gate's rows and thresholds."""
+        status, summary, months = check.get("status"), self.summary or {}, self._months_checked()
+        if check["id"] == "tie_out":
+            gated, cabs = self._tie_out_parts()
+            return findings.check_tie_out_text(
+                status=status, **(gated or {"within": 0, "checked": None, "exceptions": [], "skipped": []}),
+                cabs=[(mode, off, n) for mode, off, n, _ in cabs], tolerance_pct=validate.TIE_OUT_TOLERANCE_PCT)
+        if check["id"] == "quality_drift":
+            rows = summary.get("quality") or []
+            return findings.check_quality_text(
+                status=status, total=len(rows), below=sum(r["status"] == "fail" for r in rows),
+                floor_pct=validate.MIN_VALID_PCT, drift=self._quality_drift() if rows else [],
+                drift_points=validate.DRIFT_POINTS)
+        if check["id"] == "cbd_list":
+            lists = {r["zone_list"]: (r["both_in_fee_share"], r["neither_in_fee_share"]) for r in summary.get("cbd") or []}
+            start = self.periods["congestion_pricing_start"]     # the first month wholly under pricing
+            first = _shift(f"{start:%Y-%m}-01", 0 if start.day == 1 else 1)
+            return findings.check_cbd_text(
+                status=status, core=lists.get(validate.GATED_ZONE_LIST),
+                wide=next((v for k, v in lists.items() if k != validate.GATED_ZONE_LIST), None),
+                min_pct=validate.CBD_BOTH_IN_MIN_PCT, first_month=first, last_month=months[-1] if months else self.month)
+        if check["id"] == "schema":
+            return findings.check_schema_text(status=status, first_month=months[0] if months else self.months[0],
+                                              last_month=months[-1] if months else self.month)
+        if check["id"] == "fees":
+            return findings.check_fees_text(
+                status=status, rows=[(r["mode"], r["configured_fee"], r["exact_share"], r["status"])
+                                     for r in summary.get("fees") or []], min_pct=validate.FEE_EXACT_MIN_PCT)
+        return findings.check_fallback(status)
 
     def pay_rule(self) -> dict:
         """Ride-hail changes across the new minimum-pay rule (D28): the median week after against the

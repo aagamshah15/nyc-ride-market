@@ -103,6 +103,7 @@ def dist_rows() -> list[dict]:
             {"month": month, "mode": "yellow", "pu_zone": 132},
             {"month": month, "mode": "uber", "pu_zone": 132},
             {"month": month, "mode": "uber", "pu_zone": 7},
+            {"month": month, "mode": "yellow", "pu_zone": 1, "n": 121, "fpm_p10": 2.9, "fpm_p90": 1_500.0},  # Newark
         ]
     return rows
 
@@ -395,6 +396,9 @@ def test_thin_and_empty_zones_give_nulls(site):
     assert thin["flags"]["thin"] is True
     assert thin["title"] == "Jamaica Bay had 50 pickups in Aug 2026, too few to profile"
     assert (thin["tiles"]["wait_p50"], thin["tiles"]["wait_p90"]) == (None, None)
+    # no share or change from 50 trips, as /zones blanks the row; the trip count stays (50 ÷ 31 days)
+    assert (thin["tiles"]["rh_share"], thin["yoy"]["rh_share"], thin["yoy"]["trips_per_day"]) == (None, None, None)
+    assert thin["tiles"]["trips_per_day"] == 1.6
     assert thin["waits"] == {"monthly": [], "by_hour": []}
     empty = site["files"]["zones/50.json"]
     assert empty["tiles"]["trips_per_day"] == 0.0 and empty["tiles"]["rh_share"] is None
@@ -422,10 +426,11 @@ def test_destinations_rank_mapped_zones(site):
 
 def test_newark_zone_isnt_counted_or_described_as_tlc_pickups(site):
     """Zone 1's pickup records aren't TLC trips: no zone count includes it, the index marks it thin so
-    maps grey it, and its page talks about drop-offs. Its data rows stay (D26)."""
+    maps grey it with no figures, and its page talks about drop-offs with no pickup series."""
     index = site["files"]["zones/index.json"]
     newark = next(row for row in index["rows"] if row["zone"] == 1)
-    assert newark["thin"] is True and newark["top_mode"] == "yellow"
+    assert newark["thin"] is True
+    assert {key: newark[key] for key in publish.NO_PICKUP_FIGURES} == dict.fromkeys(publish.NO_PICKUP_FIGURES)
     assert index["tiles"]["zones_yellow_leads"] == 1        # zone 132 only; 2 if Newark counted
     page = site["files"]["zones/1.json"]
     assert page["flags"]["thin"] is True and page["flags"]["airport"] == "EWR"
@@ -435,7 +440,14 @@ def test_newark_zone_isnt_counted_or_described_as_tlc_pickups(site):
     assert page["subtitles"] == {chart: f"Pickups at Newark Airport aren't TLC trips, so {text}"
                                  for chart, text in findings.NOT_TLC_PICKUPS.items()}
     assert set(page["tiles"].values()) == {None} and set(page["yoy"].values()) == {None}
-    assert page["share_trend"] and page["hour_heatmap"]
+    assert (page["share_trend"], page["hour_heatmap"], page["top_destinations"]) == ([], [], [])
+
+
+def test_newark_pickups_leave_zone_rows(site):
+    """Rows built per pickup zone have no zone 1 (the factory gives it yellow pickups and zone rows)."""
+    assert 1 not in {r["zone"] for r in site["files"]["congestion.json"]["zone_change"]}
+    assert 1 not in {r["zone"] for r in site["files"]["prices.json"]["volatility_by_zone"]}
+    assert 132 in {r["zone"] for r in site["files"]["congestion.json"]["zone_change"]}
 
 
 def test_newark_pickups_stay_out_of_share_sentences(site):
@@ -444,12 +456,50 @@ def test_newark_pickups_stay_out_of_share_sentences(site):
     assert airports["title"] == "Uber carried 73% of trips to and from JFK and LaGuardia and to Newark in Aug 2026"
     # JFK pickups: Uber 60 of 100; LaGuardia: 30 of 50. Newark (yellow 10 of 10) isn't named.
     assert airports["subtitles"]["split"] == "In Aug 2026, Uber led pickups at JFK (60%) and LaGuardia (60%)"
-    # Yellow without Newark pickups: 60 of 220 against 70 of 220 → −4.5 pts (with them, −4.3 pts).
-    assert airports["subtitles"]["share_trend"] == \
-        "Yellow cabs' share of airport trips fell 4.5 pts between Aug 2025 and Aug 2026"
     # The data rows and the tile keep them: yellow 70 of 230.
     assert {(r["airport"], r["direction"], r["mode"]) for r in airports["split"]} >= {("EWR", "from", "yellow")}
     assert airports["tiles"]["yellow_share"] == 0.3043
+
+
+def test_airport_subtitles_match_the_lines_and_bars(site):
+    airports = site["files"]["airports.json"]
+    # Yellow's share of each airport's trips, as the trend chart draws it. JFK: 40 of 150 (0.2667) in Aug 2026
+    # against 50 of 150 (0.3333) → −6.66 pts ("6.7"); LaGuardia 20 of 50 both years. Newark's line is
+    # drop-offs only and isn't named.
+    assert airports["subtitles"]["share_trend"] == (
+        "Yellow cabs' share of trips fell 6.7 pts at JFK and held steady at LaGuardia between Aug 2025 and Aug 2026")
+    # Bars to Manhattan: JFK Uber 3,200 ÷ 40 = $80.00 and yellow 1,400 ÷ 20 = $70.00; LaGuardia Uber only,
+    # 2,100 ÷ 30 = $70.00.
+    assert airports["subtitles"]["fares"] == (
+        "Mean fares to Manhattan before tip in Aug 2026 ran from $70.00 by yellow cabs to $80.00 by Uber for trips "
+        "from JFK, and at $70.00 by Uber for trips from LaGuardia")
+    # The tile blends JFK and LaGuardia: (3,200 + 1,400 + 2,100) ÷ (40 + 20 + 30) = $74.44.
+    assert airports["tiles"]["fare_to_manhattan_mean"] == 74.44
+
+
+def test_zone_subtitles_quote_what_the_charts_draw(site):
+    jfk = site["files"]["zones/132.json"]
+    assert jfk["title"] == "Ride-hail apps carried 38% of pickups at JFK Airport in Aug 2026"
+    # Aug 2026: Uber 200, Lyft 100, yellow 500 of 800 → 25%, 12.5% ("13%"), ride-hail 37.5% ("38%"); a year
+    # earlier ride-hail 400 of 800 → −12.5 pts.
+    assert jfk["subtitles"]["share_trend"] == (
+        "Uber's share of pickups here was 25% and Lyft's 13% in Aug 2026 (ride-hail apps together 38%, −12.5 pts on "
+        "a year earlier)")
+    # One hour-of-week cell per mode; the window's only month in the table is Aug 2026 (31 days), so yellow's
+    # 500 trips are 500 ÷ (31 ÷ 7) = 112.9 a week, the largest cell drawn → "113 trips".
+    assert max(jfk["hour_heatmap"], key=lambda r: r["trips"]) == {"hour_of_week": 56, "mode": "yellow", "trips": 112.9}
+    assert jfk["subtitles"]["hour_heatmap"] == (
+        "Yellow-cab pickups here peaked on Tue 8 am, with 113 trips in that hour in an average week over the 3 months "
+        "to Aug 2026")
+
+
+def test_prices_volatility_has_a_sentence_per_map_mode(site):
+    prices = site["files"]["prices.json"]
+    # Uber in zone 161 is the only cell with 5,000+ trips (9.0 ÷ 2.0); no Lyft cell is big enough.
+    assert prices["subtitles"]["volatility_by_zone"] == (
+        "Fares per mile varied most for Uber trips from Midtown Center in Aug 2026, where the 90th-percentile fare "
+        "per mile was 4.5× the 10th")
+    assert prices["subtitles"]["volatility_by_zone_lyft"] is None
 
 
 # --- language rules (CLAUDE.md) -------------------------------------------------
@@ -520,6 +570,76 @@ def test_publishes_validated_data_after_a_passing_gate(data_dir, tmp_path):
     assert home["validated"] is True
     assert quality["validation"]["status"] == "pass"
     assert_matches_contract(quality, example("quality.json"), "quality.json")
+
+
+def realistic_summary(data_dir: Path) -> None:
+    """A passing summary with the cases the public sentences handle: an excepted ride-hail month, cab
+    months outside ±2%, the wide zone list below 98%, fee shares under 100%."""
+    months = ("2025-07", "2025-08", "2026-08")
+    tie_out = [("FHV - High Volume", "2025-07", 0.003, "pass"), ("FHV - High Volume", "2025-08", 0.001, "pass"),
+               ("FHV - High Volume", "2026-08", -0.0214, "excepted"),
+               ("Yellow", "2025-07", 0.0405, "fail"), ("Yellow", "2025-08", -0.025, "fail"), ("Yellow", "2026-08", 0.01, "pass"),
+               ("Green", "2025-07", 0.005, "pass"), ("Green", "2025-08", -0.012, "pass"), ("Green", "2026-08", 0.0, "pass")]
+    summary = {
+        "generated_at": "2026-10-27T10:00:00Z", "status": "pass", "months_checked": list(months),
+        "checks": [{"id": check, "status": "pass", "summary": f"{check} summary (D27)"}
+                   for check in ("tie_out", "quality_drift", "cbd_list", "schema", "fees")],
+        "tie_out": [{"month": f"{m}-01", "license_class": lc, "pipeline_trips_per_day": 100.0,
+                     "tlc_trips_per_day": 100.0, "diff": diff, "status": status} for lc, m, diff, status in tie_out],
+        "quality": [{"month": f"{m}-01", "mode": mode, "valid_share": 0.985, "status": "pass"}
+                    for m in ("2025-08", "2026-08") for mode in common.MODES],
+        "cbd": [{"zone_list": "core", "both_in_fee_share": 0.9892, "neither_in_fee_share": 0.0328, "status": "pass"},
+                {"zone_list": "wide", "both_in_fee_share": 0.9609, "neither_in_fee_share": 0.013, "status": "fail"}],
+        "fees": [{"mode": mode, "configured_fee": fee, "exact_share": share, "other_values": [], "status": "pass"}
+                 for mode, fee, share in (("uber", 1.5, 1.0), ("lyft", 1.5, 0.9991), ("yellow", 0.75, 1.0),
+                                          ("green", 0.75, 0.97))],
+    }
+    path = data_dir / "agg" / "validation_summary.json"
+    path.write_text(json.dumps(summary))
+
+
+def test_methods_text_is_in_public_words(data_dir, tmp_path):
+    """quality.json's subtitles and each check's text, worked by hand; the gate's summary stays as it is."""
+    write_fixture(data_dir)
+    # Valid rows out of 1,000: yellow 900 in Aug 2026 (median (985 + 900) ÷ 2 = 942.5, so 4.25 points
+    # below it) and green 920 in Aug 2025 (median 952.5, 3.25 points below); every other row 985.
+    quality = {(AUG26, "yellow"): 900, (AUG25, "green"): 920}
+    write_agg("agg_quality_month", agg_table("agg_quality_month", [
+        {"month": month, "mode": mode, "valid_rows": quality.get((month, mode), 985)}
+        for month in (AUG25, AUG26) for mode in common.MODES]))
+    realistic_summary(data_dir)
+    publish.publish(tmp_path)
+    data = json.loads((tmp_path / "quality.json").read_text())
+    assert_matches_contract(data, example("quality.json"), "quality.json")
+    assert data["subtitles"] == {
+        "valid_share": "Yellow cabs had the lowest share of valid records, 90% in Aug 2026; every month and mode was "
+                       "at least 85% valid",
+        # ride-hail: 2 months within ±2% and Aug 2026 excepted; yellow's furthest is +4.05% ("4.1%"),
+        # green's −1.2%
+        "tie_out": "Ride-hail trips per day were within 2% of TLC's monthly figures in all 2 months checked, and "
+                   "Aug 2026 (−2.1%) is a documented exception; cab figures, which don't gate, ran up to 4.1% above "
+                   "TLC's for yellow cabs and 1.2% below for green cabs"}
+    checks = {c["id"]: c for c in data["validation"]["checks"]}
+    assert checks["tie_out"]["summary"] == "tie_out summary (D27)"      # the gate's own line, unchanged
+    assert {key: c["text"] for key, c in checks.items()} == {
+        "tie_out": "Ride-hail trips per day were within 2% of TLC's monthly figures in all 2 months checked, and Aug "
+                   "2026 (−2.1%) is a documented exception. Cab figures follow TLC counting rules the trip files can't "
+                   "reproduce, so they're reported but don't gate: yellow cabs were more than 2% off in 2 of 3 months "
+                   "and green cabs were within 2% in every month",
+        "quality_drift": "All 10 month and mode results had at least 85% valid records; 2 were more than 3 points "
+                         "below their mode's median share: yellow cabs in Aug 2026 and green cabs in Aug 2025",
+        # congestion pricing began 5 Jan 2025, so the first whole month is Feb 2025
+        "cbd_list": "From Feb 2025 to Aug 2026, 99% of trips with both ends in the congestion zone carried a "
+                    "congestion fee, against the 98% needed; 3.3% of trips with neither end in it did too, by passing "
+                    "through. Counting the borderline zones as in the zone, 96% did (reported, not gated)",
+        "schema": "Every column in every monthly trip file, Jul 2025 to Aug 2026, maps to the site's unified table, "
+                  "with none missing or of the wrong type",
+        # Lyft's 0.9991 shows as 100%, green's 0.97 as 97%
+        "fees": "97% to 100% of each mode's trips with a congestion fee were charged exactly the fee set for it ($1.50 "
+                "for Uber and Lyft; $0.75 for yellow cabs and green cabs), against the 95% needed",
+    }
+    for text in [*data["subtitles"].values(), *(c["text"] for c in checks.values())]:
+        assert not re.search(r"\bD\d+\b|CBD|both-in|FHV|High Volume|\d{4}-\d\d|\b(uber|lyft|other_hv)\b", text), text
 
 
 def test_refuses_without_the_zone_map(data_dir, tmp_path):

@@ -19,7 +19,7 @@
       "yoy": "pts"
     },
     "cbd_fees_last_month": {
-      "label": "Congestion fees, last month",
+      "label": "Congestion fees, latest month",
       "unit": "usd",
       "yoy": "relative"
     },
@@ -79,7 +79,7 @@
       "yoy": "pts"
     },
     "fare_to_manhattan_mean": {
-      "label": "Mean fare to Manhattan",
+      "label": "Mean fare to Manhattan, JFK and LaGuardia",
       "unit": "usd",
       "yoy": "relative"
     },
@@ -94,7 +94,7 @@
       "yoy": "none"
     },
     "fpm_effect": {
-      "label": "Estimated effect on fare per mile",
+      "label": "Estimated effect on ride-hail fare per mile",
       "unit": "effect",
       "yoy": "none"
     },

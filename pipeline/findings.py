@@ -104,6 +104,14 @@ def usd(x: float) -> str:
     return f"{_sign(x)}${_fixed(a / 1e6, 1)} million"
 
 
+def usd_group(values: list[float]) -> list[str]:
+    """Dollars compared side by side: whole dollars for all when any shows as $100 or more, so a
+    group never mixes "$124" with "$83.67" (contracts/README.md §3)."""
+    if any(_js_round(abs(x) * 100) / 100 >= 100 for x in values) and all(abs(x) <= 1_000_000 for x in values):
+        return [f"{_sign(x)}${_js_round(abs(x)):,}" for x in values]
+    return [usd(x) for x in values]
+
+
 def _usd_per(unit: str):
     return lambda x: f"{_sign(x)}${_fixed(abs(x), 2)}/{unit}"
 
@@ -176,6 +184,23 @@ def join_and(items: list[str]) -> str:
 
 def zones_count(n: int) -> str:
     return f"{count(n)} zone" + ("" if n == 1 else "s")
+
+
+def months_count(n: int) -> str:
+    return f"{count(n)} month" + ("" if n == 1 else "s")
+
+
+def whole_trips(n: float) -> str:
+    """A trip count as a whole number with its plural: "1 trip", "732 trips", "1,470 trips"."""
+    whole = _js_round(n)
+    if whole < 1:
+        return "fewer than 1 trip"
+    return f"{count(whole)} trip" + ("" if whole == 1 else "s")
+
+
+def _pct_size(x: float) -> str:
+    """The size of a relative difference, unsigned: "4.1%"."""
+    return rel_change(abs(x)).lstrip("+")
 
 
 def moved(change: float, kind: str = "pts") -> str:
@@ -379,31 +404,48 @@ def zones_table(*, name, trips_per_day, month):
 
 # --- one zone ----------------------------------------------------------------
 
-def zone_title(*, name, rh_share, trips, thin, month):
+def zone_title(*, name, rh_share, trips, thin, month, airport=False):
+    """``airport``: pickups are "at" an airport zone and "in" any other."""
+    where = f"{'at' if airport else 'in'} {name}"
     if thin:
         if not trips:
-            return f"No pickups were recorded in {name} in {month_label(month)}"
+            return f"No pickups were recorded {where} in {month_label(month)}"
         return f"{name} had {count(trips)} pickups in {month_label(month)}, too few to profile"
     if _missing(rh_share):
         return None
-    return f"Ride-hail apps carried {share(rh_share)} of pickups in {name} in {month_label(month)}"
+    return f"Ride-hail apps carried {share(rh_share)} of pickups {where} in {month_label(month)}"
 
 
-def zone_share_trend(*, rh_share, change, month, prior):
+def zone_share_trend(*, apps, rh_share, change, month):
+    """``apps``: [(mode, share of the zone's pickups)] in the latest month for the apps the chart
+    draws as lines, one clause each; the ride-hail total, which isn't a line, comes after them."""
+    known = [(m, s) for m, s in apps if not _missing(s)]
+    if not known:
+        if _missing(rh_share):
+            return None
+        return (f"Ride-hail apps carried {share(rh_share)} of pickups here in {month_label(month)}"
+                f"{_on_year_earlier(change, 'pts')}")
+    (first, first_share), *rest = known
+    text = (f"{possessive(cap(noun(first)))} share of pickups here was {share(first_share)}"
+            + "".join(f"{',' if i < len(rest) - 1 else ' and'} {possessive(noun(m))} {share(s)}"
+                      for i, (m, s) in enumerate(rest))
+            + f" in {month_label(month)}")
     if _missing(rh_share):
-        return None
-    if change is None:
-        return f"Ride-hail apps carried {share(rh_share)} of pickups here in {month_label(month)}"
-    movement = moved(change)
-    return (f"Ride-hail apps' share of pickups here {movement} between {month_label(prior)} and "
-            f"{month_label(month)}, {'at' if movement == 'held steady' else 'to'} {share(rh_share)}")
+        return text
+    total = f"ride-hail apps together {share(rh_share)}"
+    if change is not None:
+        total += f", {share_change(change)} on a year earlier"
+    return f"{text} ({total})"
 
 
-def zone_hour_heatmap(*, peak_hour, peak_trips, window, month):
-    if _missing(peak_hour, peak_trips):
+def zone_hour_heatmap(*, mode, peak_hour, peak_trips, window, month):
+    """``mode``, ``peak_hour``, ``peak_trips``: the single largest cell of the per-mode grids, as
+    drawn (average trips a week in that hour of the week)."""
+    if _missing(mode, peak_hour, peak_trips):
         return None
-    return (f"Pickups here peaked on {hour_of_week(peak_hour)}, with {count(peak_trips)} trips in that hour "
-            f"in an average week over the {count(window)} months to {month_label(month)}")
+    return (f"{cap(FARE_NOUNS.get(mode, noun(mode)))} pickups here peaked on {hour_of_week(peak_hour)}, with "
+            f"{whole_trips(peak_trips)} in that hour in an average week over the {count(window)} months to "
+            f"{month_label(month)}")
 
 
 def zone_waits(*, mode, wait_p50, thin, month):
@@ -471,11 +513,19 @@ def airports_split(*, leaders, month):
     return f"In {month_label(month)}, " + "; ".join(parts)
 
 
-def airports_share_trend(*, yellow_change, month, prior):
-    if _missing(yellow_change):
+def airports_share_trend(*, changes, month, prior):
+    """``changes``: [(airport, change in yellow cabs' share of its trips)], one per line the chart draws."""
+    known = [(a, c) for a, c in changes if not _missing(c)]
+    if not known:
         return None
-    return (f"Yellow cabs' share of airport trips {moved(yellow_change)} between {month_label(prior)} "
-            f"and {month_label(month)}")
+    parts, last_verb = [], None
+    for airport, change in known:
+        verb, _, size = moved(change).partition(" ")   # "fell", "2.4 pts"; "held", "steady"
+        text = moved(change) if verb != last_verb or verb == "held" else size
+        parts.append(f"{text} at {AIRPORT_NAMES.get(airport, airport)}")
+        last_verb = verb
+    return (f"Yellow cabs' share of trips {join_and(parts)} between {month_label(prior)} and "
+            f"{month_label(month)}")
 
 
 def airports_by_hour(*, hour, trips_per_day, window, month):
@@ -485,15 +535,23 @@ def airports_by_hour(*, hour, trips_per_day, window, month):
             f"an average day over the {count(window)} months to {month_label(month)}")
 
 
-def airports_fares(*, airport, fare_mean, cheapest, dearest, month):
-    """``cheapest`` and ``dearest``: (mode, mean fare) from that airport to Manhattan."""
-    if _missing(airport, fare_mean):
+def airports_fares(*, ranges, month):
+    """``ranges``: [(airport, (cheapest mode, mean fare), (dearest mode, mean fare))] to Manhattan,
+    one per panel the chart draws; each airport's two fares share a format (usd_group)."""
+    clauses = []
+    for airport, cheapest, dearest in ranges:
+        if not cheapest or not dearest or _missing(cheapest[1], dearest[1]):
+            continue
+        place = f"for trips from {AIRPORT_NAMES.get(airport, airport)}"
+        if cheapest[0] == dearest[0]:
+            clauses.append(f"at {usd(cheapest[1])} by {noun(cheapest[0])} {place}")
+            continue
+        low, high = usd_group([cheapest[1], dearest[1]])
+        clauses.append(f"from {low} by {noun(cheapest[0])} to {high} by {noun(dearest[0])} {place}")
+    if not clauses:
         return None
-    text = (f"A trip from {AIRPORT_NAMES.get(airport, airport)} to Manhattan cost a mean {usd(fare_mean)} "
-            f"before tip in {month_label(month)}")
-    if cheapest and dearest and cheapest[0] != dearest[0]:
-        text += f", from {usd(cheapest[1])} by {noun(cheapest[0])} to {usd(dearest[1])} by {noun(dearest[0])}"
-    return text
+    joined = clauses[0] if len(clauses) == 1 else ", ".join(clauses[:-1]) + ", and " + clauses[-1]
+    return f"Mean fares to Manhattan before tip in {month_label(month)} ran {joined}"
 
 
 # --- congestion pricing ------------------------------------------------------
@@ -647,6 +705,158 @@ def prices_volatility(*, zone_name, mode, volatility, month):
         return None
     return (f"Fares per mile varied most for {FARE_NOUNS.get(mode, mode)} trips from {zone_name} in "
             f"{month_label(month)}, where the 90th-percentile fare per mile was {ratio(volatility)} the 10th")
+
+
+# --- methods: data quality and the validation gate ------------------------------
+# Public sentences for the gate's checks. The gate's own one-line summaries are QA text (decision
+# ids, licence classes, "YYYY-MM"); these say the same in the site's words.
+
+CHECK_STATUS = {"fail": "This check failed in the latest run", "skipped": "This check was skipped in the latest run"}
+
+
+def check_fallback(status: str) -> str:
+    return CHECK_STATUS.get(status, "This check passed in the latest run")
+
+
+def _month_span(months: list[str]) -> str:
+    """ "in Aug 2025", or "in 7 months from May 2025 to Nov 2025"."""
+    months = sorted(months)
+    if len(months) == 1:
+        return f"in {month_label(months[0])}"
+    return f"in {months_count(len(months))} from {month_label(months[0])} to {month_label(months[-1])}"
+
+
+def quality_valid_share(*, lowest, below, total, floor_pct):
+    """``lowest``: (mode, month, valid share), the lowest point on the chart; ``below``: month and
+    mode rows under the gate's floor, of ``total``."""
+    if not lowest or _missing(*lowest):
+        return None
+    mode, month, value = lowest
+    text = f"{cap(noun(mode))} had the lowest share of valid records, {share(value)} in {month_label(month)}"
+    if below:
+        return text + f"; {count(below)} of {count(total)} month and mode results were below the {floor_pct}% floor"
+    return text + f"; every month and mode was at least {floor_pct}% valid"
+
+
+def _ride_hail_tie_out(*, within, checked, exceptions, skipped, tolerance_pct):
+    """The head of both tie-out sentences: the gated ride-hail rows."""
+    if not checked:
+        text = "No month of ride-hail trips could be checked against TLC's monthly figures"
+    elif within == checked:
+        text = (f"Ride-hail trips per day were within {tolerance_pct}% of TLC's monthly figures in "
+                f"{'the' if checked == 1 else 'all'} {months_count(checked)} checked")
+    else:
+        text = (f"Ride-hail trips per day were within {tolerance_pct}% of TLC's monthly figures in {count(within)} "
+                f"of {months_count(checked)} checked")
+    if exceptions:
+        listed = join_and([f"{month_label(m)} ({rel_change(d)})" for m, d in exceptions])
+        text += f", and {listed} {'is a documented exception' if len(exceptions) == 1 else 'are documented exceptions'}"
+    if skipped:
+        text += (f"; {join_and([month_label(m) for m in skipped])} "
+                 f"{'isn' if len(skipped) == 1 else 'aren'}'t in TLC's figures yet")
+    return text
+
+
+def quality_tie_out(*, within, checked, exceptions, skipped, cab_gaps, tolerance_pct):
+    """Chart subtitle. ``exceptions``: [(month, diff)]; ``skipped``: months not yet in TLC's figures;
+    ``cab_gaps``: [(mode, the diff furthest from zero)] for the cab lines, which don't gate."""
+    text = _ride_hail_tie_out(within=within, checked=checked, exceptions=exceptions, skipped=skipped,
+                              tolerance_pct=tolerance_pct)
+    gaps = [(m, d) for m, d in cab_gaps if not _missing(d)]
+    clauses = []
+    for i, (m, d) in enumerate(gaps):
+        side = ("above" if d >= 0 else "below") + (" TLC's" if i == 0 else "")
+        clauses.append(f"{_pct_size(d)} {side} for {noun(m)}")
+    if clauses:
+        text += "; cab figures, which don't gate, ran up to " + join_and(clauses)
+    return text
+
+
+def check_tie_out_text(*, status, within, checked, exceptions, skipped, cabs, tolerance_pct):
+    """``cabs``: [(mode, months more than the tolerance off, months checked)], reported, not gated."""
+    if checked is None:
+        return check_fallback(status)
+    text = _ride_hail_tie_out(within=within, checked=checked, exceptions=exceptions, skipped=skipped,
+                              tolerance_pct=tolerance_pct)
+    parts, said_off = [], False
+    for m, off, n in cabs:
+        if not n:
+            continue
+        if not off:
+            parts.append(f"{noun(m)} were within {tolerance_pct}% in every month")
+        else:      # the second "more than 2% off" goes without saying
+            parts.append(f"{noun(m)} {'' if said_off else f'were more than {tolerance_pct}% off '}in {count(off)} "
+                         f"of {months_count(n) if not said_off else count(n)}")
+            said_off = True
+    if parts:
+        text += (". Cab figures follow TLC counting rules the trip files can't reproduce, so they're reported but "
+                 f"don't gate: {join_and(parts)}")
+    return text
+
+
+def check_quality_text(*, status, total, below, floor_pct, drift, drift_points):
+    """``drift``: [(mode, [months])] more than ``drift_points`` points below the mode's median."""
+    if not total:
+        return check_fallback(status)
+    if below:
+        text = f"{count(below)} of {count(total)} month and mode results had less than {floor_pct}% valid records"
+    else:
+        text = (f"{'The' if total == 1 else 'All'} {count(total)} month and mode "
+                f"{'result' if total == 1 else 'results'} had at least {floor_pct}% valid records")
+    listed = [(m, months) for m, months in drift if months]
+    if listed:
+        n = sum(len(months) for _, months in listed)
+        text += (f"; {count(n)} {'was' if n == 1 else 'were'} more than {drift_points} points below their mode's "
+                 f"median share: " + join_and([f"{noun(m)} {_month_span(months)}" for m, months in listed]))
+    else:
+        text += f"; none was more than {drift_points} points below its mode's median share"
+    return text
+
+
+def check_cbd_text(*, status, core, wide, min_pct, first_month, last_month):
+    """``core``, ``wide``: (share of trips with both ends in the zone list that carry a fee, share of
+    trips with neither end in it that carry one), or None. Only the core list gates, so ``status``
+    is its result."""
+    if not core or _missing(core[0]):
+        return check_fallback(status)
+    both, neither = core
+    text = (f"From {month_label(first_month)} to {month_label(last_month)}, {share(both)} of trips with both ends "
+            f"in the congestion zone carried a congestion fee, {'against' if status == 'pass' else 'below'} the "
+            f"{min_pct}% needed")
+    if not _missing(neither):
+        text += f"; {share(neither)} of trips with neither end in it did too, by passing through"
+    if wide and not _missing(wide[0]):
+        text += f". Counting the borderline zones as in the zone, {share(wide[0])} did (reported, not gated)"
+    return text
+
+
+def check_schema_text(*, status, first_month, last_month):
+    span = f"{month_label(first_month)} to {month_label(last_month)}"
+    if status == "pass":
+        return (f"Every column in every monthly trip file, {span}, maps to the site's unified table, with none "
+                "missing or of the wrong type")
+    if status == "fail":
+        return f"Some monthly trip files, {span}, have columns that are unmapped, missing or of the wrong type"
+    return check_fallback(status)
+
+
+def check_fees_text(*, status, rows, min_pct):
+    """``rows``: [(mode, fee set for the mode, share of fee-paying trips charged exactly it, status)]."""
+    known = [r for r in rows if not _missing(r[1], r[2])]
+    if not known:
+        return check_fallback(status)
+    failed = [r for r in known if r[3] == "fail"]
+    if failed:
+        return (f"Fewer than {min_pct}% of fee-paying trips were charged exactly the fee set for "
+                + join_and([f"{noun(m)} ({share(s)})" for m, _, s, _ in failed]))
+    fees: dict[float, list[str]] = {}
+    for m, fee, _, _ in known:
+        fees.setdefault(fee, []).append(noun(m))
+    low, high = share(min(r[2] for r in known)), share(max(r[2] for r in known))
+    size = low if low == high else f"{low} to {high}"
+    return (f"{size} of each mode's trips with a congestion fee were charged exactly the fee set for it ("
+            + "; ".join(f"{usd(fee)} for {join_and(names)}" for fee, names in fees.items())
+            + f"), against the {min_pct}% needed")
 
 
 # --- Q1–Q15 (home findings) ----------------------------------------------------

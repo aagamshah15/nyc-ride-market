@@ -611,7 +611,8 @@ class MockSite:
             **self.env(),
             "title": f"MOCK: riders paid a median ${fpm_now:.2f} a mile in {_label(self.latest)}",
             "subtitles": {key: f"MOCK subtitle for {key}" for key in
-                          ("fpm_by_mode", "fpm_by_hour", "fpm_by_borough", "volatility_by_zone")},
+                          ("fpm_by_mode", "fpm_by_hour", "fpm_by_borough", "volatility_by_zone",
+                           "volatility_by_zone_lyft")},
             "tiles": {"fpm_median": _r(fpm_now, 3), "volatility": _r(self.jitter(2.5), 3),
                       "cheapest_hour": cheapest, "dearest_hour": dearest},
             "yoy": {"fpm_median": _rel(fpm_now, fpm_before), "volatility": _r(self.rng.uniform(-0.05, 0.05), 4),
@@ -655,10 +656,12 @@ class MockSite:
                         "airports.json": "Airport trips, shares, hours and fares"}
         return {
             **self.env(),
+            "subtitles": {key: f"MOCK subtitle for {key}" for key in ("valid_share", "tie_out")},
             "quality": quality,
             "validation": {
                 "status": "pass",
-                "checks": [{"id": check, "status": "pass", "summary": f"MOCK summary for {check}"}
+                "checks": [{"id": check, "status": "pass", "summary": f"MOCK summary for {check}",
+                            "text": f"MOCK public text for {check}"}
                            for check in ("tie_out", "quality_drift", "cbd_list", "schema", "fees")],
                 "tie_out": tie_out,
                 "cbd": [{"zone_list": zl, "both_in_fee_share": _r(self.jitter(0.993, 0.003), 4),

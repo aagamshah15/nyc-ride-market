@@ -213,8 +213,118 @@ def test_thin_and_empty_zone_titles():
         "Jamaica Bay had 50 pickups in Aug 2026, too few to profile"
     assert findings.zone_title(name="Zone 50", rh_share=None, trips=0, thin=True, month=AUG26) == \
         "No pickups were recorded in Zone 50 in Aug 2026"
-    assert findings.zone_share_trend(rh_share=1.0, change=0.0, month=AUG26, prior="2025-08-01") == \
-        "Ride-hail apps' share of pickups here held steady between Aug 2025 and Aug 2026, at 100%"
+
+
+def test_airport_zones_are_at_the_airport():
+    assert findings.zone_title(name="JFK Airport", rh_share=0.715, trips=535_460, thin=False, month=AUG26,
+                               airport=True) == "Ride-hail apps carried 72% of pickups at JFK Airport in Aug 2026"
+    assert findings.zone_title(name="Midtown Center", rh_share=0.7, trips=1_000, thin=False, month=AUG26) == \
+        "Ride-hail apps carried 70% of pickups in Midtown Center in Aug 2026"
+
+
+def test_zone_share_names_each_line_drawn():
+    # Zone 132, Aug 2026: Uber 0.528 → "53%", Lyft 0.187 → "19%"; ride-hail 0.715 → "72%", +0.0661 → "+6.6 pts".
+    assert findings.zone_share_trend(apps=[("uber", 0.528), ("lyft", 0.187)], rh_share=0.715, change=0.0661,
+                                     month=AUG26) == (
+        "Uber's share of pickups here was 53% and Lyft's 19% in Aug 2026 (ride-hail apps together 72%, +6.6 pts on "
+        "a year earlier)")
+    # No year-earlier value: the total without a change; an app with no pickups gets no clause.
+    assert findings.zone_share_trend(apps=[("uber", None), ("lyft", 0.54)], rh_share=0.54, change=None,
+                                     month=AUG26) == \
+        "Lyft's share of pickups here was 54% in Aug 2026 (ride-hail apps together 54%)"
+    assert findings.zone_share_trend(apps=[], rh_share=1.0, change=0.0, month=AUG26) == \
+        "Ride-hail apps carried 100% of pickups here in Aug 2026 (0.0 pts on a year earlier)"
+    assert findings.zone_share_trend(apps=[], rh_share=None, change=None, month=AUG26) is None
+
+
+def test_heatmap_peak_is_one_drawn_cell_in_whole_trips():
+    # Zone 132's largest cell is Uber's 732.2 at hour 23 (Sun 11 pm) → "732 trips", not the 1,470 all modes.
+    assert findings.zone_hour_heatmap(mode="uber", peak_hour=23, peak_trips=732.2, window=3, month=AUG26) == (
+        "Uber pickups here peaked on Sun 11 pm, with 732 trips in that hour in an average week over the 3 months "
+        "to Aug 2026")
+    # 283.2 → "283 trips"; Sat 4 pm is hour 6 × 24 + 16 = 160.
+    assert findings.zone_hour_heatmap(mode="yellow", peak_hour=160, peak_trips=283.2, window=3, month=AUG26) == (
+        "Yellow-cab pickups here peaked on Sat 4 pm, with 283 trips in that hour in an average week over the 3 "
+        "months to Aug 2026")
+    assert findings.zone_hour_heatmap(mode=None, peak_hour=None, peak_trips=None, window=3, month=AUG26) is None
+
+
+def test_whole_trips_and_plurals():
+    assert [findings.whole_trips(n) for n in (0.3, 0.5, 1.4, 20.9, 1465.1)] == [
+        "fewer than 1 trip", "1 trip", "1 trip", "21 trips", "1,470 trips"]
+    assert (findings.months_count(1), findings.months_count(32)) == ("1 month", "32 months")
+
+
+def test_usd_group_keeps_one_format():
+    assert findings.usd_group([83.67, 105.92, 123.84]) == ["$84", "$106", "$124"]
+    assert findings.usd_group([61.94, 82.2]) == ["$61.94", "$82.20"]
+    assert findings.usd_group([99.996, 50.0]) == ["$100", "$50"]          # $99.996 shows as $100
+
+
+def test_airport_trend_names_each_airport_line():
+    # JFK 0.204 → 0.1797 (−2.43 pts), LaGuardia 0.131 → 0.1228 (−0.82 pts): one "fell" for both.
+    assert findings.airports_share_trend(changes=[("JFK", -0.0243), ("LGA", -0.0082)], month=AUG26,
+                                         prior="2025-08-01") == (
+        "Yellow cabs' share of trips fell 2.4 pts at JFK and 0.8 pts at LaGuardia between Aug 2025 and Aug 2026")
+    assert findings.airports_share_trend(changes=[("JFK", 0.003), ("LGA", -0.0082), ("EWR", 0.0004)],
+                                         month=AUG26, prior="2025-08-01") == (
+        "Yellow cabs' share of trips rose 0.3 pts at JFK, fell 0.8 pts at LaGuardia and held steady at Newark "
+        "between Aug 2025 and Aug 2026")
+    assert findings.airports_share_trend(changes=[("JFK", None)], month=AUG26, prior="2025-08-01") is None
+
+
+def test_airport_fares_name_both_airports():
+    # JFK's bars $83.67, $105.92, $123.84: $124 puts the range in whole dollars; LaGuardia's stay in cents.
+    ranges = [("JFK", ("yellow", 83.67), ("uber", 123.84)), ("LGA", ("yellow", 61.94), ("uber", 82.2))]
+    assert findings.airports_fares(ranges=ranges, month=AUG26) == (
+        "Mean fares to Manhattan before tip in Aug 2026 ran from $84 by yellow cabs to $124 by Uber for trips from "
+        "JFK, and from $61.94 by yellow cabs to $82.20 by Uber for trips from LaGuardia")
+    assert findings.airports_fares(ranges=[], month=AUG26) is None
+
+
+# --- methods: the validation gate in public words --------------------------------
+
+def test_quality_and_tie_out_subtitles():
+    assert findings.quality_valid_share(lowest=("yellow", "2025-11-01", 0.8685), below=0, total=128,
+                                        floor_pct=85) == (
+        "Yellow cabs had the lowest share of valid records, 87% in Nov 2025; every month and mode was at least 85% "
+        "valid")
+    assert findings.quality_tie_out(within=31, checked=31, exceptions=[("2026-06-01", -0.0214)], skipped=[],
+                                    cab_gaps=[("yellow", 0.0405), ("green", 0.0302)], tolerance_pct=2) == (
+        "Ride-hail trips per day were within 2% of TLC's monthly figures in all 31 months checked, and Jun 2026 "
+        "(−2.1%) is a documented exception; cab figures, which don't gate, ran up to 4.1% above TLC's for yellow "
+        "cabs and 3.0% above for green cabs")
+
+
+def test_check_texts_in_public_words():
+    tie_out = findings.check_tie_out_text(status="pass", within=30, checked=31, exceptions=[], skipped=["2026-08-01"],
+                                          cabs=[("yellow", 10, 32), ("green", 19, 32)], tolerance_pct=2)
+    assert tie_out == (
+        "Ride-hail trips per day were within 2% of TLC's monthly figures in 30 of 31 months checked; Aug 2026 isn't "
+        "in TLC's figures yet. Cab figures follow TLC counting rules the trip files can't reproduce, so they're "
+        "reported but don't gate: yellow cabs were more than 2% off in 10 of 32 months and green cabs in 19 of 32")
+    assert findings.check_quality_text(
+        status="pass", total=128, below=0, floor_pct=85, drift_points=3,
+        drift=[("yellow", ["2025-05-01", "2025-06-01", "2025-07-01", "2025-08-01", "2025-09-01", "2025-10-01",
+                           "2025-11-01"]), ("lyft", ["2025-08-01"])]) == (
+        "All 128 month and mode results had at least 85% valid records; 8 were more than 3 points below their "
+        "mode's median share: yellow cabs in 7 months from May 2025 to Nov 2025 and Lyft in Aug 2025")
+    assert findings.check_cbd_text(status="pass", core=(0.9892, 0.0328), wide=(0.9609, 0.013), min_pct=98,
+                                   first_month="2025-02-01", last_month=AUG26) == (
+        "From Feb 2025 to Aug 2026, 99% of trips with both ends in the congestion zone carried a congestion fee, "
+        "against the 98% needed; 3.3% of trips with neither end in it did too, by passing through. Counting the "
+        "borderline zones as in the zone, 96% did (reported, not gated)")
+    assert findings.check_fees_text(status="pass", min_pct=95, rows=[
+        ("uber", 1.5, 1.0, "pass"), ("lyft", 1.5, 1.0, "pass"), ("yellow", 0.75, 1.0, "pass"),
+        ("green", 0.75, 1.0, "pass")]) == (
+        "100% of each mode's trips with a congestion fee were charged exactly the fee set for it ($1.50 for Uber and "
+        "Lyft; $0.75 for yellow cabs and green cabs), against the 95% needed")
+    assert findings.check_schema_text(status="pass", first_month="2024-01-01", last_month=AUG26) == (
+        "Every column in every monthly trip file, Jan 2024 to Aug 2026, maps to the site's unified table, with none "
+        "missing or of the wrong type")
+    # a check that couldn't run has no rows to describe
+    assert findings.check_cbd_text(status="fail", core=None, wide=None, min_pct=98, first_month="2025-02-01",
+                                   last_month=AUG26) == "This check failed in the latest run"
 
 
 # --- language rules (CLAUDE.md) ---------------------------------------------
