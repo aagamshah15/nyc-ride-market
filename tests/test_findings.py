@@ -78,6 +78,17 @@ def test_formats_match_format_js():
            {f"{py}({v})": e for (py, _, v), e in zip(calls, expected)}
 
 
+@pytest.mark.skipif(shutil.which("node") is None, reason="node not installed")
+def test_usd_group_matches_format_js():
+    """A chart panel's dollar labels (format.usdGroup) read as findings.usd_group writes them."""
+    groups = [[84.12, 106.38, 123.6], [61.94, 75.52, 82.2], [99.994, 12.5], [99.996, 12.5], [1_500_000, 120.0]]
+    script = (f"const m = await import({json.dumps((COMPONENTS / 'format.js').as_uri())});\n"
+              f"console.log(JSON.stringify({json.dumps(groups)}.map((g) => m.usdGroup(g))));")
+    result = subprocess.run(["node", "--input-type=module", "-e", script], capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout) == [findings.usd_group(g) for g in groups]
+
+
 # --- words -------------------------------------------------------------------
 
 def test_moved_follows_the_displayed_rounding():

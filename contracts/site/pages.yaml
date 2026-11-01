@@ -42,11 +42,11 @@ routes:
     methods: cleaning
   /congestion-pricing:
     source: congestion-pricing.md
-    files: [congestion.json, taxi_zones.geojson, events.json, tiles.json]
+    files: [congestion.json, taxi_zones.geojson, events.json, tiles.json, quality.json]   # quality: the core zone list for the map outline
     methods: congestion-method
   /drivers:
     source: drivers.md
-    files: [drivers.json, events.json, tiles.json]
+    files: [drivers.json, events.json, tiles.json, home.json]   # home: the Q15 hours finding
     methods: pay-rise-method
   /prices:
     source: prices.md

@@ -53,6 +53,14 @@ export function usd(x) {
   return `${sign(x)}$${(abs / 1e6).toFixed(1)} million`;
 }
 
+/** Dollars compared side by side (one chart panel): whole dollars for all when any shows as $100 or
+ *  more, so a group never mixes "$124" with "$83.67" (contracts §3; findings.usd_group). */
+export function usdGroup(values) {
+  const whole = values.some((x) => !missing(x) && Math.round(Math.abs(x) * 100) / 100 >= 100)
+    && values.every((x) => missing(x) || Math.abs(x) <= 1e6);
+  return values.map((x) => (missing(x) ? NA : whole ? `${sign(x)}$${Math.round(Math.abs(x)).toLocaleString("en-US")}` : usd(x)));
+}
+
 const usdPer = (unit) => (x) => (missing(x) ? NA : `${sign(x)}$${Math.abs(x).toFixed(2)}/${unit}`);
 export const usdPerMile = usdPer("mile");
 export const usdPerMinute = usdPer("min");

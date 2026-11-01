@@ -120,7 +120,10 @@ function fareBars(rows, {subtitle, asOf, width = 640, dark = palette.isDark()}) 
   const max = Math.max(...data.map((d) => d.fare_mean));
   const longestMode = Math.max(...modes.map((m) => format.modeName(m).length));
   const longestValue = Math.max(...data.map((d) => format.usd(d.fare_mean).length));
-  const panel = (airport) => Plot.plot({
+  const panel = (airport) => {
+    const rows = data.filter((d) => d.airport === airport);
+    const labels = new Map(rows.map((d, i) => [d, format.usdGroup(rows.map((r) => r.fare_mean))[i]]));
+    return Plot.plot({
     width, height: 30 * modes.length + 36, marginTop: 4, marginLeft: 16 + longestMode * 7,
     marginRight: 12 + longestValue * 7, marginBottom: 24,
     style: {fontFamily: "var(--sans-serif)", fontSize: "12px", overflow: "visible"},
@@ -128,13 +131,13 @@ function fareBars(rows, {subtitle, asOf, width = 640, dark = palette.isDark()}) 
     y: {type: "band", domain: modes, label: null, tickSize: 0, tickFormat: format.modeName, padding: 0.25},
     color: palette.seriesScale(modes, dark),
     marks: [
-      Plot.barX(data.filter((d) => d.airport === airport), {x: "fare_mean", y: "mode", fill: "mode", tip: true,
+      Plot.barX(rows, {x: "fare_mean", y: "mode", fill: "mode", tip: true,
         title: (d) => `${format.modeName(d.mode)} from ${airportName(d.airport)}\n${format.usd(d.fare_mean)} mean fare before tip`}),
       Plot.ruleX([0], {stroke: "currentColor"}),
-      Plot.text(data.filter((d) => d.airport === airport), {x: "fare_mean", y: "mode", text: (d) => format.usd(d.fare_mean),
-        dx: 5, textAnchor: "start", fill: "currentColor"})
+      Plot.text(rows, {x: "fare_mean", y: "mode", text: (d) => labels.get(d), dx: 5, textAnchor: "start", fill: "currentColor"})
     ]
   });
+  };
   const panels = [...new Set(data.map((d) => d.airport))].map((a) => html`<div class="nrm-facet">
     <div class="nrm-facet-label">From ${airportName(a)}</div>
     ${panel(a)}

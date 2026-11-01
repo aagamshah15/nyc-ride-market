@@ -286,3 +286,39 @@ Simulation: v_sim = M · v (v in linear RGB), M from Machado et al. (2009), seve
   tritan  [[1.255528, -0.076749, -0.178779], [-0.078411, 0.930809, 0.147602], [0.004733, 0.691367, 0.303900]]
 Distance: CIEDE2000 on CIELAB (D65)
 ```
+
+## Resolution (integrator, 1 Nov 2026)
+
+Fixes were made in two sessions, merged to `main` as `930faec`, plus integrator follow-ups in the commit that adds this section. The re-published data (Aug 2026, 278 files) passes every contract and budget, and `make test` passes (546).
+
+| # | Status | How |
+|---|---|---|
+| 1 | Fixed | Numbered badges on each rule, with the labels in a key above the plot; badges that would touch drop a row |
+| 2 | Fixed | Per-mode wording, e.g. "Uber pickups here peaked on Sun 11 pm, with 732 trips…": the largest square drawn |
+| 3 | Fixed | Per-airport subtitle ("fell 2.4 pts at JFK and 0.8 pts at LaGuardia"). Newark's line, the yellow-share tile and trips-per-day now leave out its stray pickups (integrator) |
+| 4 | Fixed | Zone 1 dropped from `congestion.json` `zone_change` |
+| 5 | Fixed | `choropleth` `outline` option; the map outlines the 38 core zones |
+| 6 | Fixed | `/zones/1` shows Newark's own reasons, links to `/airports`, and the crumb reads "New Jersey" |
+| 7 | Fixed | No-data zones are hatched on every map; D20's ramps unchanged |
+| 8 | Fixed | `hourHeatmap` `zero` option, off on `/prices` |
+| 9 | Fixed | `quality.json` `subtitles.valid_share`, `subtitles.tie_out` and each check's `text`, shown on `/methods` |
+| 10 | Fixed | Tile label "Estimated effect on ride-hail fare per mile" |
+| 11 | Fixed | `subtitles.volatility_by_zone_lyft` is used when Lyft is selected |
+| 12 | Fixed | "All modes" uses a colour no other row on that chart uses |
+| 13 | Fixed | Zone share subtitle names Uber's and Lyft's parts and the ride-hail total |
+| 14 | Fixed | Whole trip counts and singular plurals ("1 trip") |
+| 15 | Fixed | Thin zones' share and change tiles are null |
+| 16 | Fixed | `/methods` says airport figures count valid trips, while zone pages count every record |
+| 17 | Fixed | Comparison row reads "Overall fare per minute" |
+| 18 | **Open: accept?** | Framework 1.13.4 takes `<title>` from front matter or the first heading, and a dynamic route has one source file. Per-route titles would need page loaders, which slow every build and go stale. JavaScript sets the right title at run time |
+| 19 | Fixed | `lineChart` `gaps` option; the weekly line breaks at the left-out weeks |
+| 20 | Fixed | Fares subtitle covers both airports. The tile reads "Mean fare to Manhattan, JFK and LaGuardia", and JFK's bars show whole dollars ($124 · $106 · $84) via `format.usdGroup` (integrator) |
+| 21 | Fixed | "pickups at JFK Airport" / "at LaGuardia Airport" |
+| 22 | Fixed | Tile label "Congestion fees, latest month" |
+| 23 | Fixed | `/drivers` charts hours on the road per vehicle per day |
+| 24 | Fixed | Per-minute tiles go to one column below 640 px |
+| 25 | Fixed | Newark's pickup rows are gone from `prices.json`, `zones/index.json`, `zones/1.json` and the companies `lyft_vs_uber` lists (integrator) |
+| 26 | Fixed | Borderline zones say so in the crumb, linked to `/methods#cbd-zones` |
+| 27 | Fixed | The green-cab page adds a zoomed panel for its own line |
+
+`contracts/site/pages.yaml` now also lists `quality.json` for `/congestion-pricing` and `home.json` for `/drivers`.

@@ -456,9 +456,11 @@ def test_newark_pickups_stay_out_of_share_sentences(site):
     assert airports["title"] == "Uber carried 73% of trips to and from JFK and LaGuardia and to Newark in Aug 2026"
     # JFK pickups: Uber 60 of 100; LaGuardia: 30 of 50. Newark (yellow 10 of 10) isn't named.
     assert airports["subtitles"]["split"] == "In Aug 2026, Uber led pickups at JFK (60%) and LaGuardia (60%)"
-    # The data rows and the tile keep them: yellow 70 of 230.
+    # The split rows keep them; the tile and trend don't: yellow 70 − 10 = 60 of 230 − 10 = 220.
     assert {(r["airport"], r["direction"], r["mode"]) for r in airports["split"]} >= {("EWR", "from", "yellow")}
-    assert airports["tiles"]["yellow_share"] == 0.3043
+    assert airports["tiles"]["yellow_share"] == 0.2727
+    for company in ("uber", "lyft"):
+        assert 1 not in {r["zone"] for r in site["files"][f"companies/{company}.json"]["lyft_vs_uber"]["by_zone"]}
 
 
 def test_airport_subtitles_match_the_lines_and_bars(site):

@@ -395,7 +395,7 @@ class Site:
             by_zone = [{"zone": z, "name": self.zone_name(z), "lyft_share": _r(row["lyft_share"], 4),
                         "uber_share": _r(row["uber_share"], 4), "gap": _r(row["gap"], 4),
                         "gap_change": _r(row["gap_change"], 4), "thin": info["thin"]}
-                       for z, info in self.zone_info().items() if (row := info["lvu"])]
+                       for z, info in self.zone_info().items() if (row := info["lvu"]) and z not in self.no_pickup_zones]
             lyft_vs_uber = {"zones_lyft_ahead": counts["lyft_ahead"],
                             "zones_lyft_ahead_prior_year": counts["lyft_ahead_prior"], "by_zone": by_zone}
             lvu_subtitle = findings.lyft_vs_uber(zones_now=counts["lyft_ahead"],
@@ -611,17 +611,17 @@ class Site:
         busiest = _argmax(dict(hourly))
 
         def trips_per_day(month: str) -> float | None:
-            rows = [r["trips_per_day"] for r in share_rows if r["month"] == month]
+            rows = [r["trips_per_day"] for r in counted if r["month"] == month]
             return sum(rows) if rows else None
 
         tiles, yoy = self._tiles(
-            {"trips_per_day": trips_per_day(m), "yellow_share": yellow_share(m, share_rows),
+            {"trips_per_day": trips_per_day(m), "yellow_share": yellow_share(m, counted),
              "fare_to_manhattan_mean": fare_mean(m), "busiest_hour": busiest},
-            {"trips_per_day": trips_per_day(p), "yellow_share": yellow_share(p, share_rows),
+            {"trips_per_day": trips_per_day(p), "yellow_share": yellow_share(p, counted),
              "fare_to_manhattan_mean": fare_mean(p) if self.has_prior else None})
 
         trend: dict[tuple, dict[str, int]] = defaultdict(lambda: defaultdict(int))
-        for r in share_rows:
+        for r in counted:                    # Newark's line is drop-offs only, as the page says
             trend[(r["month"], r["airport"])][r["mode"]] += r["trips"]
         share_trend = []
         for (month, airport), counts in sorted(trend.items(), key=lambda kv: (kv[0][0], _airport_rank(kv[0][1]))):
