@@ -74,7 +74,7 @@ const perMinute = data.fpm_by_mode.filter((d) => d.month === latest && MODES.inc
 ```js
 perMinute.length
   ? html`<p>Median fare per minute in ${format.month(latest)}: the middle of each trip's base fare ÷ its minutes, before tip, tolls, taxes and fees.</p>
-    <div class="nrm-tiles nrm-minute-tiles">${perMinute.map((d) =>
+    <div class="nrm-tiles">${perMinute.map((d) =>
       tile({label: format.modeName(d.mode), unit: "usd_per_minute", yoy: "none"}, d.fpmin_p50, null))}</div>`
   : emptyState("Fare per minute: no data for this month")
 ```
@@ -87,7 +87,7 @@ const hourRows = data.fpm_by_hour.filter((d) => d.mode === "all");
 
 ```js
 chartOr("Fare per mile by hour", hourRows, data.subtitles.fpm_by_hour, () =>
-  hourHeatmap(hourRows, {value: "fare_per_mile", unit: "usd_per_mile", fy: null,
+  hourHeatmap(hourRows, {value: "fare_per_mile", unit: "usd_per_mile", fy: null, zero: false,   // a rate: the scale spans its own range
     legendLabel: "Overall fare per mile, all modes ($/mile)", subtitle: data.subtitles.fpm_by_hour, asOf, width, dark}))
 ```
 
@@ -142,27 +142,20 @@ const volMode = view(Inputs.radio(mapModes, {label: "Mode", value: mapModes[0], 
 
 ```js
 const volRows = data.volatility_by_zone.filter((d) => d.mode === volMode);
+// Each mode's map states its own finding; until the file has a Lyft one, the Uber finding stays.
+const volSubtitle = (volMode === "lyft" ? data.subtitles.volatility_by_zone_lyft : null) ?? data.subtitles.volatility_by_zone;
 ```
 
 ```js
-chartOr("Price volatility by zone", volRows, data.subtitles.volatility_by_zone, () =>
+chartOr("Price volatility by zone", volRows, volSubtitle, () =>
   choropleth(geo, volRows, {value: "volatility", unit: "ratio", legendLabel: "Price volatility, p90 ÷ p10 fare per mile (×)",
-    href: zoneHref, subtitle: data.subtitles.volatility_by_zone, asOf, width: Math.min(width, 720), dark}))   // a full-width map is taller than the screen
+    href: zoneHref, missingLabel: "Too few trips", subtitle: volSubtitle, asOf, width: Math.min(width, 720), dark}))   // a full-width map is taller than the screen
 ```
 
 ```js
-display(html`<p class="nrm-note">Each zone's 90th-percentile fare per mile ÷ its 10th, for ${format.modeName(volMode)} trips picked up there in ${format.month(latest)}. Each mode's map has its own colour scale. Grey zones had too few trips. Cabs are left off the map: many zones have few cab pickups, which makes their spread unstable. Click a zone to open its page.</p>`);
+display(html`<p class="nrm-note">Each zone's 90th-percentile fare per mile ÷ its 10th, for ${format.modeName(volMode)} trips picked up there in ${format.month(latest)}. Each mode's map has its own colour scale. Hatched zones had too few trips. Cabs are left off the map: many zones have few cab pickups, which makes their spread unstable. Click a zone to open its page.</p>`);
 ```
 
 ```js
 howWeMeasured("cleaning", "Fares per mile and per minute use the base fare, before tip, tolls, taxes and fees. Medians are of each trip's own fare per mile; overall rates are total fares ÷ total miles. Definitions, cleaning rules and known limits are on the methods page.")
 ```
-
-<style>
-/* Five small tiles: two to a row on phones rather than the stat row's one. */
-@media (max-width: 639.98px) {
-  .nrm-tiles.nrm-minute-tiles {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-</style>

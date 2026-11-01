@@ -73,6 +73,11 @@ export function ratio(x) {
   return missing(x) ? NA : `${x.toFixed(1)}×`;
 }
 
+/** Not in contracts §3: hours (e.g. hours on the road per vehicle per day) to 1 decimal. */
+export function hours(x) {
+  return missing(x) ? NA : `${x.toFixed(1)} hours`;
+}
+
 /** Parses "YYYY-MM", "YYYY-MM-DD" or a Date as a UTC date (never local time). */
 export function utcDate(d) {
   if (d instanceof Date) return d;
@@ -88,11 +93,16 @@ export function month(d) {
   return `${MONTHS[date.getUTCMonth()]} ${date.getUTCFullYear()}`;
 }
 
-/** "week of 6 Jan 2025" (week_start is the Monday). */
-export function week(d) {
+/** "6 Jan 2025". */
+export function day(d) {
   if (missing(d)) return NA;
   const date = utcDate(d);
-  return `week of ${date.getUTCDate()} ${MONTHS[date.getUTCMonth()]} ${date.getUTCFullYear()}`;
+  return `${date.getUTCDate()} ${MONTHS[date.getUTCMonth()]} ${date.getUTCFullYear()}`;
+}
+
+/** "week of 6 Jan 2025" (week_start is the Monday). */
+export function week(d) {
+  return missing(d) ? NA : `week of ${day(d)}`;
 }
 
 /** "6 am", "12 pm". */
@@ -118,7 +128,7 @@ export function asOf(asOfMonth) {
 
 // Units from contracts/site/tiles.yaml.
 const BY_UNIT = {
-  count, share, usd, effect, seconds, ratio,
+  count, share, usd, effect, seconds, ratio, hours,
   usd_per_mile: usdPerMile,
   usd_per_minute: usdPerMinute,
   usd_per_hour: usdPerHour,
@@ -162,6 +172,14 @@ export function modeName(code) {
   return MODE_NAMES[code] ?? String(code);
 }
 
+// TLC's zone lookup gives Newark Airport the borough "EWR"; readers know it as New Jersey.
+const BOROUGH_NAMES = {EWR: "New Jersey"};
+
+/** A zone's borough as readers know it. */
+export function borough(name) {
+  return BOROUGH_NAMES[name] ?? String(name ?? NA);
+}
+
 // Axis ticks. Plain values follow §3; axes use compact ticks (200K, $10M) so labels fit,
 // with the unit in the axis label.
 function compact(v) {
@@ -181,14 +199,12 @@ const AXIS = {
   seconds: (v) => String(+v.toFixed(1)),   // charts draw waits in minutes
 
   ratio: (v) => `${+v.toFixed(1)}×`,
+  hours: (v) => String(+v.toFixed(1)),
   trips_per_hour: (v) => String(+v.toFixed(2)),
   hour_of_day: hourOfDay,
   hour_of_week: hourOfWeek,
   month,
-  week: (d) => {
-    const date = utcDate(d);
-    return `${date.getUTCDate()} ${MONTHS[date.getUTCMonth()]} ${date.getUTCFullYear()}`;
-  },
+  week: day,
   number: (v) => v.toLocaleString("en-US"),
 };
 AXIS.usd_per_mile = AXIS.usd_per_minute = AXIS.usd_per_hour = AXIS.usd;

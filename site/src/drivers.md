@@ -18,6 +18,8 @@ import {lineChart, Plot, sourceCaption, tableView} from "./components/charts.js"
 const data = FileAttachment("data/drivers.json").json();
 const tiles = FileAttachment("data/tiles.json").json();
 const events = FileAttachment("data/events.json").json();
+// Home's Q15 finding names the hours on the road; drivers.json's own `hours` subtitle is about trips per hour.
+const home = FileAttachment("data/home.json").json();
 ```
 
 ```js
@@ -29,6 +31,8 @@ const CLASS_LABELS = {"FHV - High Volume": "Ride-hail apps", Yellow: "Yellow cab
 const CLASSES = Object.keys(CLASS_LABELS);
 // Series in the site's order (ride-hail, then yellow, then green): the chart keeps the rows' order.
 const hours = [...data.hours].sort((a, b) => CLASSES.indexOf(a.license_class) - CLASSES.indexOf(b.license_class));
+const hoursFinding = home.findings.find((f) => f.question === "Q15")?.text;
+const classColors = {"FHV - High Volume": "ride_hail", Yellow: "yellow", Green: "green"};
 ```
 
 ```js
@@ -146,8 +150,17 @@ display(eventStudy(data.event_study.filter((d) => d.mode === "ride_hail"), {subt
 ## Hours on the road
 
 ```js
+if (hoursFinding && hours.some((d) => d.hours_per_day_per_vehicle != null)) {
+  display(lineChart(hours, {y: "hours_per_day_per_vehicle", yUnit: "hours", yLabel: "Hours on the road per vehicle per day (TLC-reported)",
+    z: "license_class", colors: classColors, seriesLabel: (k) => CLASS_LABELS[k] ?? k,
+    events: events.events, dataset: "monthly indicators", subtitle: hoursFinding, asOf: data.tlc_as_of_month, width, dark}));
+  display(html`<p class="nrm-note">Hours on the road are TLC's average hours a day for each vehicle on the road that day, from its monthly indicators: time worked, not only time with a passenger.</p>`);
+}
+```
+
+```js
 display(lineChart(hours, {y: "trips_per_hour_worked", yUnit: "trips_per_hour", yLabel: "Trips per hour worked (TLC-reported)",
-  z: "license_class", colors: {"FHV - High Volume": "ride_hail", Yellow: "yellow", Green: "green"}, seriesLabel: (k) => CLASS_LABELS[k] ?? k,
+  z: "license_class", colors: classColors, seriesLabel: (k) => CLASS_LABELS[k] ?? k,
   events: events.events, dataset: "monthly indicators", subtitle: data.subtitles.hours, asOf: data.tlc_as_of_month, width, dark}));
 ```
 

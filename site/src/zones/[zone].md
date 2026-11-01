@@ -5,12 +5,13 @@ title: Zone profile
 ```js
 // One page per taxi zone, /zones/1 … /zones/263 (SPEC §9.1; L14). Every number, title and
 // subtitle comes from zones/{zone}.json; zones 264 and 265 get no page (D26). A zone with
-// flags.thin (fewer than 100 valid trips in the latest month, or Newark Airport, whose
-// pickups aren't TLC trips) shows its title and tiles and a "too few trips" state in place
-// of the charts.
+// flags.thin (fewer than 100 valid trips in the latest month) shows its title and tiles and a
+// "too few trips" state in place of the charts. Newark Airport is thin for another reason: its
+// pickups aren't TLC trips (G4 review), so it shows its title, its own subtitles saying so, and
+// a link to the airports page, which has its drop-offs.
 import * as format from "../components/format.js";
 import {shareLine, lineChart, hourHeatmap, barChart} from "../components/charts.js";
-import {pageHeader, howWeMeasured, tooFewTrips, emptyState, siteUrl, html} from "../components/page.js";
+import {pageHeader, mockBanner, pageTitle, howWeMeasured, tooFewTrips, emptyState, siteUrl, html} from "../components/page.js";
 ```
 
 ```js
@@ -22,20 +23,35 @@ const tiles = FileAttachment("../data/tiles.json").json();
 ```js
 document.title = `${zone.name} | NYC Ride Market`;
 const asOf = zone.as_of_month;
-const thin = Boolean(zone.flags?.thin);
+// Airports whose pickup records aren't TLC trips (as on /airports): drop-offs only.
+const NO_PICKUPS = new Set(["EWR"]);
+const noPickups = NO_PICKUPS.has(zone.flags?.airport);
+const thin = Boolean(zone.flags?.thin) || noPickups;
 // Top destinations rank zones 1–263; trips leaving the city (zone 265) are in the subtitle.
 const destinations = zone.top_destinations.filter((d) => d.do_zone >= 1 && d.do_zone <= 263);
 const destinationName = new Map(destinations.map((d) => [d.do_zone, d.name]));
 ```
 
-<p class="nrm-zone-crumb"><a href="./">All zones</a> · Zone ${zone.zone} · ${zone.borough}${zone.flags?.cbd ? " · Inside the congestion zone" : ""}</p>
-
 ```js
-display(pageHeader(zone, tiles, {keys: ["trips_per_day", "rh_share", "wait_p50", "wait_p90", "top_destination"]}));
+// Borderline zones straddle the charge line or are islands with no road access; the methods page lists why.
+const congestion = zone.flags?.cbd ? "Inside the congestion zone"
+  : zone.flags?.cbd_borderline ? html`<a href=${siteUrl("methods#cbd-zones")}>Borderline congestion zone (wide list only)</a>`
+  : null;
 ```
 
+<p class="nrm-zone-crumb"><a href="./">All zones</a> · Zone ${zone.zone} · ${format.borough(zone.borough)}${congestion ? html` · ${congestion}` : ""}</p>
+
 ```js
-if (thin) display(tooFewTrips("Charts of pickups by mode, hour, wait and destination"));
+if (noPickups) {
+  // Every tile is a pickup figure, so the stat row gives way to the reasons the file states.
+  const reasons = ["share_trend", "hour_heatmap", "waits", "top_destinations"].map((k) => zone.subtitles?.[k]).filter(Boolean);
+  display(html`${mockBanner(zone)}${pageTitle(zone)}`);
+  display(emptyState("No pickup charts for this zone", html`<ul class="nrm-zone-reasons">${reasons.map((r) => html`<li>${r.replace(/\.?$/, ".")}</li>`)}</ul>`));
+  display(html`<p>Drop-offs at ${zone.name}, by mode and over time, are on the <a href=${siteUrl("/airports")}>airports page</a>.</p>`);
+} else {
+  display(pageHeader(zone, tiles, {keys: ["trips_per_day", "rh_share", "wait_p50", "wait_p90", "top_destination"]}));
+  if (thin) display(tooFewTrips("Charts of pickups by mode, hour, wait and destination"));
+}
 ```
 
 ```js
@@ -89,7 +105,7 @@ if (!thin) {
 ```
 
 ```js
-display(howWeMeasured("waits"));
+display(noPickups ? howWeMeasured("cleaning", `How the site treats ${zone.name}, with definitions and known limits, is on the methods page.`) : howWeMeasured("waits"));
 ```
 
 <style>
@@ -97,6 +113,10 @@ display(howWeMeasured("waits"));
   color: var(--theme-foreground-muted);
   font-size: 14px;
   margin: 0 0 -0.5rem;
+}
+.nrm-zone-reasons {
+  margin: 0.35rem 0 0;
+  padding-left: 1.1rem;
 }
 .nrm-chart + .nrm-note {
   margin-top: -2rem;

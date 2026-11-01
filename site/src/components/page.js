@@ -81,7 +81,7 @@ export function findingsList(findings, {featuredOnly = false} = {}) {
 
 // Labels for comparison metrics that aren't stat tiles (contracts §7: compare[] uses tile units).
 const COMPARE_LABELS = {
-  fare_per_min: "Fare per minute",
+  fare_per_min: "Overall fare per minute",
   wav_share: "Share of trips in a wheelchair-accessible vehicle",
   shared_match_rate: "Shared-ride match rate",
 };

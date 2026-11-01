@@ -37,8 +37,16 @@ if (cardOnlyTips) display(html`<p class="nrm-note">The tip rate is card-only: TL
 ## Share of NYC trips
 
 ```js
+// A company whose share is under a twentieth of the largest one's lies on the shared axis's baseline
+// (green cabs), so its line gets a panel of its own beneath, on its own scale.
+const ownShares = data.share_trend.filter((d) => d.mode === data.mode && d.share != null).map((d) => d.share);
+const topShare = Math.max(0, ...data.share_trend.map((d) => d.share ?? 0));
+const zoom = ownShares.length && Math.max(...ownShares) < topShare / 20 ? data.mode : undefined;
+```
+
+```js
 chartOr("Share of trips", data.share_trend, data.subtitles.share_trend, () =>
-  shareLine(data.share_trend, {events: events.events, subtitle: data.subtitles.share_trend, asOf, width, dark}))
+  shareLine(data.share_trend, {events: events.events, zoom, subtitle: data.subtitles.share_trend, asOf, width, dark}))
 ```
 
 ```js

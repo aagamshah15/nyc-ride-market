@@ -11,7 +11,7 @@
 //   width, height, dark
 
 import * as Plot from "npm:@observablehq/plot@0.6.17";
-import {html} from "npm:htl@0.3.1";
+import {html, svg} from "npm:htl@0.3.1";
 import * as format from "./format.js";
 import * as palette from "./palette.js";
 
@@ -127,28 +127,52 @@ function timeTicks([x0, x1], width) {
   return step >= 12 ? `${step / 12} year${step > 12 ? "s" : ""}` : `${step} month${step > 1 ? "s" : ""}`;
 }
 
+const BADGE = 7;   // radius of an event's numbered badge, px
+
+/** An event's number in a circle, as drawn on its rule: for the key above the chart. */
+function eventBadge(n) {
+  const c = BADGE + 1;
+  return svg`<svg class="nrm-event-badge" width=${2 * c} height=${2 * c} aria-hidden="true">
+    <circle cx=${c} cy=${c} r=${BADGE} fill="none" stroke="currentColor" stroke-width="1.25"></circle>
+    <text x=${c} y=${c} dy="0.35em" text-anchor="middle" font-size="10" font-weight="600" fill="currentColor">${n}</text>
+  </svg>`;
+}
+
 /**
- * Dated rules with labels (events.json rows or {date, label}), labels stacked at the top. A label
- * wraps to the room beside its rule (Plot's lineWidth is in ems, about two characters each), so it
- * stays inside narrow charts. Returns the marks and the inset the stacked labels need.
+ * Dated rules (events.json rows or {date, label}) for a time chart. Each rule carries a numbered
+ * badge at the top of the plot, and the labels sit in a key above the chart after the same numbers,
+ * so no label crosses another rule however close the dates (D28's three events fall within seven
+ * months). A badge that would touch the one before it steps down a row. Returns the marks, the
+ * inset the badges need and the key (null when no event falls in the chart's range).
  */
 function eventMarks(events, [x0, x1], dark, innerWidth) {
   const visible = (events ?? [])
     .map((e) => ({...e, date: format.utcDate(e.date)}))
-    .filter((e) => e.date >= x0 && e.date <= x1);
-  const marks = [Plot.ruleX(visible, {x: "date", stroke: palette.color("muted", dark), strokeWidth: 1.5})];
-  let top = 6;
+    .filter((e) => e.date >= x0 && e.date <= x1)
+    .sort((a, b) => a.date - b.date)
+    .map((e, i) => ({...e, n: String(i + 1)}));
+  if (!visible.length) return {marks: [], inset: 0, key: null};
+  const step = 2 * BADGE + 3;
+  const lastX = [];   // per row, where its last badge sits
   for (const e of visible) {
-    const at = (e.date - x0) / (x1 - x0);
-    const right = at <= 0.55;
-    const ems = Math.max(6, ((right ? 1 - at : at) * innerWidth - 8) / 11);
-    marks.push(Plot.text([e], {
-      x: "date", text: "label", frameAnchor: "top", lineAnchor: "top", dy: top, dx: right ? 5 : -5,
-      textAnchor: right ? "start" : "end", lineWidth: ems, fill: "currentColor", fontSize: 11, ...HALO
-    }));
-    top += 11 * Math.ceil(String(e.label).length / (2 * ems)) + 4;
+    const px = ((e.date - x0) / (x1 - x0 || 1)) * innerWidth;
+    let row = lastX.findIndex((x) => px - x >= step);
+    if (row < 0) row = lastX.length;
+    lastX[row] = px;
+    e.row = row;
   }
-  return {marks, inset: top + 2};
+  const title = (e) => `${e.label}\n${format.day(e.date)}`;
+  const marks = [Plot.ruleX(visible, {x: "date", stroke: palette.color("muted", dark), strokeWidth: 1.5})];
+  lastX.forEach((_, row) => {
+    const badges = visible.filter((e) => e.row === row);
+    const at = {x: "date", frameAnchor: "top", dy: 2 + BADGE + row * step};
+    marks.push(
+      Plot.dot(badges, {...at, r: BADGE, fill: SURFACE, stroke: "currentColor", strokeWidth: 1.25, title}),
+      Plot.text(badges, {...at, text: "n", fill: "currentColor", fontSize: 10, fontWeight: 600, pointerEvents: "none"})
+    );
+  });
+  const key = html`<ol class="nrm-events">${visible.map((e) => html`<li>${eventBadge(e.n)}<span>${e.label}, ${format.day(e.date)}</span></li>`)}</ol>`;
+  return {marks, inset: 2 * BADGE + 8 + (lastX.length - 1) * step, key};
 }
 
 /** Labelled vertical rules at numeric x positions ({x, label}), e.g. a transition week. */
@@ -172,10 +196,13 @@ function ruleMarks(rules, dark) {
  *   seriesLabel  series key → legend text (default: mode display names)
  *   events   events.json `events` for dated rules;  rules: [{x, label}] for numeric x
  *   zero     include 0 on the y axis (default true);  endLabels: label line ends (default true)
+ *   gaps     break the line at rows whose y is null, rather than joining across them (default false)
+ *   zoom     a series key: adds a panel under the chart with that series alone on its own y scale,
+ *            for a series too small to read on the shared one
  */
 export function lineChart(rows, options = {}) {
   const {
-    x = "month", xType = "month", y, yUnit, yLabel, events, rules, zero = true, endLabels = true,
+    x = "month", xType = "month", y, yUnit, yLabel, events, rules, zero = true, endLabels = true, gaps = false, zoom,
     colors, seriesLabel = format.modeName, dark = palette.isDark(), width = 640
   } = options;
   const z = options.z === undefined ? (rows.length && "mode" in rows[0] ? "mode" : null) : options.z;
@@ -185,6 +212,15 @@ export function lineChart(rows, options = {}) {
   const X = temporal ? (d) => format.utcDate(d[x]) : (d) => d[x];
   const Y = drawn(yUnit);
   const data = rows.filter((d) => d[y] != null).map((d) => ({...d, __x: X(d), __y: Y(d[y])}));
+  // Plot breaks a line at a missing y, so with `gaps` the null rows stay in the line's data. A point
+  // with a gap on both sides has no segment to draw, so it gets a dot of its own.
+  const lineData = gaps ? rows.map((d) => ({...d, __x: X(d), __y: d[y] == null ? NaN : Y(d[y])})) : data;
+  const isolated = !gaps ? [] : lineData.filter((d, i) => {
+    if (Number.isNaN(d.__y)) return false;
+    const series = (e) => e && (!z || e[z] === d[z]);
+    const before = lineData.slice(0, i).findLast(series), after = lineData.slice(i + 1).find(series);
+    return !(before && !Number.isNaN(before.__y)) && !(after && !Number.isNaN(after.__y));
+  });
   const xDomain = extent(data.map((d) => +d.__x));
   const keys = z ? ordered(data.map((d) => d[z])) : [];
   const color = z ? seriesColor(keys, {dark, colors, seriesLabel}) : null;
@@ -195,7 +231,7 @@ export function lineChart(rows, options = {}) {
   const longest = Math.max(0, ...keys.map((k) => String(seriesLabel(k)).length));
   const marginRight = labelled ? 18 + longest * 7 : 16, marginLeft = options.marginLeft ?? 48;
   const dated = temporal ? eventMarks(events, xDomain.map((t) => new Date(t)), dark, width - marginLeft - marginRight) : null;
-  const insetTop = dated ? (dated.marks.length > 1 ? dated.inset : 0) : (rules?.length ? 8 + rules.length * 15 : 0);
+  const insetTop = dated ? dated.inset : (rules?.length ? 8 + rules.length * 15 : 0);
 
   const base = {
     ...plotOptions({width, height: options.height ?? (width < 480 ? 260 : 320), marginTop: 24, marginRight, marginLeft}),
@@ -206,22 +242,46 @@ export function lineChart(rows, options = {}) {
       ...(insetTop ? {insetTop} : null)},
     color: color ?? undefined
   };
+  const pointer = (rows) => [
+    Plot.ruleX(rows, Plot.pointerX({x: "__x", stroke: palette.color("muted", dark)})),
+    Plot.dot(rows, Plot.pointerX({x: "__x", y: "__y", fill: stroke, r: 4, stroke: SURFACE, strokeWidth: 2})),
+    Plot.tip(rows, Plot.pointerX({x: "__x", y: "__y", title: tipTitle}))
+  ];
   const marks = [
     ...(dated ? dated.marks : ruleMarks(rules, dark)),
-    Plot.lineY(data, {x: "__x", y: "__y", z, stroke, strokeWidth: 2, strokeLinejoin: "round", strokeLinecap: "round"}),
-    Plot.ruleX(data, Plot.pointerX({x: "__x", stroke: palette.color("muted", dark)})),
-    Plot.dot(data, Plot.pointerX({x: "__x", y: "__y", fill: stroke, r: 4, stroke: SURFACE, strokeWidth: 2})),
-    Plot.tip(data, Plot.pointerX({x: "__x", y: "__y", title: tipTitle}))
+    Plot.lineY(lineData, {x: "__x", y: "__y", z, stroke, strokeWidth: 2, strokeLinejoin: "round", strokeLinecap: "round"}),
+    isolated.length ? Plot.dot(isolated, {x: "__x", y: "__y", fill: stroke, r: 2.5}) : null,
+    ...pointer(data)
   ];
   let plot = Plot.plot({...base, marks});
   if (labelled) plot = withEndLabels(plot, base, marks, data, {z, seriesLabel});
   const legend = z && keys.length > 1 ? plot.legend("color", LEGEND) : null;
+
+  // The zoomed panel: the same x axis and rules (without their badges), one series on its own scale.
+  let zoomed = null;
+  if (zoom != null && z && keys.includes(zoom)) {
+    const one = (rows) => rows.filter((d) => d[z] === zoom);
+    zoomed = html`<div class="nrm-facet nrm-zoom">
+      <div class="nrm-facet-label">${seriesLabel(zoom)} alone, on its own scale</div>
+      ${Plot.plot({
+        ...base,
+        height: width < 480 ? 170 : 200,
+        y: {label: yLabel, labelArrow: "none", grid: true, zero, nice: true, tickFormat: format.axis(yUnit), insetTop: 4},
+        marks: [
+          ...(dated ? dated.marks.slice(0, 1) : []),
+          Plot.lineY(one(lineData), {x: "__x", y: "__y", z, stroke, strokeWidth: 2, strokeLinejoin: "round", strokeLinecap: "round"}),
+          Plot.dot(one(isolated), {x: "__x", y: "__y", fill: stroke, r: 2.5}),
+          ...pointer(one(data))
+        ]
+      })}
+    </div>`;
+  }
   const table = tableView(data, [
     {key: x, label: temporal ? (xType === "week" ? "Week" : "Month") : options.xLabel, format: temporal ? xType : xType === "hour" ? "hour" : "number"},
     ...(z ? [{key: z, label: "Series", format: seriesLabel}] : []),
     {key: y, label: yLabel, format: yUnit}
   ]);
-  return frame("lineChart", options, [legend, plot], table);
+  return frame("lineChart", options, [legend, dated?.key, plot, zoomed], table);
 }
 
 /** Redraws a line chart with labels at the line ends, nudged apart, with short leaders. */
@@ -261,10 +321,15 @@ export function shareLine(rows, options = {}) {
  *   kind         "sequential" (level, blues) or "diverging" (change, centred on 0)
  *   key          rows' zone field (default "zone"); geo features carry LocationID, zone, borough
  *   href         zone id → link for clicks (optional)
- * Zones without a value draw in the muted colour.
+ *   missingLabel what a zone without a value means, for the key (default "No data")
+ *   outline      {zones: [zone ids], label} draws the outer edge of a set of zones, e.g. the
+ *                congestion zone, and names it in the key
+ * Zones without a value draw hatched, in the muted token over the page, so they can't be read as
+ * any colour on either ramp (the dark diverging midpoint is the muted token itself, D20).
  */
 export function choropleth(geo, rows, options = {}) {
-  const {value, unit, legendLabel, kind = "sequential", key = "zone", href, dark = palette.isDark(), width = 640} = options;
+  const {value, unit, legendLabel, kind = "sequential", key = "zone", href, missingLabel = "No data", outline,
+    dark = palette.isDark(), width = 640} = options;
   required("choropleth", options, ["value", "unit", "legendLabel"]);
   const byZone = new Map(rows.map((d) => [d[key], d[value]]));
   const V = drawn(unit);
@@ -273,24 +338,71 @@ export function choropleth(geo, rows, options = {}) {
     return {...f, value: v, __v: V(v)};
   });
   const colorScale = kind === "diverging" ? palette.divergingScale(dark) : palette.sequentialScale(dark);
-  const tipTitle = (f) => `${f.properties.zone} (${f.properties.borough})\n${f.value == null ? "No data" : format.value(unit, f.value)}`;
+  const tipTitle = (f) => `${f.properties.zone} (${format.borough(f.properties.borough)})\n${f.value == null ? missingLabel : format.value(unit, f.value)}`;
+  const hatchId = `nrm-hatch-${++hatches}`;
+  const zone = {stroke: SURFACE, strokeWidth: 0.75, href: href ? (f) => href(f.properties.LocationID) : undefined, tip: true, title: tipTitle};
+  const outlined = outline?.zones?.length ? new Set(outline.zones) : null;
   const plot = Plot.plot({
     ...plotOptions({width, height: options.height, marginTop: 4, marginRight: 4, marginBottom: 4, marginLeft: 4}),
     projection: {type: "mercator", domain: geo},
     color: {...colorScale, label: legendLabel, tickFormat: format.axis(unit === "share" && kind === "diverging" ? "pts" : unit)},
     marks: [
-      Plot.geo(features, Plot.centroid({fill: "__v", stroke: SURFACE, strokeWidth: 0.75, href: href ? (f) => href(f.properties.LocationID) : undefined,
-        tip: true, title: tipTitle}))
+      Plot.geo(features.filter((f) => f.value != null), Plot.centroid({...zone, fill: "__v"})),
+      Plot.geo(features.filter((f) => f.value == null), Plot.centroid({...zone, fill: `url(#${hatchId})`})),
+      outlined ? Plot.geo([outerEdge(geo.features.filter((f) => outlined.has(f.properties.LocationID)))],
+        {stroke: "currentColor", strokeWidth: 1.75, strokeLinecap: "round", fill: "none", pointerEvents: "none"}) : null
     ]
   });
+  plot.prepend(hatchPattern(hatchId, dark));
   const legend = plot.legend("color", {...LEGEND, width: Math.min(320, width), label: legendLabel});
-  const table = tableView(features.map((f) => ({zone: f.properties.LocationID, name: f.properties.zone, borough: f.properties.borough, value: f.value})), [
+  const mapKey = html`<div class="nrm-map-key">
+    ${features.some((f) => f.value == null) ? html`<span>${hatchSwatch(`${hatchId}-key`, dark)}${missingLabel}</span>` : null}
+    ${outlined ? html`<span>${svg`<svg width="18" height="12" aria-hidden="true"><line x1="1" x2="17" y1="6" y2="6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"></line></svg>`}${outline.label}</span>` : null}
+  </div>`;
+  const table = tableView(features.map((f) => ({zone: f.properties.LocationID, name: f.properties.zone, borough: format.borough(f.properties.borough), value: f.value})), [
     {key: "zone", label: "Zone", format: "text"},
     {key: "name", label: "Name", format: "text"},
     {key: "borough", label: "Borough", format: "text"},
     {key: "value", label: legendLabel, format: unit}
   ]);
-  return frame("choropleth", options, [legend, plot], table);
+  return frame("choropleth", options, [legend, mapKey.childElementCount ? mapKey : null, plot], table);
+}
+
+let hatches = 0;   // pattern ids are page-wide, so each map numbers its own
+
+/** The no-data hatch: muted diagonal lines over whatever lies beneath (the page surface). */
+function hatchPattern(id, dark) {
+  return svg`<defs><pattern id=${id} width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+    <line x1="0" y1="0" x2="0" y2="5" stroke=${palette.color("muted", dark)} stroke-width="2"></line>
+  </pattern></defs>`;
+}
+
+function hatchSwatch(id, dark) {
+  return svg`<svg width="14" height="14" aria-hidden="true">${hatchPattern(id, dark)}
+    <rect x="0.5" y="0.5" width="13" height="13" fill=${`url(#${id})`} stroke=${palette.color("muted", dark)}></rect>
+  </svg>`;
+}
+
+/**
+ * The outer edge of a set of zones as one MultiLineString: every ring segment that only one of the
+ * zones has. Neighbouring zones share their border vertex for vertex (the map is simplified with
+ * its topology kept), so their shared segments cancel and only the outline remains.
+ */
+function outerEdge(features) {
+  const once = new Map();
+  for (const {geometry: g} of features) {
+    for (const polygon of g.type === "Polygon" ? [g.coordinates] : g.coordinates) {
+      for (const ring of polygon) {
+        for (let i = 1; i < ring.length; ++i) {
+          const segment = [ring[i - 1], ring[i]];
+          const id = segment.map(String).sort().join(" ");
+          if (once.has(id)) once.delete(id);
+          else once.set(id, segment);
+        }
+      }
+    }
+  }
+  return {type: "MultiLineString", coordinates: [...once.values()]};
 }
 
 // --- heatmap -----------------------------------------------------------------
@@ -302,15 +414,17 @@ const WEEK_ROWS = [1, 2, 3, 4, 5, 6, 0];   // Monday first; hour_of_week has Sun
  *   value        field (default "trips");  unit: its tile unit (default "count")
  *   legendLabel  required, with units (e.g. "Trips per week")
  *   fy           facet field (default "mode"; null for a single grid);  fyLabels: {key: label}
+ *   zero         start the colour scale at 0 (default true, right for counts); false spans the
+ *                values' own range, for a rate such as fare per mile
  * All grids share one colour scale, so a quieter mode reads as quieter.
  */
 export function hourHeatmap(rows, options = {}) {
-  const {value = "trips", unit = "count", legendLabel, fyLabels, dark = palette.isDark(), width = 640} = options;
+  const {value = "trips", unit = "count", legendLabel, fyLabels, zero = true, dark = palette.isDark(), width = 640} = options;
   const fy = options.fy === undefined ? "mode" : options.fy;
   required("hourHeatmap", options, ["legendLabel"]);
   const V = drawn(unit);
-  const [, max] = extent(rows.map((d) => V(d[value])));
-  const color = {...palette.sequentialScale(dark), domain: [0, max], label: legendLabel, tickFormat: format.axis(unit)};
+  const [min, max] = extent(rows.map((d) => V(d[value])));
+  const color = {...palette.sequentialScale(dark), domain: [zero ? 0 : min, max], label: legendLabel, tickFormat: format.axis(unit)};
   const marginLeft = 36;
   const row = Math.max(15, Math.min(20, (width - marginLeft - 8) / 24));   // tall enough for day labels
   const grid = (data) => Plot.plot({
@@ -529,7 +643,7 @@ export function monthlyColumns(rows, options = {}) {
     ...plotOptions({width, height: options.height ?? (width < 480 ? 240 : 300), marginTop: 16, marginLeft: 56, marginRight: 16}),
     x: {type: "utc", label: null, ticks: timeTicks(xDomain, width), tickFormat: format.axis("month")},
     y: {label: yLabel, labelArrow: "none", grid: true, tickFormat: format.axis(unit),
-      ...(dated.marks.length > 1 ? {insetTop: dated.inset} : null)},
+      ...(dated.inset ? {insetTop: dated.inset} : null)},
     color,
     marks: [
       ...dated.marks,
@@ -545,5 +659,5 @@ export function monthlyColumns(rows, options = {}) {
     ...(z ? [{key: z, label: "Mode", format: "mode"}] : []),
     {key: y, label: yLabel, format: unit}
   ]);
-  return frame("monthlyColumns", options, [legend, plot], table);
+  return frame("monthlyColumns", options, [legend, dated.key, plot], table);
 }

@@ -100,6 +100,7 @@ TLC posts each month about two months after it ends, and may revise recent month
 - **One month at a time.** Each month's three files are mapped into one table with the same columns for every mode. A column the mapping doesn't know stops the pipeline; it is never guessed.
 - **Flag, never delete.** Each record is checked against the rules under [Quality flags](#flags) and keeps every flag it earns. A record is valid when it has none of the time, distance, fare or zone flags.
 - **Counts use every record.** Trip counts and shares count all records, valid or not, so they match TLC's own counts. Fee revenue also sums every record, since the fee was charged whatever the rest of the record says.
+- **Except on the airports page.** Its trip counts and shares count valid trips only, while the airports' own zone pages count every record, so their pickup figures for JFK and LaGuardia differ slightly.
 - **Everything else uses valid records.** Fares, driver pay, tips, distances and durations come from valid trips only.
 - **Ratios of sums.** Fare per mile is total fare divided by total miles, never the average of each trip's own fare per mile. Long trips count for more than short ones, as they do in the money.
 - **Durations.** Ride-hail records carry a trip time. Cab records don't, so a cab trip lasts from pickup to drop-off.
@@ -141,7 +142,7 @@ display(tableView(quality.quality, [
 
 ```js
 lineChart(quality.quality, {y: "valid_share", yUnit: "share", yLabel: "Valid records (%)", zero: false,
-  title: "Valid records by month", subtitle: check("quality_drift")?.summary, asOf, width, dark})
+  title: "Valid records by month", subtitle: quality.subtitles?.valid_share ?? check("quality_drift")?.summary, asOf, width, dark})
 ```
 
 The validation gate fails a month and mode whose valid share falls below a fixed floor, and lists any month well below its mode's usual share.
@@ -219,7 +220,7 @@ Nothing is published until the validation gate passes: all ${validation.checks.l
 display(tableFigure("Validation checks", table(
   html`<tr><th>Check</th><th>Result</th><th>What it tests, and the latest run</th></tr>`,
   validation.checks.map((c) => html`<tr><td><strong>${CHECKS[c.id]?.[0] ?? c.id}</strong></td><td>${status(c.status)}</td>
-    <td>${CHECKS[c.id]?.[1] ?? ""}<br><span class="nrm-sub">${c.summary}</span></td></tr>`),
+    <td>${CHECKS[c.id]?.[1] ?? ""}<br><span class="nrm-sub">${c.text ?? c.summary}</span></td></tr>`),
   {minWidth: "20rem"}
 ), sourceCaption(asOf, "trip records and monthly indicators")));
 ```
@@ -232,7 +233,7 @@ const exceptions = tieOut.filter((d) => d.status === "excepted");
 
 ```js
 lineChart(tieOut, {y: "diff", yUnit: "effect", yLabel: "Pipeline trips per day vs TLC's figure (%)",
-  title: "Tie-out with TLC's monthly indicators", subtitle: check("tie_out")?.summary, asOf,
+  title: "Tie-out with TLC's monthly indicators", subtitle: quality.subtitles?.tie_out ?? check("tie_out")?.summary, asOf,
   dataset: "trip records and monthly indicators", width, dark})
 ```
 
@@ -243,7 +244,7 @@ if (exceptions.length) display(html`<p class="nrm-note">${one ? "Documented exce
 
 ```js
 const otherValues = (vals) => vals.length
-  ? vals.map((v) => `${format.usd(v.cbd_fee)} (${format.count(v.trips)} trips)`).join(", ")
+  ? vals.map((v) => `${format.usd(v.cbd_fee)} (${format.count(v.trips)} ${v.trips === 1 ? "trip" : "trips"})`).join(", ")
   : "None";
 display(tableFigure("Congestion fees charged, by mode", table(
   html`<tr><th>Mode</th><th class="nrm-num">Fee set for the mode</th><th class="nrm-num">Trips charged exactly that</th><th>Other amounts seen</th><th>Result</th></tr>`,

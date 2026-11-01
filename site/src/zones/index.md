@@ -5,7 +5,7 @@ title: Zones
 ```js
 // /zones (D13; L14): the city-wide zone maps (Q1, Q10) and a searchable table linking to each
 // zone page. Every number, title and subtitle comes from zones/index.json. Thin zones
-// (flags.thin, Newark Airport included) are left out of the maps, so they draw grey.
+// (flags.thin, Newark Airport included) are left out of the maps, so they draw hatched.
 import * as format from "../components/format.js";
 import {choropleth, sourceCaption} from "../components/charts.js";
 import {pageHeader, howWeMeasured, siteUrl, html} from "../components/page.js";
@@ -22,6 +22,7 @@ const asOf = index.as_of_month;
 const label = (key) => tiles.tiles[key].label;
 const zoneHref = (zone) => siteUrl(`zones/${zone}`);
 const mapped = index.rows.filter((d) => !d.thin);
+const thinLabel = "Too few trips";
 const thinNames = [...new Set(index.rows.filter((d) => d.thin).map((d) => d.name))];
 const yellowLeads = mapped.filter((d) => d.top_mode === "yellow").sort((a, b) => b.yellow_share - a.yellow_share);
 ```
@@ -34,21 +35,21 @@ display(pageHeader(index, tiles, {keys: ["zones_yellow_leads", "zones_lyft_beats
 
 <div class="nrm-pair">
   <div>${resize((width) => choropleth(geo, mapped, {value: "rh_share", unit: "share", legendLabel: "Ride-hail share of pickups (%)",
-    title: "Ride-hail share of pickups", subtitle: index.subtitles.level_map, href: zoneHref, asOf, width, dark}))}</div>
+    title: "Ride-hail share of pickups", subtitle: index.subtitles.level_map, href: zoneHref, missingLabel: thinLabel, asOf, width, dark}))}</div>
   <div>${resize((width) => choropleth(geo, mapped, {value: "share_change_yoy", unit: "share", kind: "diverging",
     legendLabel: "Change in ride-hail share vs a year earlier (pts)", title: "Change in ride-hail share",
-    subtitle: index.subtitles.change_map, href: zoneHref, asOf, width, dark}))}</div>
+    subtitle: index.subtitles.change_map, href: zoneHref, missingLabel: thinLabel, asOf, width, dark}))}</div>
 </div>
 
 ```js
-display(html`<p class="nrm-note">Grey zones had too few trips in the month to map: ${thinNames.join(", ")}. Click a zone to open its page.</p>`);
+display(html`<p class="nrm-note">Hatched zones had too few trips in the month to map: ${thinNames.join(", ")}. Click a zone to open its page.</p>`);
 ```
 
 ## Where yellow cabs still lead
 
 <div class="nrm-pair">
   <div>${resize((width) => choropleth(geo, mapped, {value: "yellow_share", unit: "share", legendLabel: "Yellow-cab share of pickups (%)",
-    title: "Yellow-cab share of pickups", subtitle: index.subtitles.yellow_map, href: zoneHref, asOf, width, dark}))}</div>
+    title: "Yellow-cab share of pickups", subtitle: index.subtitles.yellow_map, href: zoneHref, missingLabel: thinLabel, asOf, width, dark}))}</div>
   <div class="nrm-chart"><figure>
     <h2>${label("zones_yellow_leads")}</h2>
     <div class="nrm-scroll-x"><table class="nrm-zone-leads">
@@ -72,13 +73,13 @@ display(html`<p class="nrm-note">Grey zones had too few trips in the month to ma
 function zoneTable(rows) {
   const columns = [
     {key: "name", label: "Zone", sort: (d) => d.name.toLowerCase()},
-    {key: "borough", label: "Borough", sort: (d) => d.borough.toLowerCase()},
+    {key: "borough", label: "Borough", f: format.borough, text: true, sort: (d) => format.borough(d.borough).toLowerCase()},
     {key: "trips_per_day", label: label("trips_per_day"), f: format.count},
     {key: "rh_share", label: label("rh_share"), f: format.share},
     {key: "share_change_yoy", label: "Change vs a year earlier", f: format.shareChange},
     {key: "yellow_share", label: label("yellow_share"), f: format.share},
     {key: "wait_p50", label: label("wait_p50"), f: format.seconds}
-  ].map((c) => ({...c, numeric: Boolean(c.f), sort: c.sort ?? ((d) => d[c.key])}));
+  ].map((c) => ({...c, numeric: Boolean(c.f) && !c.text, sort: c.sort ?? ((d) => d[c.key])}));
   // Thin zones show no figures, like their grey on the maps.
   const blank = Object.fromEntries(columns.filter((c) => c.numeric).map((c) => [c.key, null]));
   const data = rows.map((d) => (d.thin ? {...d, ...blank} : d));
@@ -97,7 +98,7 @@ function zoneTable(rows) {
   });
   function render() {
     const q = input.value.trim().toLowerCase();
-    const shown = data.filter((d) => !q || d.name.toLowerCase().includes(q) || d.borough.toLowerCase().includes(q));
+    const shown = data.filter((d) => !q || d.name.toLowerCase().includes(q) || format.borough(d.borough).toLowerCase().includes(q));
     const key = sortBy.sort;
     shown.sort((a, b) => {
       const [x, y] = [key(a), key(b)];
