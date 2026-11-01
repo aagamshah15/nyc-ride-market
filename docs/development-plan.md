@@ -49,8 +49,8 @@ The integrator keeps the Status column current.
 | [L14](lanes/L14-pages-zones.md) | Pages: Zones | `zones/[zone].md`, `zones/index.md` | 4 | L05 done | Q1, Q8, Q10 | done: merged 30 Oct (`66de92b`); zones index + 263 zone pages, build 7 s |
 | [L15](lanes/L15-pages-congestion-drivers.md) | Pages: Congestion + Drivers | `congestion-pricing.md`, `drivers.md` | 4 | L05 done | Q2, Q3, Q5, Q6, Q14, Q15 | done: merged 31 Oct (`cbdccb1`); congestion pricing + drivers; fee chart events added by the integrator (`120bdb1`) |
 | [L16](lanes/L16-pages-airports-prices.md) | Pages: Airports + Prices | `airports.md`, `prices.md` | 4 | L05 done | Q7, Q9 | done: merged 31 Oct (`8e98fe5`); airports + prices |
-| [L17](lanes/L17-refresh-deploy.md) | Refresh and deploy | `.github/workflows/refresh.yml`, release scripts | 4 | L11 writes real data; GitHub repo exists | — | not started: the cloud attempts never pushed, and the local start was blocked by the auto-mode check; held until the pages were merged (user, 31 Oct) |
-| [L18](lanes/L18-launch-review.md) | Launch review | `reports/launch_review.md` | 5 | G5 | all | not started |
+| [L17](lanes/L17-refresh-deploy.md) | Refresh and deploy | `.github/workflows/refresh.yml`, release scripts | 4 | L11 writes real data; GitHub repo exists | — | built, merged 1 Nov (`838fc6e`): `workflow_dispatch` only, schedule commented out; nothing has run on GitHub. G6 steps are the user's (lane hand-off) |
+| [L18](lanes/L18-launch-review.md) | Launch review | `reports/launch_review.md` | 5 | G5 | all | done 1 Nov: 0 blockers, 10 should-fix, 17 nits; 26 fixed (`930faec`, `e5da94b`), #18 open for the user |
 
 ---
 
@@ -124,6 +124,17 @@ All gate checks run in the integrator space. G1, G3, G4, G5 and G6 are SPEC §11
 
 ### Gate log
 
+- **Toward G6, 1 Nov 2026.** L17 (refresh workflow) and the L18 launch review merged (`838fc6e`). Two fix sessions and integrator follow-ups closed 26 of L18's 27 findings (`930faec`, `e5da94b`). #18 (static `<title>` on dynamic routes, which Framework 1.13.4 can't set) waits for the user to accept it. The real data was re-published; `make test` passes (546).
+  - **G6 status:**
+    - methods page complete: ✅
+    - phone layout checked: ✅ (L18 at 375 px, fixes re-checked by the fix session)
+    - L18 review closed: one item awaiting acceptance
+    - refresh workflow run end to end: ⏳ the user's step
+    - v1 deployed: ⏳ the user's step
+  - **Ready for the user's G6 steps** (L17 hand-off):
+    - Checked by the integrator: no rulesets or branch protection on `main`, the default workflow token stays read-only, and `zstd` is installed.
+    - `actionlint` is not installed.
+    - Still to do: seed Release `data-2026-08` (about 193 MB), the end-to-end `workflow_dispatch` run that deploys publicly, the failure drill, then uncomment the schedule.
 - **G5, 31 Oct 2026: passed** (integrator check, SPEC §11 phase 4). L12, L15 and L16 merged (`1f40ab7`, `cbdccb1`, `8e98fe5`) after a green test-merge, joining L13 and L14.
   - **Every route builds:** home, congestion pricing, 4 company pages, the zones index, 263 zone pages, airports, drivers, prices and methods. That's 275 pages in 16 s, with 274 links validated, and zones 264 and 265 have no pages.
   - **Data budgets pass:** `tests/test_site_budget.py` (14) runs on the real data, every zone file is under 50 KB, and the largest route is congestion pricing at about 783 KB of 1.5 MB.
