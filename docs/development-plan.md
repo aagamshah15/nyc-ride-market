@@ -244,7 +244,7 @@ Already settled in SPEC's favour, no action needed: the brief's four aggregate t
 | Two processes rewrite `data/agg/` at once | Only the integrator runs real `make month` / `make backfill`; lane tests use temp dirs |
 | Pages recompute metrics or hard-code numbers | CLAUDE.md rules; L18 greps page markdown for digits and `site/src` for colours outside `palette.js` |
 | Mock data deployed | `as_of_month: "MOCK"` refused by publish and by the deploy guard |
-| TLC revises a recent month | Proposed for L17: compare the last three months' size and ETag with the manifest and report changes (not in SPEC; integrator decides) |
+| TLC revises a recent month | D30: each refresh compares the last three months' size and ETag with the manifest and opens an issue per revised month |
 
 ---
 

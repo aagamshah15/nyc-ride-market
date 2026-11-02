@@ -37,7 +37,8 @@ RETRY_STATUS = {408, 429, 500, 502, 503, 504}
 MISSING_STATUS = {403, 404}   # CloudFront answers 403 for a file that isn't posted
 
 EXIT_NOT_POSTED = 1           # --check: at least one dataset isn't posted
-EXIT_CHECK_FAILED = 4         # --check: couldn't tell (network or server error)
+EXIT_CHECK_FAILED = 4         # --check, --revisions: couldn't tell (network or server error)
+EXIT_REVISED = 5              # --revisions: TLC changed a file the aggregates were built from (D30)
 
 
 class IngestError(Exception):
@@ -355,6 +356,56 @@ def check_month(month: str, *, sources: dict[str, Any] | None = None,
     return posted
 
 
+def check_revisions(months: int, *, sources: dict[str, Any] | None = None,
+                    session: requests.Session | None = None) -> list[dict[str, Any]]:
+    """HEAD the trip files of the latest ``months`` months in the manifest and compare each with its
+    entry (D30). Returns one row per file that changed: ``verdict`` is "revised" when the size
+    changed or the file is gone, "possibly revised" when only the ETag did (TLC's multipart ETags
+    change when the same bytes are uploaded again). Reprocesses nothing."""
+    sources = sources or load_sources()
+    settings = Settings.from_sources(sources)
+    session = session or make_session(settings)
+    entries = {(e["dataset"], e["month"]): e for e in load_manifest().values()
+               if e.get("dataset") in sources["datasets"] and e.get("month")}
+    latest = sorted({month for _, month in entries}, reverse=True)[:months]
+
+    def head(url: str, label: str) -> requests.Response:
+        resp = session.head(url, timeout=settings.timeout_s, allow_redirects=True)
+        if resp.status_code not in MISSING_STATUS:
+            _check_status(resp, label, url)
+        return resp
+
+    changes = []
+    for month in sorted(latest):
+        for dataset in sources["datasets"]:
+            if (entry := entries.get((dataset, month))) is None:
+                continue
+            label = f"{dataset} {month}"
+            resp = _with_retries(label, settings, lambda: head(entry["url"], label))
+            gone = resp.status_code in MISSING_STATUS
+            length = None if gone else resp.headers.get("Content-Length")
+            size = int(length) if length else None
+            etag = None if gone else resp.headers.get("ETag")
+            if gone or (size is not None and size != entry["bytes"]):
+                verdict = "revised"
+            elif etag != entry.get("etag"):
+                verdict = "possibly revised"
+            else:
+                print(f"{label}: unchanged")
+                continue
+            change = {"dataset": dataset, "month": month, "verdict": verdict,
+                      "bytes_before": entry["bytes"], "bytes_now": size,
+                      "etag_before": entry.get("etag"), "etag_now": etag,
+                      "last_modified_before": entry.get("last_modified"),
+                      "last_modified_now": None if gone else resp.headers.get("Last-Modified")}
+            changes.append(change)
+            now = (f"gone (HTTP {resp.status_code})" if gone
+                   else f"{_size(size) if size is not None else 'size unknown'}, ETag {etag}")
+            print(f"{label}: {verdict}: {_size(entry['bytes'])}, ETag {entry.get('etag')} → {now}; "
+                  f"last modified {change['last_modified_before']} → {change['last_modified_now']}")
+    return changes
+
+
 def delete_raw(month: str, *, sources: dict[str, Any] | None = None) -> None:
     """Delete one month's raw trip files. Manifest entries stay, marked with ``deleted_at``."""
     sources = sources or load_sources()
@@ -392,6 +443,9 @@ def build_parser() -> argparse.ArgumentParser:
                              f"{EXIT_CHECK_FAILED} if the check itself failed")
     action.add_argument("--delete-raw", type=month_arg, metavar="YYYY-MM",
                         help="delete this month's raw trip files")
+    action.add_argument("--revisions", type=int, metavar="N",
+                        help="HEAD the latest N months' trip files in the manifest; exit 0 if all match, "
+                             f"{EXIT_REVISED} if TLC changed one, {EXIT_CHECK_FAILED} if the check failed")
     parser.add_argument("--force", action="store_true",
                         help="download again even when the manifest matches")
     return parser
@@ -410,11 +464,13 @@ def main(argv: list[str] | None = None) -> None:
             ingest_ref(force=args.force)
         elif args.check:
             raise SystemExit(0 if check_month(args.check) else EXIT_NOT_POSTED)
+        elif args.revisions:
+            raise SystemExit(EXIT_REVISED if check_revisions(args.revisions) else 0)
         else:
             delete_raw(args.delete_raw)
     except IngestError as exc:
         print(exc, file=sys.stderr)
-        raise SystemExit(EXIT_CHECK_FAILED if args.check else 1) from None
+        raise SystemExit(EXIT_CHECK_FAILED if args.check or args.revisions else 1) from None
 
 
 if __name__ == "__main__":

@@ -293,6 +293,42 @@ def test_check_failure_is_not_read_as_not_posted(tlc):
     assert [r for r in tlc.requests if r[1] == trip_path("yellow", "2026-08")] == [("HEAD", trip_path("yellow", "2026-08"))] * 3
 
 
+# --- revisions (D30) -------------------------------------------------------------
+
+def test_revisions_flags_changed_files_in_the_latest_months(tlc, capsys):
+    for month in ("2026-05", "2026-06", "2026-07", "2026-08"):
+        tlc.post_month(month)
+        assert run("--month", month) == 0
+    assert run("--revisions", "3") == 0                       # nothing changed
+    assert tlc.gets() == 12                                    # the four downloads; the check only HEADs
+
+    # fhvhv 2026-06 gains rows (new size); yellow 2026-07 is re-uploaded with the same size and new
+    # bytes (only the ETag moves); green 2026-08 disappears; 2026-05 is outside the last three months.
+    tlc.routes[trip_path("fhvhv", "2026-06")].body = parquet_bytes(ROWS["fhvhv"] + 50, seed=1)
+    body = tlc.routes[trip_path("yellow", "2026-07")].body
+    tlc.routes[trip_path("yellow", "2026-07")].body = body[:-12] + bytes([body[-12] ^ 1]) + body[-11:]   # HEAD only
+    del tlc.routes[trip_path("green", "2026-08")]
+    tlc.routes[trip_path("fhvhv", "2026-05")].body = parquet_bytes(1, seed=7)
+    capsys.readouterr()
+
+    assert run("--revisions", "3") == ingest.EXIT_REVISED
+    out = capsys.readouterr().out
+    assert "fhvhv 2026-06: revised:" in out
+    assert "yellow 2026-07: possibly revised:" in out
+    assert "green 2026-08: revised:" in out and "gone (HTTP 403)" in out
+    assert "2026-05" not in out
+    changes = ingest.check_revisions(3)
+    assert [(c["dataset"], c["month"], c["verdict"]) for c in changes] == [
+        ("fhvhv", "2026-06", "revised"), ("yellow", "2026-07", "possibly revised"), ("green", "2026-08", "revised")]
+
+
+def test_revisions_check_failure_is_exit_4(tlc):
+    tlc.post_month("2026-08")
+    assert run("--month", "2026-08") == 0
+    tlc.routes[trip_path("yellow", "2026-08")].status = 500
+    assert run("--revisions", "1") == ingest.EXIT_CHECK_FAILED
+
+
 # --- delete-raw ----------------------------------------------------------------
 
 def test_delete_raw_removes_files_and_marks_manifest(tlc):

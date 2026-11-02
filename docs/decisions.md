@@ -249,3 +249,14 @@ TLC's "5%" is one sample trip (7.5 miles, 30 minutes) against 2024 rates, with t
 - **Unchanged:** the shared-ride match rate (Q12) and D24.
 
 Reason: a trip record exists only for a completed trip, and a trip that asked for a WAV and didn't get one isn't completed. So `SUM(wav_match) / SUM(wav_req)` is about 100% by construction: in 2025-03, Uber matched 39,879 of 39,879 requests and Lyft 16,612 of 16,615. The data can show how many WAV-requested trips each company completed, and how much of its fleet's work ran in accessible vehicles (2025-03: 1,362,901 of Uber's 14,547,181 trip records, 9.4%).
+
+## D30 · The weekly refresh flags TLC revisions of recent months
+
+1 Nov 2026 · SPEC §10 (refresh), §3.1 · L02 (closed; integrator), L17 · **Status: accepted by the user 1 Nov 2026** (proposed by L17)
+
+- **Check:** each refresh run, the check job runs `python -m pipeline.ingest --revisions 3`. It HEADs the trip files of the latest three months in the restored manifest and compares `Content-Length` and `ETag` with each file's manifest entry. Exit 0 means all match, 5 means a file changed, 4 means the check failed.
+- **Verdicts:** "revised" when the size changed or the file is gone; "possibly revised" when only the ETag changed, since TLC's multipart ETags (`…-4`) also change when the same bytes are uploaded again.
+- **On a change:** one issue per month, "TLC revised YYYY-MM", carrying the old and new size, ETag and Last-Modified, or a comment on that issue if it's still open. Nothing is reprocessed automatically, because a revision changes figures already published. The user decides, then dispatches refresh with `month: YYYY-MM`, which downloads again, rewrites that month's rows, validates, publishes and deploys.
+- **Never blocks the refresh:** a failed check (exit 4) is a warning, and it runs again the next week.
+
+Reason: TLC posts with about a two-month lag and may revise recent months (CLAUDE.md), and D27's 2026-06 tie-out exception rests on TLC's file as published. The first check (1 Nov 2026) found all nine files for 2026-06 → 2026-08 unchanged.

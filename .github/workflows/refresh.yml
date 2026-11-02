@@ -59,6 +59,7 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: read
+      issues: write      # the TLC-revision step (D30)
     outputs:
       tag: ${{ steps.restore.outputs.tag }}
       month: ${{ steps.month.outputs.month }}
@@ -116,6 +117,52 @@ jobs:
                echo "::notice::$MONTH isn't posted for all three datasets yet; nothing to do" ;;
             *) exit "$code" ;;   # 4: the check itself failed (network, server)
           esac
+
+      # D30: TLC may revise recent months. HEAD the last three months' trip files the aggregates were
+      # built from and compare size and ETag with the restored manifest. A change opens (or comments
+      # on) one issue per month and reprocesses nothing: the user decides, then dispatches refresh with
+      # that month. The check never blocks the run; if it fails, it warns and runs again next week.
+      - name: Flag TLC revisions of the last three months (D30)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set +e
+          python -m pipeline.ingest --revisions 3 | tee "$RUNNER_TEMP/revisions.txt"
+          code=${PIPESTATUS[0]}
+          set -e
+          case "$code" in
+            0) exit 0 ;;
+            4) echo "::warning::The TLC revision check failed (network or server); it runs again next week"
+               exit 0 ;;
+            5) ;;
+            *) exit "$code" ;;
+          esac
+          run_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          months="$(grep -E ': (possibly )?revised:' "$RUNNER_TEMP/revisions.txt" | awk '{print $2}' | tr -d ':' | sort -u)"
+          for month in $months; do
+            title="TLC revised $month"
+            {
+              echo "The refresh found changes to trip files that the published aggregates were built from (D30). Nothing was reprocessed."
+              echo
+              echo '```'
+              grep " $month: " "$RUNNER_TEMP/revisions.txt"
+              echo '```'
+              echo
+              echo "- **To take the revision:** dispatch **refresh** on \`main\` with \`month: $month\`. It downloads the files again, rewrites that month's rows, validates, publishes and deploys."
+              echo "- **\"Possibly revised\"** means only the ETag changed, which also happens when TLC uploads the same bytes again."
+              echo "- If 2026-06 changed, look again at D27's documented tie-out exception."
+              echo
+              echo "Run: $run_url"
+            } > "$RUNNER_TEMP/issue.md"
+            number="$(gh issue list --state open --search "\"$title\" in:title" --json number,title \
+              --jq ".[] | select(.title == \"$title\") | .number" | head -n 1)"
+            if [ -n "$number" ]; then
+              gh issue comment "$number" --body-file "$RUNNER_TEMP/issue.md"
+            else
+              gh issue create --title "$title" --body-file "$RUNNER_TEMP/issue.md"
+            fi
+            echo "::warning::$title: issue opened or updated"
+          done
 
   refresh:
     name: Process, validate and publish ${{ needs.check.outputs.month }}
