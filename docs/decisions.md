@@ -306,3 +306,17 @@ Reason: the findings are spread over ten page types, and SPEC has no single page
 - Uber and Lyft pages are unchanged.
 
 Reason: readers outside New York don't know what separates yellow and green cabs, and the cab pages had unused space beside the text on wide screens.
+
+## D34 · Filters on the pages; a filtered chart describes its selection
+
+2 Nov 2026 · SPEC §9.3, CLAUDE.md site rules · L05, L13–L16 (closed; integrator) · **Status: accepted by the user 2 Nov 2026** (option "page filters first")
+
+- **Filter bar:** each page gets a filter bar built from a shared component (`components/filters.js`). It filters only data the page already loads, so no data file, contract or budget changes. The pages and dimensions:
+  - **`/prices`:** mode, borough, and time of week (weekday or weekend, and a time band) on the hourly view.
+  - **`/airports`:** airport, direction (to or from) and mode, plus time band on the hourly view.
+  - **`/congestion-pricing`:** mode, measure (trips, fare per mile, driver share) and zone list (core or wide).
+  - **`/drivers`:** company (Uber, Lyft, both).
+  - **`/zones`:** borough, congestion-zone zones only, and a quick pick of the airport zones (JFK, LaGuardia, Newark), for the maps and the table.
+- **The default view is unchanged:** each page opens on the view its finding describes, and that chart shows its finding subtitle as now.
+- **Filtered views:** when a filter moves a chart away from that default, the finding subtitle gives way to a plain description of the selection (e.g. "Showing yellow cabs in Brooklyn"). That way a chart never states a finding it no longer shows. This narrows CLAUDE.md's "every chart has a finding subtitle" to the default view; filtered views keep units and the source caption.
+- **Not in scope:** free cross-filtering (e.g. yellow cabs from JFK at 6 pm in March). That needs a new filterable data file and a larger page budget: a separate Explore page, left for later.
