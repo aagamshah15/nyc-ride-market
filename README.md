@@ -2,7 +2,7 @@
 
 An independent, public analytics site profiling New York City's ride market (Uber, Lyft, yellow and green cabs) from NYC Taxi & Limousine Commission trip records.
 
-**Live site:** https://aagamshah15.github.io/nyc-ride-market/ · Independent analysis of public NYC TLC data. Not affiliated with any company named.
+**Live site:** https://aagamshah15.github.io/nyc-ride-market/ ([executive summary](https://aagamshah15.github.io/nyc-ride-market/summary)) · Independent analysis of public NYC TLC data. Not affiliated with any company named.
 
 ## Why
 

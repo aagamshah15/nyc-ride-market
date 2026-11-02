@@ -14,6 +14,7 @@ const COMPANIES = {uber: "Uber", lyft: "Lyft", yellow: "Yellow cabs", green: "Gr
 const ZONES = Array.from({length: 263}, (_, i) => i + 1);   // 264 and 265 are "unknown": no pages
 
 const NAV = [
+  {name: "Executive summary", path: "/summary", source: "summary.md"},   // D32
   {name: "Congestion pricing", path: "/congestion-pricing", source: "congestion-pricing.md"},
   {
     name: "Companies",

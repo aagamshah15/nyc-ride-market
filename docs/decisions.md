@@ -275,3 +275,18 @@ Reason: TLC posts with about a two-month lag and may revise recent months (CLAUD
 - **The repo `README.md`** gives the same why, who and how for GitHub visitors.
 
 Reason: the home page leads with findings and the methods page covers the how in detail, but nothing said in one place why the project exists or whom it serves.
+
+## D32 · An executive summary page
+
+2 Nov 2026 · SPEC §9.1 (routes) · L12 (closed; integrator) · **Status: requested by the user 2 Nov 2026**
+
+- **New route `/summary`** (`site/src/summary.md`, first in the nav), for readers without time for the detailed pages.
+- **Content:**
+  - the four home tiles;
+  - all fifteen findings, grouped into six themes (who carries the trips; congestion pricing; drivers and pay; prices and waits; airports; accessible and shared rides), with headline findings first in each theme;
+  - for each theme, who it matters to (from SPEC Appendix A) and a link to the full analysis;
+  - the reading caveats: estimated effects, pay per hour with a passenger, card-only cab tips, completed trips only.
+- **Stays right after every refresh:** every figure and finding comes from `home.json`, which `findings.py` rewrites each month. The page adds only theme names, audiences and caveats, with no numbers.
+- **Prints as a short report:** a "Print or save as PDF" button, and print styles that hide the sidebar.
+
+Reason: the findings are spread over ten page types, and SPEC has no single page that reads as a brief for decision-makers.

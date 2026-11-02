@@ -56,6 +56,10 @@ routes:
     source: methods.md
     files: [quality.json, congestion.json, events.json]   # the download links fetch only on click
     methods: null
+  /summary:                                                # D32: every finding on one page, by theme
+    source: summary.md
+    files: [home.json, tiles.json]
+    methods: null
   /about:                                                  # D31: why, how and who it's for
     source: about.md
     files: [home.json, share_monthly.json, events.json]
