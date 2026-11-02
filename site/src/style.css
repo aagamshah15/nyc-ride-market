@@ -298,6 +298,129 @@ table,
   margin-top: 0;
 }
 
+/* Page filters (components/filters.js, D34): labelled selects and segmented radios with a Reset
+   button. The overrides beat Inputs' own form layout (a fixed label column) inside the bar. */
+.nrm-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem 1.5rem;
+  width: fit-content;
+  max-width: 100%;
+  margin: 1rem 0 1.5rem;
+  padding: 0.75rem 1rem;
+  box-sizing: border-box;
+  background: var(--theme-background-alt);
+  border: solid 1px var(--theme-foreground-faintest);
+  border-radius: var(--nrm-radius);
+  font: 14px/1.3 var(--sans-serif);
+}
+
+.nrm-filters form.nrm-filter {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.3rem;
+  width: auto;
+  max-width: 100%;
+  min-height: 0;
+  margin: 0;
+  font: inherit;
+}
+
+.nrm-filters form.nrm-filter > label {
+  width: auto;
+  margin: 0;
+  padding: 0;
+  color: var(--theme-foreground-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.nrm-filters form.nrm-filter select {
+  width: auto;
+  min-width: 10rem;
+  max-width: 100%;
+  min-height: 2rem;
+  padding: 0.25rem 0.5rem;
+  border: solid 1px var(--theme-foreground-faint);
+  border-radius: var(--nrm-radius);
+  background: var(--theme-background);
+  color: var(--theme-foreground);
+  font: inherit;
+}
+
+/* Segmented radios: the native radio stays in the label, out of sight, so the group keeps its
+   keyboard behaviour (Tab into the group, arrow keys between options). */
+.nrm-filters form.nrm-filter--radio > div {
+  display: inline-flex;
+  flex-wrap: wrap;
+  max-width: 100%;
+  border: solid 1px var(--theme-foreground-faint);
+  border-radius: var(--nrm-radius);
+  background: var(--theme-background);
+  overflow: hidden;
+}
+
+.nrm-filters form.nrm-filter--radio > div > label {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: 2rem;
+  margin: 0;
+  padding: 0.3rem 0.75rem;
+  box-sizing: border-box;
+  color: var(--theme-foreground);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.nrm-filters form.nrm-filter--radio > div > label + label {
+  border-left: solid 1px var(--theme-foreground-faint);
+}
+
+.nrm-filters form.nrm-filter--radio input[type="radio"] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.nrm-filters form.nrm-filter--radio label:has(input:checked) {
+  background: var(--theme-foreground);
+  color: var(--theme-background);
+  font-weight: 600;
+}
+
+.nrm-filters form.nrm-filter--radio label:has(input:focus-visible) {
+  outline: 2px solid var(--theme-foreground-focus);
+  outline-offset: -4px;
+}
+
+.nrm-filters select:focus-visible,
+.nrm-filters-reset:focus-visible {
+  outline: 2px solid var(--theme-foreground-focus);
+  outline-offset: 2px;
+}
+
+.nrm-filters-reset {
+  min-height: 2rem;
+  padding: 0.3rem 0.85rem;
+  border: solid 1px var(--theme-foreground-faint);
+  border-radius: var(--nrm-radius);
+  background: var(--theme-background);
+  color: var(--theme-foreground);
+  font: inherit;
+  cursor: pointer;
+}
+
+.nrm-filters-reset:disabled {
+  color: var(--theme-foreground-faint);
+  cursor: default;
+}
+
 /* "How we measured this" (SPEC §9.3). */
 .nrm-methods {
   max-width: 760px;
@@ -329,6 +452,32 @@ table,
 
   .nrm-tile-value {
     font-size: 24px;
+  }
+
+  .nrm-filters {
+    flex-direction: column;
+    align-items: stretch;
+    width: auto;
+  }
+
+  .nrm-filters form.nrm-filter select {
+    width: 100%;
+  }
+
+  .nrm-filters form.nrm-filter--radio > div {
+    display: flex;
+    width: 100%;
+  }
+
+  .nrm-filters form.nrm-filter--radio > div > label {
+    flex: 1 1 auto;
+    justify-content: center;
+    padding: 0.3rem 0.4rem;
+    font-size: 13px;
+  }
+
+  .nrm-filters-reset {
+    align-self: flex-start;
   }
 }
 

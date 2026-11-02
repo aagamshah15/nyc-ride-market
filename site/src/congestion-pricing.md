@@ -5,12 +5,15 @@ title: Congestion pricing
 <!-- L15 · The congestion-pricing case study (SPEC §9.1, §9.3; Q2, Q3, Q14). Every number, title and
      subtitle comes from congestion.json; the page adds none. The core zone list is the headline and
      the wide list (borderline zones counted as inside) the sensitivity result (D21). Results are
-     always worded as estimated effects (CLAUDE.md). -->
+     always worded as estimated effects (CLAUDE.md). Page filters (D34): mode, measure and zone list;
+     the wide list draws against the core list, so the sensitivity shows on the charts. A chart moved
+     off its default shows a description of its selection in place of its finding. -->
 
 ```js
 import * as format from "./components/format.js";
-import {pageHeader, howWeMeasured, siteUrl, html} from "./components/page.js";
+import {pageHeader, howWeMeasured, siteUrl, emptyState, html} from "./components/page.js";
 import {effectDots, lineChart, monthlyColumns, choropleth, sourceCaption} from "./components/charts.js";
+import {filterBar, describe, modePhrase, modeOption} from "./components/filters.js";
 ```
 
 ```js
@@ -36,13 +39,13 @@ const MODES = ["all", "ride_hail", "uber", "lyft", "yellow", "green"];
 const byMetricAndMode = (a, b) =>
   METRICS.indexOf(a.metric) - METRICS.indexOf(b.metric) || MODES.indexOf(a.mode) - MODES.indexOf(b.mode);
 
-const core = data.effects.filter((d) => d.zone_list === "core").sort(byMetricAndMode);
-
-// The headline weekly series: trips touching the zone, all modes, core list. Weeks left out of the
-// summary (holiday weeks that fall differently in the two years) are left off the line too, which
-// breaks there rather than joining across them.
-const weekly = data.weekly_effect.filter((d) => d.metric === "trips" && d.mode === "all" && d.zone_list === "core");
-const excludedWeeks = [...new Set(weekly.filter((d) => d.excluded).map((d) => d.week_start))];
+// Measures as a sentence names them, and the weekly chart's axis for each.
+const METRIC_PHRASES = {
+  trips: "trips touching the zone",
+  fare_per_mile: "the base fare per mile",
+  driver_share: "the driver share of the base fare"
+};
+const ZONE_LISTS = {core: "Core list", wide: "With borderline zones"};
 const excludedReasons = [...new Set(data.excluded_weeks.map((d) => d.reason))];
 
 const [firstYear, lastYear] = [Math.min(...data.weekly_trips.map((d) => d.iso_year)), Math.max(...data.weekly_trips.map((d) => d.iso_year))];
@@ -54,13 +57,56 @@ const coreZones = (quality.cbd_zones ?? []).filter((z) => !z.borderline).map((z)
 display(pageHeader(data, tiles, {keys: ["trips_effect", "fpm_effect", "fees_to_date"]}));
 ```
 
+```js
+// The defaults are the headline: every measure and mode, the core zone list. "Core and wide" draws
+// the wide list (borderline zones counted as inside) against the core list.
+const filters = view(filterBar([
+  {key: "mode", label: "Mode", options: MODES, format: modeOption},
+  {key: "measure", label: "Measure", options: ["all", ...METRICS],
+    format: (m) => ({all: "All measures", trips: "Trips", fare_per_mile: "Fare per mile", driver_share: "Driver share"})[m]},
+  {key: "zones", label: "Zone list", options: ["core", "wide"], radio: true, format: (z) => ({core: "Core only", wide: "Core and wide"})[z]}
+]));
+```
+
+```js
+const {mode, measure} = filters;
+const wide = filters.changed("zones");
+const lists = wide ? ["core", "wide"] : ["core"];
+const pick = (d) => (!filters.changed("mode") || d.mode === mode) && (measure === "all" || d.metric === measure) && lists.includes(d.zone_list);
+const pair = wide ? {key: "zone_list", values: ["core", "wide"], labels: {core: "Core list", wide: "With borderline zones (wide list)"}} : null;
+const versus = wide ? "core list against the wide list" : "";
+
+const core = data.effects.filter(pick).sort(byMetricAndMode);
+const effectsSubtitle = filters.changed("mode", "measure", "zones")
+  ? describe({what: measure === "all" ? "estimated effects" : `the estimated effect on ${METRIC_PHRASES[measure]}`,
+      where: filters.changed("mode") ? `for ${modePhrase(mode)}` : "by mode", when: versus})
+  : data.subtitles.effects;
+
+// The headline weekly series: trips touching the zone, all modes, core list; another measure or mode
+// when chosen. Weeks left out of the summary (holiday weeks that fall differently in the two years)
+// are left off the line too, which breaks there rather than joining across them.
+const weeklyMetric = measure === "all" ? "trips" : measure;
+const weekly = data.weekly_effect.filter((d) => d.metric === weeklyMetric && d.mode === mode && lists.includes(d.zone_list));
+const excludedWeeks = [...new Set(weekly.filter((d) => d.excluded).map((d) => d.week_start))];
+const weeklyFiltered = weeklyMetric !== "trips" || filters.changed("mode", "zones");
+const weeklySubtitle = weeklyFiltered
+  ? describe({what: `the weekly estimated effect on ${METRIC_PHRASES[weeklyMetric]}`, where: `for ${modePhrase(mode)}`, when: versus})
+  : data.subtitles.weekly_effect;
+
+// Driver pay is in the ride-hail records only, so a cab has no driver-share rows.
+const noRows = (what) => emptyState(`${what}: no data for this selection`,
+  measure === "driver_share" ? "Driver share is reported for the ride-hail apps only." : "");
+```
+
 Every result on this page is an estimated effect. It compares the year-on-year change in trips that start or end inside the congestion zone with the year-on-year change in trips elsewhere in the city, week by week. The headline uses the core zone list; counting the borderline zones as inside gives the sensitivity result further down.
 
 ## Estimated effects by mode
 
 ```js
 // All modes takes the one palette colour no row here uses: the text colour would match Uber's.
-display(effectDots(core, {fyLabels: METRIC_LABELS, colors: {all: "other_hv"}, subtitle: data.subtitles.effects, asOf, width, dark}));
+display(core.length
+  ? effectDots(core, {fyLabels: METRIC_LABELS, colors: {all: "other_hv"}, pair, subtitle: effectsSubtitle, asOf, width, dark})
+  : noRows("Estimated effects"));
 ```
 
 <p class="nrm-note">Base fare excludes the congestion fee itself, which riders pay on top. Driver share is reported for the ride-hail apps only.</p>
@@ -68,23 +114,37 @@ display(effectDots(core, {fyLabels: METRIC_LABELS, colors: {all: "other_hv"}, su
 ## Week by week
 
 ```js
-display(lineChart(weekly.map((d) => (d.excluded ? {...d, effect: null} : d)), {
-  x: "week_start", xType: "week", y: "effect", yUnit: "effect", z: null, gaps: true,
-  yLabel: "Estimated effect on trips touching the zone (%)",
-  events: events.events, subtitle: data.subtitles.weekly_effect, asOf, width, dark
-}));
-if (excludedWeeks.length) {
+display(weekly.length
+  ? lineChart(weekly.map((d) => (d.excluded ? {...d, effect: null} : d)), {
+    x: "week_start", xType: "week", y: "effect", yUnit: "effect", gaps: true,
+    // With both lists, a line each: the core list in the accent, the wide list in the text colour.
+    z: wide ? "zone_list" : null, colors: {core: "accent", wide: "foreground"}, seriesLabel: (k) => ZONE_LISTS[k] ?? k,
+    yLabel: `Estimated effect on ${METRIC_PHRASES[weeklyMetric].replace(/^the /, "")} (%)`,
+    events: events.events, subtitle: weeklySubtitle, asOf, width, dark
+  })
+  : noRows("Weekly estimated effect"));
+if (weekly.length && excludedWeeks.length) {
   display(html`<p class="nrm-note">Left out of the summary and off the line: the ${excludedWeeks.map(format.week).join(" and ")}. ${excludedReasons.map((r) => r.replace(/\.?$/, ".")).join(" ")}</p>`);
 }
 ```
 
 ```js
-display(lineChart(data.weekly_trips.filter((d) => d.mode === "all"), {
-  x: "week_start", xType: "week", y: "trips_per_day", yUnit: "count", z: "cbd_group",
-  yLabel: "Trips per day in each week", zero: false,
-  colors: {treated: "accent", control: "foreground"}, seriesLabel: (k) => GROUP_LABELS[k] ?? k,
-  events: events.events, subtitle: data.subtitles.weekly_trips, asOf, width, dark
-}));
+// The groups' trips are published for all modes and the ride-hail apps together (and cabs together),
+// not for each company.
+const groupMode = ["all", "ride_hail"].includes(mode) ? mode : null;
+const groupSubtitle = filters.changed("mode")
+  ? describe({what: "trips per day", where: `by ${modePhrase(mode)}, touching the zone and elsewhere`})
+  : data.subtitles.weekly_trips;
+display(groupMode
+  ? lineChart(data.weekly_trips.filter((d) => d.mode === groupMode), {
+    x: "week_start", xType: "week", y: "trips_per_day", yUnit: "count", z: "cbd_group",
+    yLabel: "Trips per day in each week", zero: false,
+    colors: {treated: "accent", control: "foreground"}, seriesLabel: (k) => GROUP_LABELS[k] ?? k,
+    events: events.events, subtitle: groupSubtitle, asOf, width, dark
+  })
+  : emptyState(`Trips per day touching the zone and elsewhere: not published for ${modePhrase(mode)}`,
+    "These weekly counts are published for all modes and for the ride-hail apps together."));
+if (groupMode && wide) display(html`<p class="nrm-note">Trips touching the zone are counted on the core list here.</p>`);
 ```
 
 ## With and without borderline zones
@@ -106,7 +166,7 @@ function sensitivityTable(rows) {
         <th class=${num}>Core list</th><th class=${num}>Range</th>
         <th class=${num}>With borderline zones</th><th class=${num}>Range</th>
       </tr></thead>
-      ${METRICS.map((metric) => html`<tbody>
+      ${METRICS.filter((metric) => rowsCore.some((d) => d.metric === metric)).map((metric) => html`<tbody>
         <tr><th colspan="5" style="padding-top: 0.75rem">${METRIC_LABELS[metric]}</th></tr>
         ${rowsCore.filter((d) => d.metric === metric).map((d) => {
           const w = wide.get(key(d));
@@ -124,7 +184,8 @@ function sensitivityTable(rows) {
 ```
 
 ```js
-display(sensitivityTable(data.effects));
+const sensitivityRows = data.effects.filter((d) => (!filters.changed("mode") || d.mode === mode) && (measure === "all" || d.metric === measure));
+display(sensitivityRows.length ? sensitivityTable(sensitivityRows) : noRows("Core and wide lists"));
 ```
 
 <p class="nrm-note">Each figure is the median week's estimated effect; the range runs across the weeks, as in the chart above.</p>
@@ -132,8 +193,15 @@ display(sensitivityTable(data.effects));
 ## Congestion fees
 
 ```js
-display(monthlyColumns(data.fees, {y: "cbd_fee", unit: "usd", yLabel: "Congestion fees charged ($ per month)",
-  events: events.events, subtitle: data.subtitles.fees, asOf, width, dark}));
+const RIDE_HAIL = ["uber", "lyft"];
+const fees = data.fees.filter((d) => !filters.changed("mode") || d.mode === mode || (mode === "ride_hail" && RIDE_HAIL.includes(d.mode)));
+const feesSubtitle = filters.changed("mode")
+  ? describe({what: "congestion fees", where: `on trips by ${modePhrase(mode)}`})
+  : data.subtitles.fees;
+display(fees.length
+  ? monthlyColumns(fees, {y: "cbd_fee", unit: "usd", yLabel: "Congestion fees charged ($ per month)",
+    events: events.events, subtitle: feesSubtitle, asOf, width, dark})
+  : emptyState("Congestion fees: no data for this selection"));
 ```
 
 ## Where pickups moved
@@ -144,7 +212,7 @@ display(choropleth(geo, data.zone_change, {value: "change", unit: "effect", kind
   outline: {zones: coreZones, label: "Congestion zone (core list)"}, subtitle: data.subtitles.zone_change, asOf, width: Math.min(width, 640), dark}));
 ```
 
-<p class="nrm-note">This map has no comparison group, so it shows where pickups moved, not an estimated effect. The outline marks the taxi zones on the congestion zone's core list. Click a zone to open its page.</p>
+<p class="nrm-note">This map has no comparison group, so it shows where pickups moved, not an estimated effect. The outline marks the taxi zones on the congestion zone's core list. ${filters.changed("mode") ? "It counts pickups by every mode, whatever the filter. " : ""}Click a zone to open its page.</p>
 
 ## Limits
 

@@ -127,6 +127,12 @@ function timeTicks([x0, x1], width) {
   return step >= 12 ? `${step / 12} year${step > 12 ? "s" : ""}` : `${step} month${step > 1 ? "s" : ""}`;
 }
 
+/** Hour-of-day ticks every six hours; every hour (or every other) when a filter crops the day. */
+function hourTicks([h0, h1]) {
+  const every = (step) => Array.from({length: 24}, (_, h) => h).filter((h) => h >= h0 && h <= h1 && h % step === 0);
+  return [6, 2, 1].map(every).find((ticks) => ticks.length >= 3) ?? every(1);
+}
+
 const BADGE = 7;   // radius of an event's numbered badge, px
 
 /** An event's number in a circle, as drawn on its rule: for the key above the chart. */
@@ -237,7 +243,7 @@ export function lineChart(rows, options = {}) {
     ...plotOptions({width, height: options.height ?? (width < 480 ? 260 : 320), marginTop: 24, marginRight, marginLeft}),
     x: temporal
       ? {type: "utc", label: options.xLabel ?? null, labelArrow: "none", ticks: timeTicks(xDomain.map((t) => new Date(t)), width), tickFormat: format.axis("month")}
-      : {label: options.xLabel, labelArrow: "none", tickFormat: xType === "hour" ? format.hourOfDay : format.axis("number"), ticks: xType === "hour" ? [0, 6, 12, 18] : undefined},
+      : {label: options.xLabel, labelArrow: "none", tickFormat: xType === "hour" ? format.hourOfDay : format.axis("number"), ticks: xType === "hour" ? hourTicks(xDomain) : undefined},
     y: {label: yLabel, labelArrow: "none", grid: true, zero, nice: true, tickFormat: format.axis(yUnit),
       ...(insetTop ? {insetTop} : null)},
     color: color ?? undefined
@@ -324,11 +330,13 @@ export function shareLine(rows, options = {}) {
  *   missingLabel what a zone without a value means, for the key (default "No data")
  *   outline      {zones: [zone ids], label} draws the outer edge of a set of zones, e.g. the
  *                congestion zone, and names it in the key
+ *   focus        zone ids a page filter selected (D34): the other zones fade, and the table
+ *                lists only these
  * Zones without a value draw hatched, in the muted token over the page, so they can't be read as
  * any colour on either ramp (the dark diverging midpoint is the muted token itself, D20).
  */
 export function choropleth(geo, rows, options = {}) {
-  const {value, unit, legendLabel, kind = "sequential", key = "zone", href, missingLabel = "No data", outline,
+  const {value, unit, legendLabel, kind = "sequential", key = "zone", href, missingLabel = "No data", outline, focus,
     dark = palette.isDark(), width = 640} = options;
   required("choropleth", options, ["value", "unit", "legendLabel"]);
   const byZone = new Map(rows.map((d) => [d[key], d[value]]));
@@ -340,7 +348,9 @@ export function choropleth(geo, rows, options = {}) {
   const colorScale = kind === "diverging" ? palette.divergingScale(dark) : palette.sequentialScale(dark);
   const tipTitle = (f) => `${f.properties.zone} (${format.borough(f.properties.borough)})\n${f.value == null ? missingLabel : format.value(unit, f.value)}`;
   const hatchId = `nrm-hatch-${++hatches}`;
-  const zone = {stroke: SURFACE, strokeWidth: 0.75, href: href ? (f) => href(f.properties.LocationID) : undefined, tip: true, title: tipTitle};
+  const focused = focus ? new Set(focus) : null;
+  const zone = {stroke: SURFACE, strokeWidth: 0.75, href: href ? (f) => href(f.properties.LocationID) : undefined, tip: true, title: tipTitle,
+    fillOpacity: focused ? (f) => (focused.has(f.properties.LocationID) ? 1 : 0.15) : undefined};
   const outlined = outline?.zones?.length ? new Set(outline.zones) : null;
   const plot = Plot.plot({
     ...plotOptions({width, height: options.height, marginTop: 4, marginRight: 4, marginBottom: 4, marginLeft: 4}),
@@ -359,7 +369,8 @@ export function choropleth(geo, rows, options = {}) {
     ${features.some((f) => f.value == null) ? html`<span>${hatchSwatch(`${hatchId}-key`, dark)}${missingLabel}</span>` : null}
     ${outlined ? html`<span>${svg`<svg width="18" height="12" aria-hidden="true"><line x1="1" x2="17" y1="6" y2="6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"></line></svg>`}${outline.label}</span>` : null}
   </div>`;
-  const table = tableView(features.map((f) => ({zone: f.properties.LocationID, name: f.properties.zone, borough: format.borough(f.properties.borough), value: f.value})), [
+  const listed = focused ? features.filter((f) => focused.has(f.properties.LocationID)) : features;
+  const table = tableView(listed.map((f) => ({zone: f.properties.LocationID, name: f.properties.zone, borough: format.borough(f.properties.borough), value: f.value})), [
     {key: "zone", label: "Zone", format: "text"},
     {key: "name", label: "Name", format: "text"},
     {key: "borough", label: "Borough", format: "text"},
@@ -454,11 +465,14 @@ export function hourHeatmap(rows, options = {}) {
  *   y            category field (default "mode");  yLabels: {key: label} (default mode names)
  *   fy           facet field (optional);  fyLabels: {key: label}
  *   zero         draw a rule at 0
+ *   pair         {key, values: [first, second], labels: {value: text}}: two ranges per row, the
+ *                first filled and the second hollow, named in a key above (e.g. two zone lists)
  */
 export function rangeDots(rows, options = {}) {
-  const {x, x1, x2, unit, xLabel, y = "mode", yLabels, fy, fyLabels, zero = false, colors, dark = palette.isDark(), width = 640} = options;
+  const {x, x1, x2, unit, xLabel, y = "mode", yLabels, fy, fyLabels, zero = false, pair, colors, dark = palette.isDark(), width = 640} = options;
   required("rangeDots", options, ["x", "x1", "x2", "unit", "xLabel"]);
   const yText = (k) => yLabels?.[k] ?? format.modeName(k);
+  const pairText = (d) => (pair ? ` · ${pair.labels?.[d[pair.key]] ?? d[pair.key]}` : "");
   const V = drawn(unit);
   const drawnRows = rows.map((d) => ({...d, __x: V(d[x]), __x1: V(d[x1]), __x2: V(d[x2])}));
   const domain = extent(drawnRows.flatMap((d) => [d.__x1, d.__x2, d.__x, ...(zero ? [0] : [])]));
@@ -466,26 +480,36 @@ export function rangeDots(rows, options = {}) {
   const color = isSeries ? seriesColor(rows.map((d) => d[y]), {dark, colors, seriesLabel: yText}) : undefined;
   const fill = isSeries ? y : palette.color("accent", dark);
   const marginLeft = Math.min(width * 0.4, 16 + Math.max(...rows.map((d) => String(yText(d[y])).length)) * 7);
+  // One layer per pair value, nudged above and below the row's centre; a single layer otherwise.
+  const layers = pair ? pair.values.map((v, i) => ({value: v, dy: i ? 5 : -5, hollow: i > 0})) : [{value: null, dy: 0, hollow: false}];
+  const title = (d) => `${yText(d[y])}${pairText(d)}\n${format.value(unit, d[x])} (range ${format.value(unit, d[x1])} to ${format.value(unit, d[x2])})`;
   const panel = (data) => Plot.plot({
-    ...plotOptions({width, height: 30 * unique(data.map((d) => d[y])).length + 44, marginTop: 8, marginLeft, marginRight: 16, marginBottom: 24}),
+    ...plotOptions({width, height: (pair ? 40 : 30) * unique(data.map((d) => d[y])).length + 44, marginTop: 8, marginLeft, marginRight: 16, marginBottom: 24}),
     x: {domain, nice: true, label: null, grid: true, tickFormat: format.axis(unit)},
-    y: {type: "band", domain: ordered(data.map((d) => d[y])), label: null, tickSize: 0, tickFormat: yText, padding: 0.4},
+    y: {type: "band", domain: ordered(data.map((d) => d[y])), label: null, tickSize: 0, tickFormat: yText, padding: pair ? 0.2 : 0.4},
     color,
     marks: [
       zero ? Plot.ruleX([0], {stroke: "currentColor", strokeOpacity: 0.5}) : null,
-      Plot.ruleY(data, {y, x1: "__x1", x2: "__x2", stroke: fill, strokeWidth: 2, strokeLinecap: "round"}),
-      Plot.dot(data, {x: "__x", y, fill, r: 5, stroke: SURFACE, strokeWidth: 2, tip: true,
-        title: (d) => `${yText(d[y])}\n${format.value(unit, d[x])} (range ${format.value(unit, d[x1])} to ${format.value(unit, d[x2])})`})
+      ...layers.flatMap(({value, dy, hollow}) => {
+        const layer = pair ? data.filter((d) => d[pair.key] === value) : data;
+        return [
+          Plot.ruleY(layer, {y, x1: "__x1", x2: "__x2", dy, stroke: fill, strokeWidth: 2, strokeLinecap: "round", strokeOpacity: hollow ? 0.6 : 1}),
+          Plot.dot(layer, {x: "__x", y, dy, r: hollow ? 4.5 : 5, fill: hollow ? SURFACE : fill, stroke: hollow ? fill : SURFACE, strokeWidth: 2, tip: true, title})
+        ];
+      })
     ]
   });
+  const key = pair ? html`<div class="nrm-map-key">${pair.values.map((v, i) => html`<span>${svg`<svg width="14" height="14" aria-hidden="true">
+    <circle cx="7" cy="7" r="5" fill=${i ? "none" : "currentColor"} stroke="currentColor" stroke-width="2"></circle></svg>`}${pair.labels?.[v] ?? v}</span>`)}</div>` : null;
   const table = tableView(rows, [
     ...(fy ? [{key: fy, label: "Panel", format: (k) => fyLabels?.[k] ?? k}] : []),
     {key: y, label: "Series", format: yText},
+    ...(pair ? [{key: pair.key, label: "Version", format: (k) => pair.labels?.[k] ?? k}] : []),
     {key: x, label: "Value", format: unit},
     {key: x1, label: "Low", format: unit},
     {key: x2, label: "High", format: unit}
   ]);
-  return frame("rangeDots", options, [facetStack(drawnRows, fy, fyLabels, panel), axisLabel(xLabel)], table);
+  return frame("rangeDots", options, [key, facetStack(drawnRows, fy, fyLabels, panel), axisLabel(xLabel)], table);
 }
 
 /**

@@ -5,13 +5,16 @@ title: Airports
 <!-- L16 · Who wins the airport trip, at what fare and when (Q9; SPEC §9.1, §9.3, D10). Every number,
      title, subtitle and finding comes from airports.json; the page adds none. TLC vehicles don't pick
      up at Newark (G4 review), so its pickup rows stay out of the pickup bars and Newark shows as
-     drop-offs. -->
+     drop-offs. Page filters (D34): airport, direction and mode for the page, time of day by the hourly
+     chart; a chart moved off its default shows a description of its selection in place of its
+     finding. -->
 
 ```js
 import {pageHeader, howWeMeasured, emptyState, html} from "./components/page.js";
-import {Plot, lineChart, stackedBars100, sourceCaption, tableView} from "./components/charts.js";
+import {Plot, lineChart, stackedBars100, barChart, sourceCaption, tableView} from "./components/charts.js";
 import * as format from "./components/format.js";
 import * as palette from "./components/palette.js";
+import {filterBar, describe, modePhrase, modePossessive, modeOption, none, TIME_BANDS, bandOption, inBand, hourRange} from "./components/filters.js";
 ```
 
 ```js
@@ -32,9 +35,10 @@ const dropoffOnly = airports.filter((a) => NO_PICKUPS.has(a));
 const list = (codes) => codes.map(airportName).reduce((s, name, i, all) =>
   i === 0 ? name : `${s}${i === all.length - 1 ? " and " : ", "}${name}`, "");
 
-// A chart, or a plain state when the file has no rows or no finding for it.
-const chartOr = (what, rows, subtitle, draw) =>
-  rows?.length && subtitle ? draw() : emptyState(`${what}: no data for this month`);
+// A chart, or a plain state when the file has no rows or no finding for it, or a filter leaves no rows.
+const chartOr = (what, rows, subtitle, draw, filtered = false) =>
+  rows?.length && subtitle ? draw() : emptyState(`${what}: no data for ${filtered ? "this selection" : "this month"}`);
+const capital = (text) => text[0].toUpperCase() + text.slice(1);
 ```
 
 ```js
@@ -43,40 +47,86 @@ const fareAirports = [...new Set(data.fares.map((d) => d.airport))];
 if (fareAirports.length) display(html`<p class="nrm-note">The mean fare to Manhattan is what riders paid before tip, including tolls, taxes and fees, on trips from ${list(fareAirports)} taken together. The busiest hour is for an average day.</p>`);
 ```
 
+```js
+const filters = view(filterBar([
+  {key: "airport", label: "Airport", options: ["all", ...airports], format: (a) => (a === "all" ? "All airports" : airportName(a))},
+  {key: "direction", label: "Direction", options: ["both", "to", "from"], radio: true,
+    format: (d) => ({both: "Both ways", to: "To airport", from: "From airport"})[d]},
+  {key: "mode", label: "Mode", options: ["all", "uber", "lyft", "yellow", "green"], format: modeOption}
+]));
+```
+
+```js
+const {airport, direction, mode} = filters;
+const oneAirport = airport !== "all";
+const byPlace = (d) => (!oneAirport || d.airport === airport) && (direction === "both" || d.direction === direction);
+// "to and from the airports", "from JFK": where a selection's trips go.
+const place = (all = "the airports") =>
+  `${({both: "to and from", to: "to", from: "from"})[direction]} ${oneAirport ? airportName(airport) : all}`;
+// The selection asks for pickups where TLC vehicles don't pick up: a fresh state for each chart.
+const noPickups = direction === "from" && NO_PICKUPS.has(airport)
+  ? () => emptyState(`No pickups at ${airportName(airport)} Airport`, "TLC vehicles don't pick up there, so it appears as drop-offs only.")
+  : null;
+```
+
 ## Who carries airport trips
 
 ```js
 const split = data.split.filter((d) => !(d.direction === "from" && NO_PICKUPS.has(d.airport)));
+// With a mode chosen, one bar per airport and direction holds that mode's share.
+const splitShown = split.filter(byPlace);
+const modeShares = splitShown.filter((d) => d.mode === mode)
+  .map((d) => ({...d, bar: `${d.direction === "from" ? "Pickups" : "Drop-offs"} at ${airportName(d.airport)}`}));
+const splitFiltered = filters.changed("airport", "direction", "mode");
+const splitSubtitle = splitFiltered
+  ? describe({what: `${filters.changed("mode") ? modePossessive(mode) : "each mode's"} share of trips`, where: place("each airport")})
+  : data.subtitles.split;
 ```
 
 ```js
-chartOr("Airport trips by mode", split, data.subtitles.split, () =>
-  stackedBars100(split, {y: "airport", yLabels: AIRPORTS, fy: "direction", fyLabels: DIRECTIONS,
-    xLabel: "Share of the airport's trips in the month (%)", subtitle: data.subtitles.split, asOf, width, dark}))
+noPickups?.() ?? (filters.changed("mode")
+  ? chartOr("Airport trips by mode", modeShares, splitSubtitle, () =>
+    barChart(modeShares, {x: "share", y: "bar", unit: "share", fill: "mode", sort: false,
+      xLabel: `${capital(modePossessive(mode))} share of the airport's trips in the month (%)`, subtitle: splitSubtitle, asOf, width, dark}), true)
+  : chartOr("Airport trips by mode", splitShown, splitSubtitle, () =>
+    stackedBars100(splitShown, {y: "airport", yLabels: AIRPORTS, fy: "direction", fyLabels: DIRECTIONS,
+      xLabel: "Share of the airport's trips in the month (%)", subtitle: splitSubtitle, asOf, width, dark}), splitFiltered))
 ```
 
 ```js
-if (dropoffOnly.length) display(html`<p class="nrm-note">TLC vehicles don't pick up at ${list(dropoffOnly)} Airport, so it appears as drop-offs only.</p>`);
+display(dropoffOnly.some((a) => splitShown.some((d) => d.airport === a)) ? html`<p class="nrm-note">TLC vehicles don't pick up at ${list(dropoffOnly)} Airport, so it appears as drop-offs only.</p>` : none());
 ```
 
-## Yellow cabs over time
+```js
+// Yellow cabs by default (the finding); a chosen mode replaces them.
+const trendMode = filters.changed("mode") ? mode : "yellow";
+```
+
+## ${`${modeOption(trendMode)} over time`}
 
 ```js
-const yellowTrend = data.share_trend.filter((d) => d.mode === "yellow");
+const yellowTrend = data.share_trend.filter((d) => d.mode === trendMode && (!oneAirport || d.airport === airport));
 const trendLabel = (code) => airportName(code);
+const trendFiltered = filters.changed("airport", "mode");
+const trendSubtitle = trendFiltered
+  ? describe({what: `${modePossessive(trendMode)} share of trips`, where: `at ${oneAirport ? airportName(airport) : "each airport"}`})
+  : data.subtitles.share_trend;
+const trendLabelY = trendMode === "yellow" ? "Yellow-cab share of the airport's trips (%)" : `${capital(modePossessive(trendMode))} share of the airport's trips (%)`;
 ```
 
 ```js
-chartOr("Yellow-cab share", yellowTrend, data.subtitles.share_trend, () =>
-  lineChart(yellowTrend, {z: "airport", y: "share", yUnit: "share", yLabel: "Yellow-cab share of the airport's trips (%)",
+chartOr(`${modeOption(trendMode)} share`, yellowTrend, trendSubtitle, () =>
+  lineChart(yellowTrend, {z: "airport", y: "share", yUnit: "share", yLabel: trendLabelY,
     colors: {JFK: "accent", LGA: "foreground", EWR: "other_hv"}, seriesLabel: trendLabel,
-    subtitle: data.subtitles.share_trend, asOf, width, dark}))
+    subtitle: trendSubtitle, asOf, width, dark}), trendFiltered)
 ```
 
 ```js
-if (dropoffOnly.some((a) => yellowTrend.some((d) => d.airport === a))) {
-  display(html`<p class="nrm-note">Pickups and drop-offs together; ${list(dropoffOnly)} counts drop-offs only.</p>`);
-}
+display(dropoffOnly.some((a) => yellowTrend.some((d) => d.airport === a))
+  ? html`<p class="nrm-note">Pickups and drop-offs together; ${list(dropoffOnly)} counts drop-offs only.</p>`
+  : filters.changed("direction")
+  ? html`<p class="nrm-note">Pickups and drop-offs together: the monthly shares have no split by direction.</p>`
+  : none());
 ```
 
 ## When airport trips happen
@@ -96,15 +146,34 @@ function byHour(rows) {
   }
   return [...sums.values()].sort((a, b) => a.hour - b.hour);
 }
-const hourly = byHour(data.by_hour);
 ```
 
 ```js
-chartOr("Airport trips by hour", hourly, data.subtitles.by_hour, () =>
+const time = view(filterBar([
+  {key: "band", label: "Time of day", options: Object.keys(TIME_BANDS), format: bandOption}
+], {label: "Filter the hourly chart"}));
+```
+
+```js
+// The default sums every row, as the finding does. A filtered view leaves out Newark's pickup
+// records, which aren't TLC trips (G4 review), and keeps one mode's line when a mode is chosen.
+const hourFiltered = filters.changed("airport", "direction", "mode") || time.changed("band");
+const hourly = hourFiltered
+  ? byHour(data.by_hour.filter((d) => byPlace(d) && !(d.direction === "from" && NO_PICKUPS.has(d.airport)) && inBand(d.hour, time.band)))
+    .filter((d) => !filters.changed("mode") || d.mode === mode)
+  : byHour(data.by_hour);
+const hourSubtitle = hourFiltered
+  ? describe({what: "trips", where: `${place()}${filters.changed("mode") ? ` by ${modePhrase(mode)}` : ""}`,
+      when: TIME_BANDS[time.band] ? hourRange(TIME_BANDS[time.band]) : ""})
+  : data.subtitles.by_hour;
+```
+
+```js
+noPickups?.() ?? chartOr("Airport trips by hour", hourly, hourSubtitle, () =>
   // On phones the long axis label runs into the "6 pm" tick, so it shortens there.
   lineChart(hourly, {x: "hour", xType: "hour", xLabel: width < 480 ? "Hour" : "Hour of day", y: "trips_per_day", yUnit: "count",
     yLabel: "Trips in that hour, average day", colors: {all: "accent"},   // Uber's grey sits too close to the text colour
-    subtitle: data.subtitles.by_hour, asOf, width, dark}))
+    subtitle: hourSubtitle, asOf, width, dark}), hourFiltered)
 ```
 
 ## Fares to Manhattan
@@ -160,12 +229,22 @@ function fareBars(rows, {subtitle, asOf, width = 640, dark = palette.isDark()}) 
 ```
 
 ```js
-const fares = data.fares.filter((d) => !NO_PICKUPS.has(d.airport));   // trips from the airport are pickups there
+const fares = data.fares.filter((d) => !NO_PICKUPS.has(d.airport))   // trips from the airport are pickups there
+  .filter((d) => (!oneAirport || d.airport === airport) && (!filters.changed("mode") || d.mode === mode));
+const faresFiltered = filters.changed("airport", "mode");
+const faresSubtitle = faresFiltered
+  ? describe({what: "fares", where: [filters.changed("mode") ? `by ${modePhrase(mode)}` : "",
+      `from ${oneAirport ? airportName(airport) : "each airport"}`, "to Manhattan"].filter(Boolean).join(" ")})
+  : data.subtitles.fares;
 ```
 
 ```js
-chartOr("Fares to Manhattan", fares, data.subtitles.fares, () =>
-  fareBars(fares, {subtitle: data.subtitles.fares, asOf, width, dark}))
+noPickups?.() ?? (direction === "to"
+  ? emptyState("Fares to Manhattan: trips from the airport only", "The fares are for trips from the airport into Manhattan. Choose both ways or from the airport to see them.")
+  : NO_PICKUPS.has(airport)
+  ? emptyState(`Fares to Manhattan: none from ${airportName(airport)} Airport`, "TLC vehicles don't pick up there, so there are no trips from it to Manhattan.")
+  : chartOr("Fares to Manhattan", fares, faresSubtitle, () =>
+    fareBars(fares, {subtitle: faresSubtitle, asOf, width, dark}), faresFiltered))
 ```
 
 ```js
