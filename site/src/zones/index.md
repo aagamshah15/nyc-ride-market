@@ -12,6 +12,7 @@ import * as format from "../components/format.js";
 import {choropleth, sourceCaption} from "../components/charts.js";
 import {pageHeader, howWeMeasured, siteUrl, emptyState, html} from "../components/page.js";
 import {filterBar, describe} from "../components/filters.js";
+import {explainer} from "../components/notes.js";
 ```
 
 ```js
@@ -32,6 +33,20 @@ const yellowLeadsAll = mapped.filter((d) => d.top_mode === "yellow").sort((a, b)
 
 ```js
 display(pageHeader(index, tiles, {keys: ["zones_yellow_leads", "zones_lyft_beats_uber", "zones_rh_share_up"]}));
+```
+
+```js
+// What a taxi zone is (D33): TLC conventions written here; the zone count from JSON.
+const zoneCount = format.count(index.rows.length);
+display(explainer({
+  title: "What is a taxi zone?",
+  body: html`<p>The TLC splits New York into ${zoneCount} taxi zones, from single neighborhoods to the airports, and every trip record names a pickup zone and a drop-off zone rather than an address. This page shows who carries the trips in each zone, and every zone has a page of its own. A zone with too few trips in a month isn't profiled, and appears hatched on the maps.</p>`,
+  notes: [
+    `${zoneCount} zones, the airports included`,
+    "Trip records give zones, not street addresses",
+    "Hatched: too few trips to profile"
+  ]
+}));
 ```
 
 ```js

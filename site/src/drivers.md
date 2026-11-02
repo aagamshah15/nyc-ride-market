@@ -15,6 +15,7 @@ import * as palette from "./components/palette.js";
 import {pageHeader, howWeMeasured, html} from "./components/page.js";
 import {lineChart, Plot, sourceCaption, tableView} from "./components/charts.js";
 import {filterBar, describe, modePhrase, modePossessive, none} from "./components/filters.js";
+import {explainer} from "./components/notes.js";
 ```
 
 ```js
@@ -41,6 +42,20 @@ const classColors = {"FHV - High Volume": "ride_hail", Yellow: "yellow", Green: 
 ```js
 display(pageHeader(data, tiles, {keys: ["pay_per_hour", "driver_share", "trips_per_hour_worked", "active_drivers"]}));
 display(html`<p class="nrm-note">Pay and driver share cover Uber and Lyft: TLC's cab records carry no driver pay. Pay per hour counts hours with a passenger only, not time spent waiting for a trip. TLC-reported figures come from TLC's monthly indicators, latest month ${format.month(data.tlc_as_of_month)}.</p>`);
+```
+
+```js
+// How app drivers are paid (D33, D28): TLC pay rules written here; dates and shares from JSON.
+const payDate = (id) => events.events.find((e) => e.id === id)?.date;
+display(explainer({
+  title: "How are app drivers paid?",
+  body: html`<p>Uber and Lyft drivers have a TLC minimum pay for every trip: a rate per mile and a rate per minute, each divided by how busy drivers are, so the floor also pays for the time spent waiting between trips. The new rule of ${format.day(payDate("driver_pay_rise"))} lowered the per-mile floor and raised the per-minute floor; the per-minute rate had already risen with inflation on ${format.day(payDate("driver_pay_inflation_step"))}. Cab drivers aren't covered by these floors, and their records carry no driver pay.</p>`,
+  notes: [
+    "Pay per hour here counts time with a passenger only",
+    `${format.share(data.tiles.driver_share)} of app base fares reached drivers in ${format.asOf(asOf)}`,
+    "Since the new rule: floor down per mile, up per minute"
+  ]
+}));
 ```
 
 ```js

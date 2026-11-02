@@ -303,7 +303,13 @@ Reason: the findings are spread over ten page types, and SPEC has no single page
   - When the main column is narrower than 1,000 px, and on phones, the notes stack under the text, without arrows.
   - Reduced motion and print show everything at once.
   - Strokes use `currentColor` and the theme's muted text colour, so no colour comes from outside `palette.js`.
-- Uber and Lyft pages are unchanged.
+- **Extended on 2 Nov 2026, at the user's request:**
+  - Uber and Lyft: what a high-volume for-hire service is;
+  - congestion pricing: what the zone and the per-trip fee are, and that results are estimated effects;
+  - drivers: how the TLC pay floor works and what the new rule changed;
+  - airports: JFK and LaGuardia in the city, Newark drop-offs only, the JFK flat fare;
+  - zones: what a taxi zone is.
+  - The same rule throughout: facts are written in the page, and figures come from that page's JSON.
 
 Reason: readers outside New York don't know what separates yellow and green cabs, and the cab pages had unused space beside the text on wide screens.
 

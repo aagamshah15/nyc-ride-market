@@ -14,6 +14,7 @@ import * as format from "./components/format.js";
 import {pageHeader, howWeMeasured, siteUrl, emptyState, html} from "./components/page.js";
 import {effectDots, lineChart, monthlyColumns, choropleth, sourceCaption} from "./components/charts.js";
 import {filterBar, describe, modePhrase, modeOption} from "./components/filters.js";
+import {explainer} from "./components/notes.js";
 ```
 
 ```js
@@ -55,6 +56,20 @@ const coreZones = (quality.cbd_zones ?? []).filter((z) => !z.borderline).map((z)
 
 ```js
 display(pageHeader(data, tiles, {keys: ["trips_effect", "fpm_effect", "fees_to_date"]}));
+```
+
+```js
+// What congestion pricing is (D33): MTA and TLC rules written here; the dates and money from JSON.
+const cpStart = events.events.find((e) => e.id === "congestion_pricing_start")?.date;
+display(explainer({
+  title: "What is congestion pricing?",
+  body: html`<p>Since ${format.day(cpStart)}, the MTA has tolled vehicles entering Manhattan's congestion zone, the part of Manhattan south of Sixtieth Street. Taxi and app riders don't pay the vehicle toll; their trips in the zone carry a per-trip fee instead, and app trips pay twice what taxi trips pay. The results on this page are estimated effects: they compare trips touching the zone with trips elsewhere, against the same weeks a year earlier, so other changes in those weeks can't be ruled out.</p>`,
+  notes: [
+    `Started ${format.day(cpStart)}`,
+    "A trip touches the zone when it starts or ends inside it",
+    `${format.usd(data.tiles.fees_to_date)} in fees charged on these trips so far`
+  ]
+}));
 ```
 
 ```js

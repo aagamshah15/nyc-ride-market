@@ -15,6 +15,7 @@ import {Plot, lineChart, stackedBars100, barChart, sourceCaption, tableView} fro
 import * as format from "./components/format.js";
 import * as palette from "./components/palette.js";
 import {filterBar, describe, modePhrase, modePossessive, modeOption, none, TIME_BANDS, bandOption, inBand, hourRange} from "./components/filters.js";
+import {explainer} from "./components/notes.js";
 ```
 
 ```js
@@ -45,6 +46,19 @@ const capital = (text) => text[0].toUpperCase() + text.slice(1);
 display(pageHeader(data, tiles, {keys: ["trips_per_day", "yellow_share", "fare_to_manhattan_mean", "busiest_hour"]}));
 const fareAirports = [...new Set(data.fares.map((d) => d.airport))];
 if (fareAirports.length) display(html`<p class="nrm-note">The mean fare to Manhattan is what riders paid before tip, including tolls, taxes and fees, on trips from ${list(fareAirports)} taken together. The busiest hour is for an average day.</p>`);
+```
+
+```js
+// How airport trips work (D33): Port Authority and TLC rules written here; the busiest hour from JSON.
+display(explainer({
+  title: "How do airport trips work?",
+  body: html`<p>JFK and LaGuardia are in Queens, inside the city: yellow cabs serve their taxi stands, and app riders meet their cars at set pickup areas. Newark is in New Jersey, outside the TLC's area, so TLC vehicles can drop passengers off there, but their pickup records at Newark aren't TLC trips and are left out; Newark counts drop-offs only. Yellow cabs between JFK and Manhattan charge a flat fare, while other airport trips run on the meter or the app's price.</p>`,
+  notes: [
+    "Newark: drop-offs only in TLC data",
+    "JFK to Manhattan by yellow cab: a flat fare",
+    `Busiest hour on an average day: ${format.hourOfDay(data.tiles.busiest_hour)}`
+  ]
+}));
 ```
 
 ```js
