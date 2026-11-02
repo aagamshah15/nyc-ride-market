@@ -37,10 +37,31 @@ if (cardOnlyTips) display(html`<p class="nrm-note">The tip rate is card-only: TL
 ```
 
 ```js
-// What a yellow or a green cab is, for readers who don't know New York's taxi rules (D33). The rules
-// are TLC licensing facts, so they're written here; the figures come from this page's JSON.
+// What each company is, for readers who don't know New York's licensing rules (D33). The rules are
+// TLC licensing facts, so they're written here; the figures come from this page's JSON.
 const thisMonth = html`${format.share(data.tiles.share)} of NYC trips in ${format.asOf(asOf)}`;
+const lyftAhead = data.lyft_vs_uber?.zones_lyft_ahead;
+const appBody = (name) => html`<p>${name} is one of New York's two high-volume for-hire services, the TLC's category for the app companies that dispatch the most trips. Every trip is booked in the app: its drivers can't stop for a street hail, and they drive TLC-licensed for-hire vehicles rather than taxis. The app sets the fare and raises it when demand is high, while the TLC sets a minimum pay for each trip that drivers receive. In the congestion zone, app trips pay twice the per-trip fee that taxi trips pay.</p>`;
 const EXPLAINERS = {
+  uber: {
+    title: "What is Uber in New York?",
+    body: appBody("Uber"),
+    notes: [
+      "Booked in the app only: no street hails",
+      thisMonth,
+      "Fares set by the app and rise with demand; drivers' pay has a TLC floor"
+    ]
+  },
+  lyft: {
+    title: "What is Lyft in New York?",
+    body: appBody("Lyft"),
+    notes: [
+      "Booked in the app only: no street hails",
+      thisMonth,
+      lyftAhead == null ? "Fares set by the app; drivers' pay has a TLC floor"
+        : `More pickups than Uber in ${format.count(lyftAhead)} zone${lyftAhead === 1 ? "" : "s"} in ${format.asOf(asOf)}`
+    ]
+  },
   yellow: {
     title: "What is a yellow cab?",
     body: html`<p>Yellow cabs are New York's medallion taxis. Each one needs a medallion, a city license whose number is capped, and they're the only vehicles allowed to pick up street hails anywhere in the five boroughs, including the Manhattan core and the airport taxi stands. Fares run on the meter at rates the TLC sets, plus fixed surcharges, and trips between JFK and Manhattan pay a flat fare.</p>`,
