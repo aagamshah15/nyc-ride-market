@@ -1,20 +1,20 @@
 # Validation report
 
-Generated 2026-11-01 23:37 UTC by `make validate` (`pipeline/validate.py`). Don't edit by hand. SPEC §8 and §7.2 set the checks; the thresholds are never widened to pass.
+Generated 2026-11-02 21:27 UTC by `make validate` (`pipeline/validate.py`). Don't edit by hand. SPEC §8 and §7.2 set the checks; the thresholds are never widened to pass.
 
-**Status: PASS** · months checked: 2024-01 → 2026-08 (32 months)
+**Status: PASS** · months checked: 2024-01 → 2026-09 (33 months)
 
 | Check | Status | Summary |
 |---|---|---|
-| Tie-out | PASS | All 31 FHV - High Volume months with indicators within ±2%; reported, not gated (D27): Yellow 10 of 32 months outside ±2%, Green within ±2%; excepted (D27): FHV - High Volume 2026-06 |
-| Quality drift | PASS | All 128 month × mode rows at least 85% valid (D26); 8 more than 3 points below the mode's median (listed): yellow 2025-05 (5.92 pts), yellow 2025-06 (5.52 pts), yellow 2025-07 (5.37 pts), lyft 2025-08 (3.21 pts), yellow 2025-08 (6.01 pts) and 3 more |
-| CBD list | PASS | core: 98.92% of both-in trips carry a fee, pass-through 3.28%; wide (reported, not gated): 96.09% of both-in trips carry a fee (below 98%), pass-through 1.30% (2025-02 → 2026-08) |
-| Schema | PASS | 96 files, no unmapped, missing or mistyped columns |
+| Tie-out | PASS | All 31 FHV - High Volume months with indicators within ±2%; reported, not gated (D27): Yellow 11 of 33 months outside ±2%, Green 1 of 33 months outside ±2%; excepted (D27): FHV - High Volume 2026-06; 2026-09 (FHV - High Volume) skipped (not yet in indicators) |
+| Quality drift | PASS | All 132 month × mode rows at least 85% valid (D26); 8 more than 3 points below the mode's median (listed): yellow 2025-05 (5.83 pts), yellow 2025-06 (5.44 pts), yellow 2025-07 (5.29 pts), lyft 2025-08 (3.21 pts), yellow 2025-08 (5.92 pts) and 3 more |
+| CBD list | PASS | core: 98.95% of both-in trips carry a fee, pass-through 3.28%; wide (reported, not gated): 96.12% of both-in trips carry a fee (below 98%), pass-through 1.30% (2025-02 → 2026-09) |
+| Schema | PASS | 99 files, no unmapped, missing or mistyped columns |
 | Fees | PASS | uber 100.00%, lyft 100.00%, yellow 100.00%, green 100.00% of trips with a CBD fee carry the configured fee (at least 95%) |
 
 ## Tie-out
 
-**PASS**: All 31 FHV - High Volume months with indicators within ±2%; reported, not gated (D27): Yellow 10 of 32 months outside ±2%, Green within ±2%; excepted (D27): FHV - High Volume 2026-06
+**PASS**: All 31 FHV - High Volume months with indicators within ±2%; reported, not gated (D27): Yellow 11 of 33 months outside ±2%, Green 1 of 33 months outside ±2%; excepted (D27): FHV - High Volume 2026-06; 2026-09 (FHV - High Volume) skipped (not yet in indicators)
 
 Pipeline trips per day against TLC's "Trips Per Day" in `ref_indicators`; a row passes within ±2%. Only FHV - High Volume (uber + lyft + other_hv) gates the check (D27). Yellow and Green rows carry their own pass/fail as information, reported, not gated, because TLC's cab figures follow counting rules the pipeline can't reproduce. A row listed in `tie_out_exceptions` (`config/sources.yaml`) is `excepted`: shown with its reason below, not gating.
 
@@ -118,6 +118,9 @@ Records are `SUM(trips_all)` from `agg_zone_hour` (every row). The records of ve
 | 2026-08 | FHV - High Volume | 20,493,480 | — | 661,080.0 | 661,079.0 | +0.00% | pass |
 | 2026-08 | Green | 40,687 | — | 1,312.5 | 1,313.0 | -0.04% | pass |
 | 2026-08 | Yellow | 3,336,716 | — | 107,636.0 | 107,637.0 | -0.00% | pass |
+| 2026-09 | FHV - High Volume | 20,987,681 | — | 699,589.4 |  |  | skipped |
+| 2026-09 | Green | 46,676 | — | 1,555.9 | 1,486.0 | +4.70% | fail (reported, not gated) |
+| 2026-09 | Yellow | 3,876,044 | — | 129,201.5 | 115,307.0 | +12.05% | fail (reported, not gated) |
 
 Exceptions (D27):
 
@@ -125,7 +128,7 @@ Exceptions (D27):
 
 ## Quality drift
 
-**PASS**: All 128 month × mode rows at least 85% valid (D26); 8 more than 3 points below the mode's median (listed): yellow 2025-05 (5.92 pts), yellow 2025-06 (5.52 pts), yellow 2025-07 (5.37 pts), lyft 2025-08 (3.21 pts), yellow 2025-08 (6.01 pts) and 3 more
+**PASS**: All 132 month × mode rows at least 85% valid (D26); 8 more than 3 points below the mode's median (listed): yellow 2025-05 (5.83 pts), yellow 2025-06 (5.44 pts), yellow 2025-07 (5.29 pts), lyft 2025-08 (3.21 pts), yellow 2025-08 (5.92 pts) and 3 more
 
 `valid_rows / rows` per month × mode from `agg_quality_month`; a row fails below 85% (D26, replacing SPEC §8's 95%: green's zero-mile records and yellow's fares of $0 or less are data quality, not pipeline faults). A month more than 3 percentage points below its mode's median over the months checked is listed (marked *drift*), not failed.
 
@@ -147,13 +150,13 @@ Exceptions (D27):
 | 2025-02 | 99.97% | 99.99% | 92.03% | 93.10% |
 | 2025-03 | 99.97% | 98.94% | 91.98% | 92.88% |
 | 2025-04 | 99.97% | 99.73% | 92.14% | 92.63% |
-| 2025-05 | 99.97% | 99.98% | 88.82% *drift −5.92 pts* | 93.26% |
-| 2025-06 | 99.96% | 99.77% | 89.22% *drift −5.52 pts* | 94.53% |
-| 2025-07 | 99.96% | 99.77% | 89.37% *drift −5.37 pts* | 95.36% |
-| 2025-08 | 99.95% | 96.77% *drift −3.21 pts* | 88.73% *drift −6.01 pts* | 95.08% |
-| 2025-09 | 99.95% | 99.98% | 90.03% *drift −4.71 pts* | 95.48% |
-| 2025-10 | 99.96% | 99.46% | 88.77% *drift −5.97 pts* | 94.84% |
-| 2025-11 | 99.94% | 99.98% | 86.85% *drift −7.89 pts* | 94.77% |
+| 2025-05 | 99.97% | 99.98% | 88.82% *drift −5.83 pts* | 93.26% |
+| 2025-06 | 99.96% | 99.77% | 89.22% *drift −5.44 pts* | 94.53% |
+| 2025-07 | 99.96% | 99.77% | 89.37% *drift −5.29 pts* | 95.36% |
+| 2025-08 | 99.95% | 96.77% *drift −3.21 pts* | 88.73% *drift −5.92 pts* | 95.08% |
+| 2025-09 | 99.95% | 99.98% | 90.03% *drift −4.62 pts* | 95.48% |
+| 2025-10 | 99.96% | 99.46% | 88.77% *drift −5.89 pts* | 94.84% |
+| 2025-11 | 99.94% | 99.98% | 86.85% *drift −7.80 pts* | 94.77% |
 | 2025-12 | 99.95% | 99.47% | 93.78% | 94.39% |
 | 2026-01 | 99.58% | 99.27% | 94.16% | 94.28% |
 | 2026-02 | 99.94% | 99.99% | 94.18% | 93.78% |
@@ -163,39 +166,40 @@ Exceptions (D27):
 | 2026-06 | 99.90% | 99.97% | 94.83% | 93.70% |
 | 2026-07 | 99.93% | 99.75% | 94.61% | 93.05% |
 | 2026-08 | 99.96% | 99.97% | 94.65% | 93.05% |
-| median | 99.96% | 99.97% | 94.74% | 93.79% |
+| 2026-09 | 99.95% | 99.75% | 94.45% | 92.71% |
+| median | 99.96% | 99.97% | 94.65% | 93.78% |
 
 ## CBD list
 
-**PASS**: core: 98.92% of both-in trips carry a fee, pass-through 3.28%; wide (reported, not gated): 96.09% of both-in trips carry a fee (below 98%), pass-through 1.30% (2025-02 → 2026-08)
+**PASS**: core: 98.95% of both-in trips carry a fee, pass-through 3.28%; wide (reported, not gated): 96.12% of both-in trips carry a fee (below 98%), pass-through 1.30% (2025-02 → 2026-09)
 
-From `agg_cbd_pairs`, months 2025-02 → 2026-08. 2025-01 left out: congestion pricing began on 2025-01-05, and the table has no day grain to drop the trips before it. Both-in: pickup and drop-off zones both in the list; passes when at least 98% carry a fee (`cbd_fee > 0`). Only the core list gates the check (D21); the other list's result is reported, since its borderline zones lie mostly outside the charge zone. Pass-through: neither zone in the list; reported, not failed. Zone lists from `pipeline.zones.cbd_zone_ids`: core 38 zones, wide 47 zones.
+From `agg_cbd_pairs`, months 2025-02 → 2026-09. 2025-01 left out: congestion pricing began on 2025-01-05, and the table has no day grain to drop the trips before it. Both-in: pickup and drop-off zones both in the list; passes when at least 98% carry a fee (`cbd_fee > 0`). Only the core list gates the check (D21); the other list's result is reported, since its borderline zones lie mostly outside the charge zone. Pass-through: neither zone in the list; reported, not failed. Zone lists from `pipeline.zones.cbd_zone_ids`: core 38 zones, wide 47 zones.
 
 | Zone list | Both-in trips | With fee | Share | Pass-through trips | With fee | Share | Status |
 |---|---:|---:|---:|---:|---:|---:|---|
-| core | 83,098,705 | 82,197,406 | 98.92% | 289,345,788 | 9,496,628 | 3.28% | pass |
-| wide | 105,662,544 | 101,529,349 | 96.09% | 267,716,579 | 3,483,996 | 1.30% | fail |
+| core | 87,485,698 | 86,566,830 | 98.95% | 304,736,083 | 10,003,290 | 3.28% | pass |
+| wide | 111,204,281 | 106,889,528 | 96.12% | 281,945,922 | 3,673,570 | 1.30% | fail |
 
 By mode:
 
 | Zone list | Mode | Both-in trips | Share with fee | Pass-through trips | Share with fee |
 |---|---|---:|---:|---:|---:|
-| core | uber | 39,093,412 | 99.83% | 192,259,274 | 2.68% |
-| core | lyft | 14,109,185 | 98.50% | 74,809,893 | 2.99% |
-| core | yellow | 29,895,561 | 97.92% | 21,477,858 | 9.73% |
-| core | green | 547 | 7.13% | 798,763 | 1.53% |
-| wide | uber | 47,335,737 | 97.86% | 183,278,370 | 1.19% |
-| wide | lyft | 17,337,235 | 96.67% | 71,259,073 | 1.32% |
-| wide | yellow | 40,972,253 | 93.82% | 12,474,785 | 2.84% |
-| wide | green | 17,319 | 46.08% | 704,351 | 0.81% |
+| core | uber | 41,396,331 | 99.83% | 202,479,975 | 2.69% |
+| core | lyft | 14,696,862 | 98.52% | 78,889,738 | 2.96% |
+| core | yellow | 31,391,895 | 97.99% | 22,526,017 | 9.82% |
+| core | green | 610 | 7.38% | 840,353 | 1.56% |
+| wide | uber | 50,107,677 | 97.87% | 192,991,256 | 1.19% |
+| wide | lyft | 18,049,640 | 96.68% | 75,173,385 | 1.31% |
+| wide | yellow | 43,028,817 | 93.87% | 13,040,019 | 2.90% |
+| wide | green | 18,147 | 45.92% | 741,262 | 0.84% |
 
-Months below 98% (listed; the check is on the totals): core 2026-05 (96.76%), wide 2025-02 (96.16%), wide 2025-03 (96.06%), wide 2025-04 (96.07%), wide 2025-05 (95.95%), wide 2025-06 (96.09%), wide 2025-07 (96.38%), wide 2025-08 (96.03%), wide 2025-09 (96.10%), wide 2025-10 (96.08%), wide 2025-11 (96.19%), wide 2025-12 (95.84%), wide 2026-01 (95.83%), wide 2026-02 (96.33%), wide 2026-03 (96.50%), wide 2026-04 (96.49%), wide 2026-05 (93.79%), wide 2026-06 (95.90%), wide 2026-07 (97.05%), wide 2026-08 (97.06%)
+Months below 98% (listed; the check is on the totals): core 2026-05 (96.76%), wide 2025-02 (96.16%), wide 2025-03 (96.06%), wide 2025-04 (96.07%), wide 2025-05 (95.95%), wide 2025-06 (96.09%), wide 2025-07 (96.38%), wide 2025-08 (96.03%), wide 2025-09 (96.10%), wide 2025-10 (96.08%), wide 2025-11 (96.19%), wide 2025-12 (95.84%), wide 2026-01 (95.83%), wide 2026-02 (96.33%), wide 2026-03 (96.50%), wide 2026-04 (96.49%), wide 2026-05 (93.79%), wide 2026-06 (95.90%), wide 2026-07 (97.05%), wide 2026-08 (97.06%), wide 2026-09 (96.72%)
 
 ## Schema
 
-**PASS**: 96 files, no unmapped, missing or mistyped columns
+**PASS**: 99 files, no unmapped, missing or mistyped columns
 
-Footers of 96 trip files (0 local, 96 read over HTTP, D11) checked against `config/schema_map.yaml` by `pipeline.discover`, the same check as `python -m pipeline.discover --check`.
+Footers of 99 trip files (0 local, 99 read over HTTP, D11) checked against `config/schema_map.yaml` by `pipeline.discover`, the same check as `python -m pipeline.discover --check`.
 
 No problems.
 
@@ -207,16 +211,16 @@ From `agg_fee_values`, months from 2025-01 (congestion pricing began on 2025-01-
 
 | Mode | Configured fee | Trips with a fee | At configured fee | Share | Status |
 |---|---:|---:|---:|---:|---|
-| uber | $1.50 | 98,955,408 | 98,955,408 | 100.00% | pass |
-| lyft | $1.50 | 37,745,537 | 37,745,289 | 100.00% | pass |
-| yellow | $0.75 | 56,219,671 | 56,219,471 | 100.00% | pass |
-| green | $0.75 | 82,507 | 82,507 | 100.00% | pass |
+| uber | $1.50 | 104,385,855 | 104,385,855 | 100.00% | pass |
+| lyft | $1.50 | 39,319,210 | 39,318,954 | 100.00% | pass |
+| yellow | $0.75 | 59,140,562 | 59,140,362 | 100.00% | pass |
+| green | $0.75 | 87,571 | 87,571 | 100.00% | pass |
 
 Other values found:
 
 | Mode | cbd_fee | Trips |
 |---|---:|---:|
-| lyft | 3.0 | 235 |
+| lyft | 3.0 | 243 |
 | lyft | 4.5 | 13 |
 | yellow | 1.25 | 133 |
 | yellow | 1.5 | 65 |
