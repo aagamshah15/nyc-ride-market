@@ -124,6 +124,11 @@ All gate checks run in the integrator space. G1, G3, G4, G5 and G6 are SPEC §11
 
 ### Gate log
 
+- **First monthly refresh, 2 Nov 2026.** GitHub skipped the first Monday 14:00 UTC slot, so the refresh was dispatched by hand on `main` ([run 41528239100](https://github.com/aagamshah15/nyc-ride-market/actions/runs/41528239100), all four jobs green).
+  - The D30 revision check ran for the first time on GitHub: 2026-06 → 2026-08 unchanged, and no issue opened.
+  - 2026-09 was processed, validated and published: `github-actions[bot]` commit `c96f20f`, Release `data-2026-09`.
+  - The About page (D31) is live.
+  - The local `data/agg/` is still through 2026-08; restore 2026-09 with `python -m pipeline.release download` and then `unpack` before local work on the data.
 - **G6, 1 Nov 2026: passed. v1 is live at https://aagamshah15.github.io/nyc-ride-market/** (the user said "Yes, launch"; SPEC §11 phase 5).
   - **Refresh workflow ran once end to end:** [run 41362907480](https://github.com/aagamshah15/nyc-ride-market/actions/runs/41362907480) on `main`, `month: 2026-08`, all four jobs green. `github-actions[bot]` committed `cc76515`, Pages deployed, Release `data-2026-08` was refreshed, about 5 minutes in all (`reports/runner_check.md`). Two first-run fixes on the way:
     - `.venv/bin` on PATH in the refresh job (`472bb5a`);
