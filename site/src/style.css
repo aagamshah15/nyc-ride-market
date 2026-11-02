@@ -331,3 +331,107 @@ table,
     font-size: 24px;
   }
 }
+
+/* Explainer with margin notes (components/notes.js, D33). One column by default: the notes stack
+   under the text without arrows. When the main column has room past the text, the notes move into
+   the right-hand gutter and pencil arrows point back at the text. */
+.nrm-explainer-wrap {
+  container-type: inline-size;
+  margin: 1.5rem 0 1rem;
+}
+.nrm-explainer {
+  display: grid;
+  gap: 1rem;
+}
+.nrm-explainer-body {
+  max-width: 760px;
+}
+.nrm-explainer-body h2 {
+  margin-top: 0;
+}
+.nrm-margin-notes {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 0.9rem;
+  border-left: dashed 1px var(--theme-foreground-faint);
+  display: grid;
+  gap: 0.6rem;
+  max-width: 760px;
+}
+.nrm-margin-note {
+  font: 18px/1.3 "Bradley Hand", "Segoe Print", "Chalkboard SE", "Comic Sans MS", cursive;
+  color: var(--theme-foreground-muted);
+}
+.nrm-arrow {
+  display: none;
+}
+@container (min-width: 1000px) {
+  .nrm-explainer {
+    grid-template-columns: minmax(0, 760px) minmax(12rem, 17rem);
+    column-gap: 7.5rem;
+    align-items: start;
+  }
+  .nrm-margin-notes {
+    border-left: none;
+    padding: 0.4rem 0 0;
+    gap: 1.6rem;
+  }
+  .nrm-margin-note {
+    position: relative;
+    transform: rotate(calc(-1.2deg + var(--i) * 1deg));
+  }
+  .nrm-arrow {
+    display: block;
+    position: absolute;
+    right: calc(100% + 0.3rem);
+    top: -0.7rem;
+    width: 7.25rem;
+    height: 3.6rem;
+    overflow: visible;
+  }
+}
+.nrm-pencil-line,
+.nrm-pencil-ghost {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+}
+.nrm-pencil-line {
+  stroke-width: 2;
+}
+.nrm-pencil-ghost {
+  stroke-width: 1.1;
+  opacity: 0.4;
+}
+.nrm-margin-note > span {
+  opacity: 0;
+}
+.nrm-drawn .nrm-margin-note > span {
+  animation: nrm-fade 500ms ease-out forwards;
+  animation-delay: calc(var(--i) * 450ms);
+}
+.nrm-drawn .nrm-shaft {
+  animation: nrm-draw 750ms ease-in-out forwards;
+  animation-delay: calc(var(--i) * 450ms + 250ms);
+}
+.nrm-drawn .nrm-head {
+  animation: nrm-draw 220ms ease-out forwards;
+  animation-delay: calc(var(--i) * 450ms + 1000ms);
+}
+@keyframes nrm-draw {
+  to { stroke-dashoffset: 0; }
+}
+@keyframes nrm-fade {
+  to { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nrm-margin-note > span { opacity: 1; animation: none !important; }
+  .nrm-pencil-line, .nrm-pencil-ghost { stroke-dashoffset: 0; animation: none !important; }
+}
+@media print {
+  .nrm-margin-note > span { opacity: 1; }
+  .nrm-pencil-line, .nrm-pencil-ghost { stroke-dashoffset: 0; }
+}

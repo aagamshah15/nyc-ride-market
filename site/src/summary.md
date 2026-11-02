@@ -41,7 +41,8 @@ const themeFindings = (t) => t.questions.map((q) => byQuestion.get(q)).filter(Bo
 ```
 
 ```js
-display(mockBanner(home));
+const banner = mockBanner(home);   // nothing for validated real data
+if (banner) display(banner);
 ```
 
 # Executive summary

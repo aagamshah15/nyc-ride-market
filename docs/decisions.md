@@ -290,3 +290,19 @@ Reason: the home page leads with findings and the methods page covers the how in
 - **Prints as a short report:** a "Print or save as PDF" button, and print styles that hide the sidebar.
 
 Reason: the findings are spread over ten page types, and SPEC has no single page that reads as a brief for decision-makers.
+
+## D33 · Explainers with margin notes on the cab pages
+
+2 Nov 2026 · SPEC §9.3, §9.5 · L05, L13 (closed; integrator) · **Status: requested by the user 2 Nov 2026**
+
+- **Cab explainers:** `/companies/yellow` and `/companies/green` gain a short "What is a yellow cab?" / "What is a green cab?" description under the tiles.
+  - The descriptions state TLC licensing rules: medallions and street hails anywhere for yellow; street-hail liveries limited to outside the Manhattan core and the airports for green; the same metered rates for both.
+  - Three factoids each. Facts are written in the page; figures (share of trips, month) come from the company's JSON.
+- **New component `components/notes.js` (`explainer`):**
+  - On wide screens the notes sit in the empty right-hand gutter, in a handwritten-style system font, each tied to the text by a pencil-drawn arrow: a sketched SVG with a grain filter and a faint offset stroke. The arrow draws itself in when the block scrolls into view.
+  - When the main column is narrower than 1,000 px, and on phones, the notes stack under the text, without arrows.
+  - Reduced motion and print show everything at once.
+  - Strokes use `currentColor` and the theme's muted text colour, so no colour comes from outside `palette.js`.
+- Uber and Lyft pages are unchanged.
+
+Reason: readers outside New York don't know what separates yellow and green cabs, and the cab pages had unused space beside the text on wide screens.

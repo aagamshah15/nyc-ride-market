@@ -10,6 +10,8 @@ title: Company profile
 import {pageHeader, howWeMeasured, notReported, emptyState, compareTable, html} from "../components/page.js";
 import {shareLine, lineChart, fareRange, sourceCaption} from "../components/charts.js";
 import {countTiles, gapScatter, latestAndYearEarlier, tipSeriesLabel} from "./company.js";
+import {explainer} from "../components/notes.js";
+import * as format from "../components/format.js";
 ```
 
 ```js
@@ -32,6 +34,33 @@ const chartOr = (what, rows, subtitle, draw) =>
 ```js
 display(pageHeader(data, tiles, {keys: ["trips_per_day", "share", "fpm_median", "driver_share", "tip_rate"]}));
 if (cardOnlyTips) display(html`<p class="nrm-note">The tip rate is card-only: TLC records cab tips on card payments only.</p>`);
+```
+
+```js
+// What a yellow or a green cab is, for readers who don't know New York's taxi rules (D33). The rules
+// are TLC licensing facts, so they're written here; the figures come from this page's JSON.
+const thisMonth = html`${format.share(data.tiles.share)} of NYC trips in ${format.asOf(asOf)}`;
+const EXPLAINERS = {
+  yellow: {
+    title: "What is a yellow cab?",
+    body: html`<p>Yellow cabs are New York's medallion taxis. Each one needs a medallion, a city license whose number is capped, and they're the only vehicles allowed to pick up street hails anywhere in the five boroughs, including the Manhattan core and the airport taxi stands. Fares run on the meter at rates the TLC sets, plus fixed surcharges, and trips between JFK and Manhattan pay a flat fare.</p>`,
+    notes: [
+      "The only cars that can stop for a street hail anywhere in the city",
+      thisMonth,
+      "Metered fares set by the TLC, so no surge pricing"
+    ]
+  },
+  green: {
+    title: "What is a green cab?",
+    body: html`<p>Green cabs, officially street-hail liveries and often called boro taxis, were created to serve the parts of the city where yellow cabs rarely cruise. They can pick up street hails in the Bronx, Brooklyn, Queens, Staten Island and northern Manhattan, but not in the Manhattan core or at the airports, and they can drop passengers off anywhere. They charge the same metered rates as yellow cabs.</p>`,
+    notes: [
+      "Street hails only outside the Manhattan core and the airports",
+      thisMonth,
+      "Drop-offs anywhere in the city, pickups in their own area"
+    ]
+  }
+};
+if (EXPLAINERS[data.mode]) display(explainer(EXPLAINERS[data.mode]));
 ```
 
 ## Share of NYC trips
