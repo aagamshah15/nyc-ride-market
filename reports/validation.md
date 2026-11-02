@@ -1,6 +1,6 @@
 # Validation report
 
-Generated 2026-11-02 21:27 UTC by `make validate` (`pipeline/validate.py`). Don't edit by hand. SPEC §8 and §7.2 set the checks; the thresholds are never widened to pass.
+Generated 2026-11-02 22:06 UTC by `make validate` (`pipeline/validate.py`). Don't edit by hand. SPEC §8 and §7.2 set the checks; the thresholds are never widened to pass.
 
 **Status: PASS** · months checked: 2024-01 → 2026-09 (33 months)
 
