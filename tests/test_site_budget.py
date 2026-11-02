@@ -6,7 +6,8 @@ after `make site-mock`, real data after `make publish`. Skips when that folder h
 (a fresh checkout).
 
 Components: format.js against the contracts/README.md §3 examples, palette.js against SPEC §9.5,
-no literal colours elsewhere in site/src, and every component parses. These run in Node.
+filters.js's selection descriptions (D34), no literal colours elsewhere in site/src, and every
+component parses. These run in Node.
 """
 
 import json
@@ -115,9 +116,18 @@ def test_flags_missing_files(tmp_path):
 needs_node = pytest.mark.skipif(shutil.which("node") is None, reason="node not installed")
 
 
-def _node_eval(module: str, expressions: list[str]) -> list:
+# Framework resolves `npm:` imports at build time; Node can't, so a component that imports one
+# (through page.js) gets an empty stand-in for each.
+STUB_NPM = """import {registerHooks} from "node:module";
+const stub = "data:text/javascript," + encodeURIComponent("export const html = () => null, svg = () => null;");
+registerHooks({resolve: (s, c, next) => (s.startsWith("npm:") ? {url: stub, shortCircuit: true} : next(s, c))});
+"""
+
+
+def _node_eval(module: str, expressions: list[str], stub_npm: bool = False) -> list:
     """Imports a component in Node and returns the JSON value of each expression (`m` is the module)."""
-    script = (f"const m = await import({json.dumps((COMPONENTS / module).as_uri())});\n"
+    script = ((STUB_NPM if stub_npm else "")
+              + f"const m = await import({json.dumps((COMPONENTS / module).as_uri())});\n"
               f"console.log(JSON.stringify([{', '.join(expressions)}]));")
     result = subprocess.run(["node", "--input-type=module", "-e", script], capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
@@ -171,6 +181,37 @@ FORMAT_CASES = [   # contracts/README.md §3 examples, then edges L05 pinned
 def test_format_follows_the_contract():
     got = _node_eval("format.js", [expr for expr, _ in FORMAT_CASES])
     assert dict(zip([e for e, _ in FORMAT_CASES], got)) == dict(FORMAT_CASES)
+
+
+FILTER_CASES = [   # D34: what a filtered chart says in place of its finding
+    ("m.describe({what: m.modePhrase('yellow'), where: 'in Brooklyn', when: m.timePhrase('weekdays', 'evening')})",
+     "Showing yellow cabs in Brooklyn, weekdays 4–8 pm"),
+    ("m.describe({what: m.modePhrase('uber')})", "Showing Uber"),
+    ("m.describe({what: 'trips', where: 'from JFK by Lyft', when: m.hourRange(m.TIME_BANDS.morning)})",
+     "Showing trips from JFK by Lyft, 6–10 am"),
+    ("m.hourRange([0, 6])", "12–6 am"),
+    ("m.hourRange([10, 16])", "10 am–4 pm"),
+    ("m.hourRange([20, 24])", "8 pm–12 am"),
+    ("m.bandOption('evening')", "Evening rush, 4–8 pm"),
+    ("m.bandOption('all')", "All day"),
+    ("m.timePhrase('all', 'midday')", "10 am–4 pm every day"),
+    ("m.timePhrase('weekends')", "weekends"),
+    ("m.timePhrase()", ""),
+    ("m.modePossessive('yellow')", "yellow cabs'"),
+    ("m.modePossessive('uber')", "Uber's"),
+    ("m.modeOption('ride_hail')", "Ride-hail apps"),
+    ("m.list(['Uber', 'Lyft', 'yellow cabs'])", "Uber, Lyft and yellow cabs"),
+    ("m.inWeek(2 * 24 + 17, 'weekdays', 'evening')", True),   # Tue 5 pm
+    ("m.inWeek(6 * 24 + 17, 'weekdays', 'evening')", False),  # Sat 5 pm
+    ("m.inWeek(2 * 24 + 20, 'weekdays', 'evening')", False),  # Tue 8 pm: bands end before their last hour
+    ("m.inBand(23, 'all')", True),
+]
+
+
+@needs_node
+def test_filter_descriptions():
+    got = _node_eval("filters.js", [expr for expr, _ in FILTER_CASES], stub_npm=True)
+    assert dict(zip([e for e, _ in FILTER_CASES], got)) == dict(FILTER_CASES)
 
 
 SPEC_PALETTE = {   # SPEC §9.5

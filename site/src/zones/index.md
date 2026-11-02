@@ -6,9 +6,12 @@ title: Zones
 // /zones (D13; L14): the city-wide zone maps (Q1, Q10) and a searchable table linking to each
 // zone page. Every number, title and subtitle comes from zones/index.json. Thin zones
 // (flags.thin, Newark Airport included) are left out of the maps, so they draw hatched.
+// Page filters (D34): borough and a pick of zones; the maps fade the zones outside the selection and
+// the tables list only the selection, with a description of it in place of the finding.
 import * as format from "../components/format.js";
 import {choropleth, sourceCaption} from "../components/charts.js";
-import {pageHeader, howWeMeasured, siteUrl, html} from "../components/page.js";
+import {pageHeader, howWeMeasured, siteUrl, emptyState, html} from "../components/page.js";
+import {filterBar, describe} from "../components/filters.js";
 ```
 
 ```js
@@ -24,21 +27,49 @@ const zoneHref = (zone) => siteUrl(`zones/${zone}`);
 const mapped = index.rows.filter((d) => !d.thin);
 const thinLabel = "Too few trips";
 const thinNames = [...new Set(index.rows.filter((d) => d.thin).map((d) => d.name))];
-const yellowLeads = mapped.filter((d) => d.top_mode === "yellow").sort((a, b) => b.yellow_share - a.yellow_share);
+const yellowLeadsAll = mapped.filter((d) => d.top_mode === "yellow").sort((a, b) => b.yellow_share - a.yellow_share);
 ```
 
 ```js
 display(pageHeader(index, tiles, {keys: ["zones_yellow_leads", "zones_lyft_beats_uber", "zones_rh_share_up"]}));
 ```
 
+```js
+// The city's boroughs (Newark Airport, in New Jersey, is in the airport pick) and the airport zones:
+// Newark, JFK and LaGuardia.
+const BOROUGHS = ["Bronx", "Brooklyn", "Manhattan", "Queens", "Staten Island"];
+const AIRPORT_ZONES = [1, 132, 138];
+const filters = view(filterBar([
+  {key: "borough", label: "Borough", options: ["all", ...BOROUGHS], format: (b) => (b === "all" ? "All boroughs" : b)},
+  {key: "zones", label: "Zones", options: ["all", "cbd", "airports"], radio: true,
+    format: (z) => ({all: "All zones", cbd: "Congestion zone", airports: "Airports"})[z]}
+]));
+```
+
+```js
+const inSelection = (d) => (filters.borough === "all" || d.borough === filters.borough)
+  && (filters.zones === "all" || (filters.zones === "cbd" ? d.cbd : AIRPORT_ZONES.includes(d.zone)));
+const zoneFiltered = filters.changed("borough", "zones");
+const selected = index.rows.filter(inSelection);
+const focus = zoneFiltered ? selected.map((d) => d.zone) : null;
+const yellowLeads = yellowLeadsAll.filter(inSelection);
+const selection = {
+  what: ({all: "zones", cbd: "zones inside the congestion zone", airports: "the airport zones"})[filters.zones],
+  where: filters.borough === "all" ? "" : `in ${filters.borough}`
+};
+// A map's finding, or what it shows when filtered.
+const mapSubtitle = (finding) => (zoneFiltered ? describe({...selection, when: "other zones faded"}) : finding);
+const noZones = () => emptyState(`No ${selection.what.replace(/^the /, "")} ${selection.where}`.trim(), "Choose another borough or set of zones.");
+```
+
 ## How each zone rides
 
 <div class="nrm-pair">
-  <div>${resize((width) => choropleth(geo, mapped, {value: "rh_share", unit: "share", legendLabel: "Ride-hail share of pickups (%)",
-    title: "Ride-hail share of pickups", subtitle: index.subtitles.level_map, href: zoneHref, missingLabel: thinLabel, asOf, width, dark}))}</div>
-  <div>${resize((width) => choropleth(geo, mapped, {value: "share_change_yoy", unit: "share", kind: "diverging",
+  <div>${selected.length ? resize((width) => choropleth(geo, mapped, {value: "rh_share", unit: "share", legendLabel: "Ride-hail share of pickups (%)",
+    title: "Ride-hail share of pickups", subtitle: mapSubtitle(index.subtitles.level_map), href: zoneHref, missingLabel: thinLabel, focus, asOf, width, dark})) : noZones()}</div>
+  <div>${selected.length ? resize((width) => choropleth(geo, mapped, {value: "share_change_yoy", unit: "share", kind: "diverging",
     legendLabel: "Change in ride-hail share vs a year earlier (pts)", title: "Change in ride-hail share",
-    subtitle: index.subtitles.change_map, href: zoneHref, missingLabel: thinLabel, asOf, width, dark}))}</div>
+    subtitle: mapSubtitle(index.subtitles.change_map), href: zoneHref, missingLabel: thinLabel, focus, asOf, width, dark})) : noZones()}</div>
 </div>
 
 ```js
@@ -48,13 +79,13 @@ display(html`<p class="nrm-note">Hatched zones had too few trips in the month to
 ## Where yellow cabs still lead
 
 <div class="nrm-pair">
-  <div>${resize((width) => choropleth(geo, mapped, {value: "yellow_share", unit: "share", legendLabel: "Yellow-cab share of pickups (%)",
-    title: "Yellow-cab share of pickups", subtitle: index.subtitles.yellow_map, href: zoneHref, missingLabel: thinLabel, asOf, width, dark}))}</div>
+  <div>${selected.length ? resize((width) => choropleth(geo, mapped, {value: "yellow_share", unit: "share", legendLabel: "Yellow-cab share of pickups (%)",
+    title: "Yellow-cab share of pickups", subtitle: mapSubtitle(index.subtitles.yellow_map), href: zoneHref, missingLabel: thinLabel, focus, asOf, width, dark})) : noZones()}</div>
   <div class="nrm-chart"><figure>
     <h2>${label("zones_yellow_leads")}</h2>
     <div class="nrm-scroll-x"><table class="nrm-zone-leads">
       <thead><tr><th>Zone</th><th class="nrm-num">${label("yellow_share")}</th><th class="nrm-num">Change vs a year earlier</th><th class="nrm-num">${label("rh_share")}</th></tr></thead>
-      <tbody>${yellowLeads.map((d) => html`<tr>
+      <tbody>${yellowLeads.length ? "" : html`<tr><td colspan="4">None in this selection</td></tr>`}${yellowLeads.map((d) => html`<tr>
         <td><a href=${zoneHref(d.zone)}>${d.name}</a></td>
         <td class="nrm-num">${format.share(d.yellow_share)}</td>
         <td class="nrm-num">${format.shareChange(d.yellow_share_change_yoy)}</td>
@@ -122,8 +153,8 @@ function zoneTable(rows) {
 ```
 
 <div class="nrm-chart"><figure>
-  <h3>${index.subtitles.table}</h3>
-  ${zoneTable(index.rows)}
+  <h3>${zoneFiltered ? describe(selection) : index.subtitles.table}</h3>
+  ${selected.length ? zoneTable(selected) : noZones()}
   <figcaption>${sourceCaption(asOf)} · The median wait is for ride-hail only: cab records have no request time. Click a column to sort it.</figcaption>
 </figure></div>
 

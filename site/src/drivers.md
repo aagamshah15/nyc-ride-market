@@ -5,13 +5,16 @@ title: Drivers
 <!-- L15 · Driver pay, driver share of the fare and hours worked (SPEC §9.1, §9.3; Q5, Q6, Q15). Every
      number, title and subtitle comes from drivers.json and events.json; the page adds none. Pay is per
      hour with a passenger. The August event is the new minimum-pay rule (D28); its event study marks
-     the transition week (D12) and draws the year before as the seasonal reference. -->
+     the transition week (D12) and draws the year before as the seasonal reference. Page filter (D34):
+     company; a chart moved off its default shows a description of its selection in place of its
+     finding. -->
 
 ```js
 import * as format from "./components/format.js";
 import * as palette from "./components/palette.js";
 import {pageHeader, howWeMeasured, html} from "./components/page.js";
 import {lineChart, Plot, sourceCaption, tableView} from "./components/charts.js";
+import {filterBar, describe, modePhrase, modePossessive, none} from "./components/filters.js";
 ```
 
 ```js
@@ -40,25 +43,44 @@ display(pageHeader(data, tiles, {keys: ["pay_per_hour", "driver_share", "trips_p
 display(html`<p class="nrm-note">Pay and driver share cover Uber and Lyft: TLC's cab records carry no driver pay. Pay per hour counts hours with a passenger only, not time spent waiting for a trip. TLC-reported figures come from TLC's monthly indicators, latest month ${format.month(data.tlc_as_of_month)}.</p>`);
 ```
 
+```js
+// "Uber and Lyft" is the default: each app and the two together on the trends, the two together in
+// the event study.
+const filters = view(filterBar([
+  {key: "company", label: "Company", options: ["ride_hail", "uber", "lyft"], radio: true,
+    format: (c) => (c === "ride_hail" ? "Uber and Lyft" : format.modeName(c))}
+]));
+```
+
+```js
+const {company} = filters;
+const oneCompany = filters.changed("company");
+const byCompany = (rows) => (oneCompany ? rows.filter((d) => d.mode === company) : rows);
+const onCompany = `on ${modePhrase(company)}`;
+```
+
 ## Driver share of the fare
 
 ```js
-display(lineChart(data.driver_share_trend, {y: "driver_share", yUnit: "share", yLabel: "Driver share of the base fare (%)", zero: false,
-  events: events.events, subtitle: data.subtitles.driver_share_trend, asOf, width, dark}));
+display(lineChart(byCompany(data.driver_share_trend), {y: "driver_share", yUnit: "share", yLabel: "Driver share of the base fare (%)", zero: false,
+  events: events.events, subtitle: oneCompany ? describe({what: "the driver share of the base fare", where: onCompany}) : data.subtitles.driver_share_trend,
+  asOf, width, dark}));
 ```
 
 ## Pay per hour with a passenger
 
 ```js
-display(lineChart(data.pay_per_hour_trend, {y: "pay_per_hour", yUnit: "usd_per_hour", yLabel: "Driver pay per hour with a passenger ($/hour)",
-  zero: false, events: events.events, subtitle: data.subtitles.pay_per_hour_trend, asOf, width, dark}));
+display(lineChart(byCompany(data.pay_per_hour_trend), {y: "pay_per_hour", yUnit: "usd_per_hour", yLabel: "Driver pay per hour with a passenger ($/hour)",
+  zero: false, events: events.events,
+  subtitle: oneCompany ? describe({what: "driver pay per hour with a passenger", where: onCompany}) : data.subtitles.pay_per_hour_trend,
+  asOf, width, dark}));
 ```
 
 ## The new minimum-pay rule
 
 ```js
 if (payRule) {
-  display(html`<p>The ${payRule.label.toLowerCase()} took effect in ${format.month(payRule.date)}. It lowered the per-mile pay floor and raised the per-minute floor.${inflationStep ? html` An earlier inflation step, in ${format.month(inflationStep.date)}, raised only the per-minute floor.` : null} The chart follows ride-hail pay and fares week by week around the rule, against the same weeks a year earlier.</p>`);
+  display(html`<p>The ${payRule.label.toLowerCase()} took effect in ${format.month(payRule.date)}. It lowered the per-mile pay floor and raised the per-minute floor.${inflationStep ? html` An earlier inflation step, in ${format.month(inflationStep.date)}, raised only the per-minute floor.` : null} The chart follows ${oneCompany ? modePossessive(company) : "ride-hail"} pay and fares week by week around the rule, against the same weeks a year earlier.</p>`);
 }
 ```
 
@@ -142,12 +164,19 @@ function eventStudy(rows, {subtitle, asOf, event, width = 640, dark = palette.is
 ```
 
 ```js
-display(eventStudy(data.event_study.filter((d) => d.mode === "ride_hail"), {subtitle: data.subtitles.event_study, asOf, event: payRule, width, dark}));
+display(eventStudy(data.event_study.filter((d) => d.mode === company), {asOf, event: payRule, width, dark,
+  subtitle: oneCompany
+    ? describe({what: "driver pay and fares", where: `${onCompany} around the ${payRule ? payRule.label.toLowerCase() : "rule"}`})
+    : data.subtitles.event_study}));
 ```
 
 <p class="nrm-note">The shaded week straddles the rule's first day, so it is drawn but left out of the before-and-after comparison. Pay per minute counts minutes with a passenger.</p>
 
 ## Hours on the road
+
+```js
+display(oneCompany ? html`<p class="nrm-note">TLC's monthly indicators count the ride-hail apps together, so these charts don't split by company.</p>` : none());
+```
 
 ```js
 if (hoursFinding && hours.some((d) => d.hours_per_day_per_vehicle != null)) {
