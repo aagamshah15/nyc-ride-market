@@ -260,3 +260,18 @@ Reason: a trip record exists only for a completed trip, and a trip that asked fo
 - **Never blocks the refresh:** a failed check (exit 4) is a warning, and it runs again the next week.
 
 Reason: TLC posts with about a two-month lag and may revise recent months (CLAUDE.md), and D27's 2026-06 tie-out exception rests on TLC's file as published. The first check (1 Nov 2026) found all nine files for 2026-06 → 2026-08 unchanged.
+
+## D31 · An About page and a home-page intro
+
+1 Nov 2026 · SPEC §9.1 (routes) · L12 (closed; integrator) · **Status: accepted by the user 1 Nov 2026**
+
+- **New route `/about`** (`site/src/about.md`, last in the nav). It covers:
+  - why the site exists (the 2025 congestion-pricing and minimum-pay changes, and data that's public but not usable as published);
+  - how it works (public records only, flag-don't-delete cleaning, the validation gate, measures defined once, the weekly refresh);
+  - who can use it and for what, built from SPEC Appendix A's "who acts on it" column, with links to the pages;
+  - what it isn't (not affiliated, estimated effects not proof of cause, only completed trips).
+  - Prose only: the date range, trips a day and policy dates come from `home.json`, `share_monthly.json` and `events.json` (listed for the route in `contracts/site/pages.yaml`).
+- **Home page:** a one-sentence intro under the tiles links to `/about`. The page stays findings-first, as SPEC §9.3 has it.
+- **The repo `README.md`** gives the same why, who and how for GitHub visitors.
+
+Reason: the home page leads with findings and the methods page covers the how in detail, but nothing said in one place why the project exists or whom it serves.

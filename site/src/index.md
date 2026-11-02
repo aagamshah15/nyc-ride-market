@@ -37,7 +37,9 @@ const effectValue = (question) => home.findings.find((f) => f.question === quest
 display(pageHeader(home, tiles, {keys: ["trips_per_day", "rh_share", "platform_share", "cbd_fees_last_month"]}));
 ```
 
-<p class="nrm-note">Uber, Lyft, yellow cabs and green cabs, from NYC TLC trip records. Platform share is the part of Uber and Lyft base fares that doesn't go to the driver.</p>
+An independent look at New York City's ride market (Uber, Lyft, yellow cabs and green cabs), built from the trip records the TLC publishes and refreshed as each month arrives. [Why it exists, how it's built and who it's for.](./about)
+
+<p class="nrm-note">Platform share is the part of Uber and Lyft base fares that doesn't go to the driver.</p>
 
 ## Who carries New York's trips
 

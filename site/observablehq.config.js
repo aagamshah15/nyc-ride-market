@@ -24,7 +24,8 @@ const NAV = [
   {name: "Airports", path: "/airports", source: "airports.md"},
   {name: "Drivers", path: "/drivers", source: "drivers.md"},
   {name: "Prices", path: "/prices", source: "prices.md"},
-  {name: "Methods", path: "/methods", source: "methods.md"}
+  {name: "Methods", path: "/methods", source: "methods.md"},
+  {name: "About", path: "/about", source: "about.md"}   // D31
 ];
 
 export default {

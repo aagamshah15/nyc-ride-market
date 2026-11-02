@@ -56,3 +56,7 @@ routes:
     source: methods.md
     files: [quality.json, congestion.json, events.json]   # the download links fetch only on click
     methods: null
+  /about:                                                  # D31: why, how and who it's for
+    source: about.md
+    files: [home.json, share_monthly.json, events.json]
+    methods: null
